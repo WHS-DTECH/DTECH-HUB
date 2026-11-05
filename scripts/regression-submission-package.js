@@ -280,7 +280,18 @@ async function testEndpoints() {
     await chain[0](req, res, () => chain[1](req, res));
     return res;
   };
+  const confirm = async (ready = true, overrides = {}, identity = email) => {
+    const current = data.context.copies.find((copy) => copy.templateId === "final-submission-package");
+    const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, set() { return this; }, json(value) { this.body = value; return this; } };
+    await handlers.get("POST /api/activities/:id/submission-package/ready")[0]({
+      email: identity, params: { id: "49" },
+      body: { ready, fileUrl: current?.fileUrl, builtAt: current?.submissionPackage?.builtAt, ...overrides }
+    }, res);
+    return res;
+  };
   try {
+    assert.equal((await confirm()).statusCode, 409, "No ZIP means no readiness confirmation");
+    assert.equal((await confirm(true, {}, "")).statusCode, 401);
     assert.equal((await request("GET", {}, "")).statusCode, 401);
     assert.equal((await request("GET")).body.components.length, 6);
     assert.equal((await request("POST", { action: "check" })).statusCode, 400);
@@ -297,11 +308,21 @@ async function testEndpoints() {
     const saved = await request("POST", { action: "save", snapshotId, driveAccessToken: "student-token" });
     assert.equal(saved.statusCode, 200);
     assert.equal(saved.body.saved.submissionPackage.components.length, 4);
-    assert.equal(saved.body.emailNotification.status, "sent");
-    assert.ok(saved.body.saved.submissionPackage.notifiedAt);
+    assert.equal(emails.length, 0, "Saving a package no longer emails teachers");
+    assert.equal((await notify(email)).statusCode, 409, "Staff cannot claim readiness on the student's behalf");
+    assert.equal((await confirm("true")).statusCode, 400);
+    assert.equal((await confirm(true, { builtAt: "old" })).statusCode, 409, "Stale package confirmations are rejected");
+    assert.equal((await confirm(true, { fileUrl: fileUrl("another-student") })).statusCode, 409);
+    const packageRecord = data.context.copies.find((copy) => copy.templateId === "final-submission-package");
+    packageRecord.submissionPackage.notifiedAt = date;
+    assert.equal((await confirm()).body.emailNotification.status, "sent", "Legacy package notifications do not suppress readiness emails");
+    assert.ok((await request("GET")).body.saved.submissionPackage.readyConfirmedAt);
+    assert.ok((await request("GET")).body.saved.submissionPackage.readyNotifiedAt);
     assert.equal(emails.length, 1);
     assert.deepEqual(Array.from(emails[0].to), ["lead@school.test"]);
-    assert.equal(emails[0].emailType, "final_submission_package");
+    assert.equal(emails[0].emailType, "final_submission_ready");
+    assert.match(emails[0].subject, /Ready to submit/);
+    assert.match(emails[0].html, /ticked the Final Step/);
     assert.match(emails[0].html, /Student &lt;Name&gt;/);
     assert.match(emails[0].html, /Task-List-Documentation.pdf/);
     assert.match(emails[0].html, /not submission to Hapara/);
@@ -311,31 +332,45 @@ async function testEndpoints() {
     assert.equal(uploads[0].buffer, undefined);
     assert.equal((await request("GET")).body.saved.fileUrl, fileUrl("submission-zip"));
     assert.equal((await request("POST", { action: "save", snapshotId, driveAccessToken: "student-token" })).body.reused, true);
+    assert.ok((await request("GET")).body.saved.submissionPackage.readyConfirmedAt,
+      "Retrying the same ZIP save preserves the student's confirmation");
     assert.equal(uploads.length, 1);
     assert.equal(emails.length, 1, "Retrying the same saved package does not email again");
-    delete data.context.copies.find((copy) => copy.templateId === "final-submission-package").submissionPackage.notifiedAt;
+    assert.equal((await confirm()).body.emailNotification.status, "already_sent");
+    assert.equal((await confirm(false)).body.saved.submissionPackage.readyConfirmedAt, "");
+    assert.equal((await confirm()).body.emailNotification.status, "already_sent", "Reticking the same package does not spam teachers");
+    delete data.context.copies.find((copy) => copy.templateId === "final-submission-package").submissionPackage.readyNotifiedAt;
     emailFails = true;
-    const failedNotification = await request("POST", { action: "save", snapshotId, driveAccessToken: "student-token" });
+    const errorsBefore = notificationErrors.length;
+    const failedNotification = await confirm();
     assert.equal(failedNotification.statusCode, 200, "An email failure does not invalidate a saved ZIP");
     assert.equal(failedNotification.body.emailNotification.status, "failed");
-    assert.equal(notificationErrors.length, 1, "Notification failure is logged");
-    assert.ok(!failedNotification.body.saved.submissionPackage.notifiedAt);
+    assert.equal(notificationErrors.length, errorsBefore + 1, "Notification failure is logged");
+    assert.ok(!failedNotification.body.saved.submissionPackage.readyNotifiedAt);
+    assert.ok(failedNotification.body.saved.submissionPackage.readyConfirmedAt, "Email failure preserves readiness");
     emailFails = false;
-    assert.equal((await request("POST", { action: "save", snapshotId, driveAccessToken: "student-token" })).body.emailNotification.status, "sent");
+    assert.equal((await confirm()).body.emailNotification.status, "sent");
     assert.equal(emails.length, 2, "A failed email can be retried on the same saved package");
     assert.equal((await notify(email, false)).statusCode, 403, "Students cannot trigger staff catch-up emails");
     assert.equal((await notify("invalid")).statusCode, 400);
     assert.equal((await notify("missing@westlandhigh.school.nz")).statusCode, 404);
     assert.equal((await notify(email)).body.emailNotification.status, "already_sent");
-    delete data.context.copies.find((copy) => copy.templateId === "final-submission-package").submissionPackage.notifiedAt;
+    delete data.context.copies.find((copy) => copy.templateId === "final-submission-package").submissionPackage.readyNotifiedAt;
     const originalBuiltAt = saved.body.saved.submissionPackage.builtAt;
     assert.equal((await notify(email)).body.emailNotification.status, "sent");
     assert.equal(emails.length, 3, "Staff can send a missing notification without rebuilding the package");
     assert.match(emails[2].html, new RegExp(originalBuiltAt.replace(/\./g, "\\.")));
     assert.equal((await notify(email)).body.emailNotification.status, "already_sent");
+    existing = null;
+    const rebuilt = await request("POST", { action: "prepare", manifestHash: checked.body.manifestHash, driveAccessToken: "student-token" });
+    const newSaved = await request("POST", { action: "save", snapshotId: rebuilt.body.snapshot.snapshotId, driveAccessToken: "student-token" });
+    assert.equal(newSaved.statusCode, 200);
+    assert.ok(!newSaved.body.saved.submissionPackage.readyConfirmedAt, "New package needs a fresh confirmation");
+    assert.ok(!newSaved.body.saved.submissionPackage.readyNotifiedAt);
+    assert.equal(emails.length, 3, "Rebuilding alone sends no email");
     data.state.sha = "b".repeat(40);
     assert.equal((await request("POST", { action: "save", snapshotId, driveAccessToken: "student-token" })).statusCode, 409);
-    assert.equal(uploads.length, 1, "A newly outdated package cannot be uploaded as current");
+    assert.equal(uploads.length, 2, "A newly outdated package cannot be uploaded as current");
   } finally { store.close(); }
 }
 
@@ -352,6 +387,11 @@ async function testFrontend() {
   assert.match(html, /id="task-list-hapara-dashboard" class="task-list-hapara-link task-list-hapara-backup" target="_blank" rel="noopener noreferrer" hidden/);
   assert.match(source, /window\.addEventListener\("hub-auth-state-changed", renderHaparaDashboardLink\)/,
     "Dashboard link updates when sign-in or role state changes");
+  const finalCard = html.slice(haparaPosition, checklistPosition);
+  assert.match(finalCard, /type="checkbox" id="task-list-final-ready" disabled/);
+  assert.match(finalCard, /I have checked my Final Package and I am ready to submit/);
+  assert.match(source, /handleFinalStepConfirmation\(event\.target\.checked\)/);
+  assert.match(source, /#task-list-final-email-retry.*handleFinalStepConfirmation\(true\)/);
   const elements = new Map();
   const makeElement = () => ({ hidden: false, disabled: false, textContent: "", children: [], href: "",
     replaceChildren() { this.children = []; }, append(...children) { this.children.push(...children); },
@@ -366,12 +406,25 @@ async function testFrontend() {
   const actions = [];
   let failSave = false;
   let emailNotificationFails = false;
+  let confirmationFails = false;
   let outdated = false;
   let ready = true;
   const context = vm.createContext({
     document, taskListState: state, hubAccessState: { resolved: true, isStaff: false, isStudent: true },
     isSeniorSubmissionTask: () => true, buildTaskListHeaders: (headers) => headers,
-    loadJson: async () => ({ components: components.map((component) => ({ ...component, status: "unchecked" })), saved }),
+    loadJson: async (url, options) => {
+      if (url.endsWith("/ready")) {
+        if (confirmationFails) throw new Error("Readiness save failed");
+        const body = JSON.parse(options.body);
+        assert.equal(body.fileUrl, saved.fileUrl);
+        assert.equal(body.builtAt, saved.submissionPackage.builtAt);
+        actions.push("confirm");
+        return { saved: { ...saved, submissionPackage: { ...saved.submissionPackage,
+          readyConfirmedAt: body.ready ? date : "", readyNotifiedAt: emailNotificationFails ? "" : date } },
+          emailNotification: { status: emailNotificationFails ? "failed" : "sent" } };
+      }
+      return { components: components.map((component) => ({ ...component, status: "unchecked" })), saved };
+    },
     requestHubDriveAccessToken: async () => { actions.push("permission"); return { access_token: "student-token" }; },
     fetch: async (_url, options) => {
       const body = JSON.parse(options.body);
@@ -382,7 +435,7 @@ async function testFrontend() {
       assert.equal(body.snapshotId, "prepared");
       return { ok: !failSave && !outdated, status: outdated ? 409 : 503,
         json: async () => outdated ? { error: "The final files changed. Check files again." } : failSave ? { error: "Drive unavailable" } : {
-          saved, emailNotification: { status: emailNotificationFails ? "failed" : "sent" }
+          saved
         } };
     }
   });
@@ -409,6 +462,14 @@ async function testFrontend() {
   context.renderHaparaDashboardLink();
   assert.equal(dashboard.hidden, true, "No staff dashboard is guessed when access is unresolved or signed out");
   await context.loadSubmissionStage({ id: "49" });
+  assert.equal(document.querySelector("#task-list-final-ready").disabled, false);
+  assert.equal(document.querySelector("#task-list-final-ready").checked, false);
+  const initiallySaved = state.submissionStage.saved;
+  state.submissionStage.saved = null;
+  context.renderSubmissionStage();
+  assert.equal(document.querySelector("#task-list-final-ready").disabled, true, "Final Step requires a saved package");
+  state.submissionStage.saved = initiallySaved;
+  context.renderSubmissionStage();
   assert.equal(document.querySelector("#task-list-submission-files").children.length, 6);
   assert.equal(document.querySelector("#task-list-submission-build").disabled, true);
   assert.equal(document.querySelector("#task-list-submission-open").hidden, false, "Saved package link survives reload without claiming freshness");
@@ -455,11 +516,24 @@ async function testFrontend() {
   await context.handleSubmissionStageAction("retry");
   assert.deepEqual(actions, ["permission", "save"], "Retry saves the same package without rebuilding");
   emailNotificationFails = true;
-  await context.handleSubmissionStageAction("build");
-  assert.match(state.submissionStage.message, /Your ZIP is saved, but the Lead Teacher email notification failed/);
+  actions.length = 0;
+  await context.handleFinalStepConfirmation(true);
+  assert.deepEqual(actions, ["confirm"], "Final Step does not request Drive permission or rebuild");
+  assert.match(document.querySelector("#task-list-final-ready-status").textContent, /readiness is saved, but the Lead Teacher email failed/);
+  assert.equal(document.querySelector("#task-list-final-ready").checked, true);
+  assert.equal(document.querySelector("#task-list-final-email-retry").hidden, false);
   assert.equal(document.querySelector("#task-list-submission-open").hidden, false, "Saved ZIP remains available when email fails");
-  assert.equal(document.querySelector("#task-list-submission-status").className, "is-error");
   emailNotificationFails = false;
+  await context.handleFinalStepConfirmation(true);
+  assert.equal(document.querySelector("#task-list-final-email-retry").hidden, true);
+  assert.match(document.querySelector("#task-list-final-ready-status").textContent, /Lead Teachers have been emailed/);
+  await context.handleFinalStepConfirmation(false);
+  assert.equal(document.querySelector("#task-list-final-ready").checked, false);
+  confirmationFails = true;
+  await context.handleFinalStepConfirmation(true);
+  assert.equal(document.querySelector("#task-list-final-ready").checked, false, "Failed persistence cannot show a saved tick");
+  assert.match(document.querySelector("#task-list-final-ready-status").textContent, /Readiness save failed/);
+  confirmationFails = false;
   outdated = true;
   await context.handleSubmissionStageAction("build");
   assert.equal(state.submissionStage.ready, false);

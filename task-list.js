@@ -3490,6 +3490,46 @@ function renderSubmissionStage() {
     const marker = tone === "is-success" ? "\u2713 " : tone === "is-error" ? "\u2717 " : "";
     message.className = tone;
     message.textContent = state.message ? `${marker}${state.message}` : "";
+    const confirmation = document.querySelector("#task-list-final-ready");
+    const finalStatus = document.querySelector("#task-list-final-ready-status");
+    const emailRetry = document.querySelector("#task-list-final-email-retry");
+    if (confirmation && finalStatus && emailRetry) {
+        const confirmed = Boolean(state.saved?.submissionPackage?.readyConfirmedAt);
+        const notified = Boolean(state.saved?.submissionPackage?.readyNotifiedAt);
+        confirmation.checked = confirmed;
+        confirmation.disabled = taskListState.submissionBusy || !url;
+        emailRetry.hidden = !confirmed || notified;
+        emailRetry.disabled = taskListState.submissionBusy;
+        finalStatus.textContent = state.finalStepMessage || (confirmed
+            ? notified ? "\u2713 Ready to submit confirmed. Lead Teachers have been emailed. You must still hand in on Hapara."
+                : "Readiness is saved, but the Lead Teacher email has not been sent. Retry the email or let your teacher know."
+            : url ? "Tick when you have checked your Final Package and are ready to hand it in. This emails your Lead Teachers."
+                : "Build and save your Final Package above before confirming you are ready to submit.");
+    }
+}
+
+async function handleFinalStepConfirmation(ready) {
+    const state = taskListState.submissionStage;
+    const item = taskListState.allItems.find((candidate) => String(candidate.id) === taskListState.selectedId);
+    if (!state || !isSeniorSubmissionTask(item) || state.activityId !== taskListState.selectedId || taskListState.submissionBusy) return;
+    taskListState.submissionBusy = true;
+    state.finalStepMessage = ready ? "Saving readiness and notifying Lead Teachers..." : "Removing readiness confirmation...";
+    renderSubmissionStage();
+    try {
+        const payload = await loadJson(`/api/activities/${encodeURIComponent(state.activityId)}/submission-package/ready`, {
+            method: "POST", headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ ready, fileUrl: state.saved?.fileUrl || "", builtAt: state.saved?.submissionPackage?.builtAt || "" })
+        });
+        if (taskListState.submissionStage !== state || taskListState.selectedId !== state.activityId) return;
+        state.saved = payload.saved;
+        state.finalStepMessage = payload.emailNotification?.status === "failed"
+            ? "Your readiness is saved, but the Lead Teacher email failed. Retry the email or let your teacher know." : "";
+    } catch (error) {
+        state.finalStepMessage = error?.message || "Could not save your readiness confirmation. Please retry.";
+    } finally {
+        taskListState.submissionBusy = false;
+        renderSubmissionStage();
+    }
 }
 
 async function loadSubmissionStage(item) {
@@ -3574,10 +3614,7 @@ async function handleSubmissionStageAction(action) {
         state.retryDriveSave = false;
         state.messageTone = "is-success";
         state.message = "Combined final submission ZIP saved in SeniorDTECH / Process Assessment. Use Open saved final submission ZIP (all files) to download it, not the Stage 2 GitHub-only ZIP. No assessment was submitted.";
-        if (saved.emailNotification?.status === "failed") {
-            state.messageTone = "is-error";
-            state.message += " Your ZIP is saved, but the Lead Teacher email notification failed. Please let your teacher know.";
-        }
+        state.finalStepMessage = "";
     } catch (error) {
         state.messageTone = "is-error";
         if (error.status === 409 || error.status === 410) {
@@ -5146,6 +5183,11 @@ async function runTaskListTrelloSync() {
         if (event.target?.closest?.("#task-list-submission-check")) void handleSubmissionStageAction("check");
         else if (event.target?.closest?.("#task-list-submission-build")) void handleSubmissionStageAction("build");
         else if (event.target?.closest?.("#task-list-submission-retry")) void handleSubmissionStageAction("retry");
+        else if (event.target?.closest?.("#task-list-final-email-retry")) void handleFinalStepConfirmation(true);
+    });
+
+    document.addEventListener("change", (event) => {
+        if (event.target?.id === "task-list-final-ready") void handleFinalStepConfirmation(event.target.checked);
     });
 
     document.addEventListener("change", (event) => {

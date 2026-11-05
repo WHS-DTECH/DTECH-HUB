@@ -372,21 +372,27 @@ classification (not the currently selected teacher/student view): staff open
 `https://app.hapara.com/`, students open `https://app.hapara.com/student/`.
 Unknown roles show a sign-in explanation rather than guessing a dashboard.
 
-After a combined Final Package has been uploaded, rechecked and recorded, the
-Hub emails its existing DTECH-HUB Lead Teacher recipients using the configured
-SMTP service. The email identifies the student and assessment, lists the packaged
-files and links to the ZIP (without changing Drive sharing or attaching the ZIP).
-It explicitly does not confirm Hapara submission. Checks, preparation and
-GitHub-only ZIPs do not send this notification. A saved notification timestamp
-prevents ordinary retries of the same saved package from sending another email;
-a newly built package sends a new notification. If notification fails, the ZIP
-remains saved, the server logs the error and the student sees an explicit warning.
-Staff can send a missing notification for an existing saved ZIP with
+Saving the combined Final Package no longer sends an email. In Final Step the
+student ticks **I have checked my Final Package and I am ready to submit**.
+The checkbox is enabled only with a saved combined ZIP. Readiness is persisted
+against that ZIP and triggers an email to the existing DTECH-HUB Lead Teachers.
+The email identifies the student, assessment, confirmation time and packaged
+files, and links to the ZIP without changing sharing or attaching the archive.
+This is a student declaration, not a new automated freshness check or proof of
+Hapara hand-in. Students must still submit in Hapara.
+
+Unchecking clears readiness; it cannot recall an email already sent. Reticking
+the same ZIP does not send another email. A new package resets readiness and
+requires a fresh confirmation. Legacy package-save notifications do not imply
+readiness or suppress this new notification. Email failures leave readiness and
+the ZIP saved, log the error and show a Retry Lead Teacher email button.
+`POST /api/activities/:id/submission-package/ready` uses the signed-in student's
+allocation and checks the submitted ZIP URL/build time against the current saved
+record. Staff can retry a missing email for an already confirmed ZIP with
 `POST /api/activities/:id/submission-package/notify` and a `studentEmail` body.
-This uses Teacher/Admin authentication and the same per-student save lock and
-notification timestamp as normal saves. It does not rebuild the ZIP or require
-student Drive permission. The email retains the original package build date;
-the send timestamp is the actual current time, not backdated.
+Both actions use the same per-student save lock as package creation. They do not
+rebuild the ZIP or require student Drive permission. Notification timestamps use
+the actual send time.
 
 Run `node scripts/regression-submission-package.js` for readiness, staleness,
 exact archive entries, unchanged inner ZIP, corrupt-input rejection, authenticated

@@ -1452,6 +1452,12 @@
                         <h2 id="task-list-hapara-title">Submit to Hapara</h2>
                         <p>After building your Final Submission Package, open the saved final submission ZIP above and submit that combined ZIP to the correct assessment in Hapara.</p>
                         <p><strong>Use the Final-Submission ZIP, not the GitHub-only ZIP.</strong> Building or saving your package here does not submit your assessment.</p>
+                        <label class="task-list-outcome-confirm" for="task-list-final-ready">
+                            <input type="checkbox" id="task-list-final-ready" disabled>
+                            <span>I have checked my Final Package and I am ready to submit.</span>
+                        </label>
+                        <p id="task-list-final-ready-status" role="status" aria-live="polite"></p>
+                        <button type="button" class="task-list-sync-drive-btn" id="task-list-final-email-retry" hidden>Retry Lead Teacher email</button>
                         <div class="task-list-documentation-actions">
                             <p id="task-list-hapara-dashboard-status">Sign in with your school account to show your Hapara dashboard link.</p>
                             <a id="task-list-hapara-dashboard" class="task-list-hapara-link task-list-hapara-backup" target="_blank" rel="noopener noreferrer" hidden>Open Hapara dashboard</a>
@@ -1494,6 +1500,6 @@
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="script.js"></script>
-    <script src="task-list.js?v=video-tools-two-1"></script>
+    <script src="task-list.js?v=final-step-ready-1"></script>
 </body>
 </html>

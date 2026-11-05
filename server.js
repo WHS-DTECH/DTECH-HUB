@@ -6491,6 +6491,8 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
         manifestHash: String(entry?.submissionPackage?.manifestHash || ""),
         builtAt: String(entry?.submissionPackage?.builtAt || ""), bytes: Number(entry?.submissionPackage?.bytes || 0),
         notifiedAt: String(entry?.submissionPackage?.notifiedAt || ""),
+        readyConfirmedAt: String(entry?.submissionPackage?.readyConfirmedAt || ""),
+        readyNotifiedAt: String(entry?.submissionPackage?.readyNotifiedAt || ""),
         components: (Array.isArray(entry?.submissionPackage?.components) ? entry.submissionPackage.components : []).map((component) => ({
           key: String(component.key || ""), entryName: String(component.entryName || ""), fileId: String(component.fileId || ""),
           bytes: Number(component.bytes || 0), md5Checksum: String(component.md5Checksum || ""), modifiedTime: String(component.modifiedTime || ""),
@@ -18326,18 +18328,19 @@ async function notifyFinalSubmissionPackage(email, activityId, saved) {
   const files = saved.submissionPackage.components.map((component) => `<li>${safe(component.entryName)}</li>`).join("");
   await sendConfiguredHubEmail({
     to: recipients,
-    subject: `[DTECH HUB] Final Package saved - ${name.replace(/[\r\n]+/g, " ")} - Task ${activityId}`,
-    html: `<div style="font-family:Arial,sans-serif"><h2>Final Submission Package saved</h2><p><strong>${safe(name)}</strong> (${safe(email)}) has built and saved their combined Final Package for assessment ${safe(activityId)}.</p><p>Package: ${safe(saved.fileName)}</p><p>Built: ${safe(saved.submissionPackage.builtAt)}</p><ul>${files}</ul><p><a href="${safe(saved.fileUrl)}">Open Final Package in Google Drive</a> (normal Drive permissions apply).</p><p>This confirms package creation only, not submission to Hapara.</p></div>`,
-    emailType: "final_submission_package"
+    subject: `[DTECH HUB] Ready to submit - ${name.replace(/[\r\n]+/g, " ")} - Task ${activityId}`,
+    html: `<div style="font-family:Arial,sans-serif"><h2>Student confirmed ready to submit</h2><p><strong>${safe(name)}</strong> (${safe(email)}) has ticked the Final Step to confirm they are ready to submit their combined Final Package for assessment ${safe(activityId)}.</p><p>Confirmed: ${safe(saved.submissionPackage.readyConfirmedAt)}</p><p>Package: ${safe(saved.fileName)}</p><p>Built: ${safe(saved.submissionPackage.builtAt)}</p><ul>${files}</ul><p><a href="${safe(saved.fileUrl)}">Open Final Package in Google Drive</a> (normal Drive permissions apply).</p><p>This confirms student readiness only, not submission to Hapara.</p></div>`,
+    emailType: "final_submission_ready"
   });
 }
 
 async function sendSavedPackageNotification(email, activityId, saved) {
-  if (saved.submissionPackage.notifiedAt) return { status: "already_sent" };
+  if (!saved.submissionPackage.readyConfirmedAt) throw Object.assign(new Error("The student must confirm they are ready to submit in the Final Step first."), { status: 409 });
+  if (saved.submissionPackage.readyNotifiedAt) return { status: "already_sent" };
   await notifyFinalSubmissionPackage(email, activityId, saved);
-  const notified = { ...saved, submissionPackage: { ...saved.submissionPackage, notifiedAt: new Date().toISOString() } };
+  const notified = { ...saved, submissionPackage: { ...saved.submissionPackage, readyNotifiedAt: new Date().toISOString() } };
   await recordTemplateCopyInDb(activityId, email, notified);
-  saved.submissionPackage.notifiedAt = notified.submissionPackage.notifiedAt;
+  saved.submissionPackage.readyNotifiedAt = notified.submissionPackage.readyNotifiedAt;
   return { status: "sent" };
 }
 
@@ -18365,6 +18368,41 @@ app.post("/api/activities/:id/submission-package/notify", requireActivityWriteAc
   } catch (error) {
     console.error("[submission-package] Catch-up notification failed:", error);
     res.status(error.status || 500).json({ error: error.message || "Could not send the saved package notification." });
+  }
+});
+
+app.post("/api/activities/:id/submission-package/ready", async (req, res) => {
+  try {
+    const context = await loadFinalOutcomeContext(req);
+    const { email, activityId } = context;
+    if (typeof req.body?.ready !== "boolean") throw Object.assign(new Error("Choose whether you are ready to submit."), { status: 400 });
+    const result = await withFinalOutcomeLock(`${email}:${activityId}:submission-package-save`, async () => {
+      const latest = await loadFinalOutcomeContext(req);
+      const saved = latest.copies.find((copy) => copy?.templateId === "final-submission-package");
+      if (!saved?.submissionPackage?.builtAt || !/^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(String(saved.fileUrl || ""))) {
+        throw Object.assign(new Error("Build and save your Final Package before confirming you are ready to submit."), { status: 409 });
+      }
+      if (req.body.fileUrl !== saved.fileUrl || req.body.builtAt !== saved.submissionPackage.builtAt) {
+        throw Object.assign(new Error("Your saved Final Package has changed. Reload and confirm the current ZIP."), { status: 409 });
+      }
+      const updated = { ...saved, submissionPackage: { ...saved.submissionPackage,
+        readyConfirmedAt: req.body.ready ? saved.submissionPackage.readyConfirmedAt || new Date().toISOString() : "" } };
+      await recordTemplateCopyInDb(activityId, email, updated);
+      let emailNotification = { status: "not_requested" };
+      if (req.body.ready) {
+        try {
+          emailNotification = await sendSavedPackageNotification(email, activityId, updated);
+        } catch (error) {
+          console.error("[submission-package] Readiness notification failed:", error);
+          emailNotification = { status: "failed" };
+        }
+      }
+      return { saved: updated, emailNotification };
+    });
+    res.set("Cache-Control", "no-store").json(result);
+  } catch (error) {
+    console.error("[submission-package] Readiness confirmation failed:", error);
+    res.status(error.status || 500).json({ error: error.message || "Could not save your readiness confirmation." });
   }
 });
 
@@ -18451,16 +18489,11 @@ app.post("/api/activities/:id/submission-package", async (req, res) => {
         const previous = latestContext.copies.find((copy) => copy?.templateId === "final-submission-package");
         if (previous?.fileUrl === saved.fileUrl && previous?.submissionPackage?.builtAt === saved.submissionPackage.builtAt) {
           saved.submissionPackage.notifiedAt = previous.submissionPackage.notifiedAt || "";
+          saved.submissionPackage.readyConfirmedAt = previous.submissionPackage.readyConfirmedAt || "";
+          saved.submissionPackage.readyNotifiedAt = previous.submissionPackage.readyNotifiedAt || "";
         }
         await recordTemplateCopyInDb(activityId, email, saved);
-        let emailNotification;
-        try {
-          emailNotification = await sendSavedPackageNotification(email, activityId, saved);
-        } catch (error) {
-          console.error("[submission-package] Lead Teacher notification failed:", error);
-          emailNotification = { status: "failed" };
-        }
-        return { saved, reused, emailNotification };
+        return { saved, reused };
       });
     } finally { lease.release(); }
     res.set("Cache-Control", "no-store").json(result);
