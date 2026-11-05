@@ -11,6 +11,26 @@ function extract(start, end) {
     assert.ok(from >= 0 && to > from);
     return source.slice(from, to);
 }
+test("Drive token renewal bypasses the cached token only when explicitly requested", async () => {
+    const requests = [];
+    const context = vm.createContext({
+        getActiveHubDriveAccessToken: () => "cached",
+        getActiveHubGrantedScopes: () => "openid email",
+        hubAuthState: { pendingTokenResolvers: [], tokenClient: {
+            requestAccessToken(options) {
+                requests.push(options.prompt);
+                context.hubAuthState.pendingTokenResolvers.splice(0).forEach((resolve) => resolve({ access_token: "fresh" }));
+            }
+        } },
+        window: { setTimeout: () => 1, clearTimeout() {} }
+    });
+    vm.runInContext(extract("function requestHubDriveAccessToken(", "async function fetchHubDriveSetup("), context);
+    assert.equal((await context.requestHubDriveAccessToken()).access_token, "cached");
+    assert.deepEqual(requests, []);
+    assert.equal((await context.requestHubDriveAccessToken({ forceRefresh: true })).access_token, "fresh");
+    assert.deepEqual(requests, [""]);
+    assert.equal(context.hubAuthState.pendingTokenResolvers.length, 0);
+});
 function fixture() {
     let raw = null;
     const context = vm.createContext({

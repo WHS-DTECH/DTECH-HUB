@@ -1927,7 +1927,7 @@ function refreshTemplateLibraryAccessUi(signedIn = hasAllowedSignedInHubAccount(
 function requestHubDriveAccessToken(options = {}) {
     const forceConsent = Boolean(options?.forceConsent);
     const existingToken = getActiveHubDriveAccessToken();
-    if (existingToken) {
+    if (existingToken && !options.forceRefresh) {
         return Promise.resolve({ access_token: existingToken, scope: getActiveHubGrantedScopes() });
     }
 

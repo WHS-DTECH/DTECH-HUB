@@ -26,6 +26,7 @@
     let revision = 0;
     let classRevision = 0;
     let classData = null;
+    let refreshingReviewEmail = "";
     function node(tag, text, parent, className) {
         const element = document.createElement(tag);
         if (text !== undefined) element.textContent = text;
@@ -57,6 +58,36 @@
         return key === "juniordtech" ? "JuniorDTECH"
             : key === "middledtech" ? "MiddleDTECH"
                 : key === "seniordtech" ? "SeniorDTECH" : "";
+    }
+    async function fetchDocumentReview(url, options = {}) {
+        const email = adminHeaders(true)["x-user-email"];
+        async function renew(forceRefresh) {
+            if (typeof requestHubDriveAccessToken !== "function") {
+                throw new Error("Google sign-in is not ready. Reload this page and try again.");
+            }
+            refreshingReviewEmail = email.toLowerCase();
+            try {
+                const token = await requestHubDriveAccessToken({ forceConsent: false, forceRefresh });
+                if (token?.error || !token?.access_token) {
+                    throw new Error(token?.error || "Google sign-in could not be renewed. Allow the Google sign-in window and try again.");
+                }
+                if (adminHeaders(true)["x-user-email"].toLowerCase() !== email.toLowerCase()) {
+                    throw new Error("Your Google account changed. Refresh the list before reviewing a document.");
+                }
+                return { "x-user-email": email, Authorization: `Bearer ${token.access_token}` };
+            } finally {
+                refreshingReviewEmail = "";
+            }
+        }
+        let headers = adminHeaders(true);
+        if (!headers.Authorization) headers = await renew(false);
+        const send = () => fetch(url, { ...options, headers: { ...options.headers, ...headers } });
+        let response = await send();
+        if (response.status === 401) {
+            headers = await renew(true);
+            response = await send();
+        }
+        return response;
     }
     function courseLabel(value) {
         const key = courseKey(value);
@@ -120,9 +151,9 @@
         submissionStatus.textContent = `Saving Completed for ${student.name} - ${activity.title}...`;
         renderSubmissions(filteredStudents());
         try {
-            const response = await fetch(`/api/admin/kit-document-review/${encodeURIComponent(kit.id)}/${activity.index}`, {
+            const response = await fetchDocumentReview(`/api/admin/kit-document-review/${encodeURIComponent(kit.id)}/${activity.index}`, {
                 method: "PUT",
-                headers: { ...adminHeaders(true), "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: student.email, documentKey: entry.documentKey, approved: checked })
             });
             const saved = await response.json();
@@ -400,7 +431,7 @@
             busy = true;
             buttons();
             try {
-                const response = await fetch(`${path}?email=${encodeURIComponent(email)}`, { headers: adminHeaders(true), cache: "no-store" });
+                const response = await fetchDocumentReview(`${path}?email=${encodeURIComponent(email)}`, { cache: "no-store" });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.error || "Could not read the document review.");
                 if (!live()) return;
@@ -425,8 +456,8 @@
             busy = true;
             buttons();
             try {
-                const response = await fetch(path, {
-                    method: "PUT", headers: { ...adminHeaders(true), "Content-Type": "application/json" },
+                const response = await fetchDocumentReview(path, {
+                    method: "PUT", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email, documentKey, approved })
                 });
                 const data = await response.json();
@@ -513,7 +544,9 @@
             button.disabled = false;
         }
     });
-    window.addEventListener("hub-auth-state-changed", () => {
+    window.addEventListener("hub-auth-state-changed", (event) => {
+        if (refreshingReviewEmail && event.detail?.signedIn
+            && typeof getActiveHubEmail === "function" && getActiveHubEmail().toLowerCase() === refreshingReviewEmail) return;
         revision += 1;
         classRevision += 1;
         classData = null;

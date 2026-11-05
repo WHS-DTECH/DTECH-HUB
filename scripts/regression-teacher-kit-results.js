@@ -8,6 +8,69 @@ const vm = require("node:vm");
 const { registerTeacherResults, ensureTeacherKitChocolateSchema, getTeacherKitCourse } = require("../practical-skills/teacher-results-store");
 const { getHuntProfile } = require("../learning-sites-assessment");
 
+test("document reviews renew expired verification and retry 401 only once", async () => {
+    const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "teacher-results.js"), "utf8");
+    const headers = source.slice(source.indexOf("    function adminHeaders("), source.indexOf("    function courseKey("));
+    const request = source.slice(source.indexOf("    async function fetchDocumentReview("), source.indexOf("    function courseLabel("));
+    const jwt = (exp) => `header.${Buffer.from(JSON.stringify({ exp })).toString("base64url")}.signature`;
+    async function run(auth, statuses, renewalError, changedEmail) {
+        const calls = [], renewals = [];
+        const context = vm.createContext({
+            refreshingReviewEmail: "",
+            localStorage: { getItem: () => JSON.stringify(auth) },
+            sessionStorage: { getItem: () => null },
+            atob: (text) => Buffer.from(text, "base64").toString(),
+            requestHubDriveAccessToken: async (options) => {
+                renewals.push(options.forceRefresh);
+                if (changedEmail) auth.profile.email = changedEmail;
+                return renewalError ? { error: renewalError } : { access_token: "renewed" };
+            },
+            fetch: async (url, options) => {
+                calls.push({ url, ...options });
+                return { status: statuses.shift() || 200 };
+            }
+        });
+        vm.runInContext(headers + request, context);
+        const options = { method: "PUT", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ approved: true, email: "student@school.nz", documentKey: "google-file:ship" }) };
+        let result, error;
+        try { result = await context.fetchDocumentReview("/api/admin/kit-document-review/kit-google-drawings/0", options); }
+        catch (caught) { error = caught.message; }
+        assert.equal(context.refreshingReviewEmail, "", "Refresh state always cleared");
+        for (const call of calls) {
+            assert.equal(call.method, options.method);
+            assert.equal(call.body, options.body);
+            assert.equal(call.headers["Content-Type"], "application/json");
+            assert.equal(call.headers["x-user-email"], "teacher@school.nz");
+        }
+        return { calls, renewals, result, error };
+    }
+    const auth = (idToken, accessToken = "", expiresAt = 0) => ({
+        profile: { email: "teacher@school.nz" }, idToken, accessToken, expiresAt
+    });
+    let result = await run(auth(jwt(Date.now() / 1000 + 600)), [200]);
+    assert.deepEqual(result.renewals, []);
+    assert.match(result.calls[0].headers.Authorization, /^Bearer header\./);
+    result = await run(auth(jwt(1), "live", Date.now() + 60000), [200]);
+    assert.equal(result.calls[0].headers.Authorization, "Bearer live");
+    assert.deepEqual(result.renewals, []);
+    result = await run(auth(jwt(1), "expired", 1), [200]);
+    assert.deepEqual(result.renewals, [false]);
+    assert.equal(result.calls[0].headers.Authorization, "Bearer renewed");
+    result = await run(auth(null), [200]);
+    assert.deepEqual(result.renewals, [false]);
+    result = await run(auth(jwt(Date.now() / 1000 + 600)), [401, 401]);
+    assert.deepEqual(result.renewals, [true]);
+    assert.equal(result.calls.length, 2);
+    assert.equal(result.result.status, 401, "Second rejection remains an error for the caller");
+    result = await run(auth(null), [], "Google sign-in was closed");
+    assert.match(result.error, /sign-in was closed/);
+    assert.equal(result.calls.length, 0);
+    result = await run(auth(null), [], null, "another@school.nz");
+    assert.match(result.error, /account changed/);
+    assert.equal(result.calls.length, 0, "Never review as a newly selected account");
+});
+
 test("teacher course groups require enrolment, not just a year-level folder", () => {
     for (const year of [9, 10]) {
         for (const programs of [[], ["COMP"], ["MPROG"], ["DTECH"]]) {
@@ -406,17 +469,26 @@ test("submissions list follows the class filters, links drawings and saves teach
             1: { url: "", documentKey: "", submittedAt: null, completed: false } } } }] };
     const puts = [];
     const auths = [];
+    const authEvents = {};
     const context = vm.createContext({
         document: { getElementById: el, querySelector: el, createElement: element },
-        window: { addEventListener() {}, location: { search: "?kit=kit-google-drawings&student=ana%40school.nz" } },
+        window: { addEventListener(name, listener) { authEvents[name] = listener; },
+            location: { search: "?kit=kit-google-drawings&student=ana%40school.nz" } },
         URLSearchParams,
         localStorage: { getItem: () => JSON.stringify({ profile: { email: "admin@school.nz" }, idToken: null,
             accessToken: "oauth-teacher", expiresAt: Date.now() + 60000 }) },
+        getActiveHubEmail: () => "admin@school.nz",
+        requestHubDriveAccessToken: async (options) => {
+            assert.equal(options.forceRefresh, true);
+            authEvents["hub-auth-state-changed"]({ detail: { signedIn: true } });
+            return { access_token: "renewed-teacher" };
+        },
         Option: function (text, value) { return { textContent: text, value }; },
         fetch: async (url, options) => {
             if (options?.method === "PUT") {
                 puts.push({ url, body: JSON.parse(options.body) });
                 auths.push(options.headers.Authorization);
+                if (puts.length === 2) return { ok: false, status: 401, json: async () => ({ error: "Verify sign-in" }) };
                 return { ok: true, json: async () => ({ verification: { passed: JSON.parse(options.body).approved }, completedActivities: {} }) };
             }
             return { ok: true, json: async () => url.includes("kit-submissions") ? submissions
@@ -451,6 +523,14 @@ test("submissions list follows the class filters, links drawings and saves teach
     assert.deepEqual(auths, ["Bearer oauth-teacher"], "Popup (OAuth) sign-in can tick Completed");
     assert.equal(rows()[0].children[3].children[0].children[0].checked, true);
     assert.match(el("submission-status").textContent, /Ticked Completed for Ana - Ship/);
+    const revoke = rows()[0].children[3].children[0].children[0];
+    revoke.checked = false;
+    await revoke.events.change();
+    assert.equal(puts.length, 3, "Rejected write is retried once after token renewal");
+    assert.equal(auths[2], "Bearer renewed-teacher");
+    assert.equal(rows()[0].children[3].children[0].children[0].checked, false,
+        "Same-account token refresh keeps the current list and applies the saved result");
+    assert.match(el("submission-status").textContent, /Removed Completed for Ana - Ship/);
     el("class-kit-filter").value = "kit-login";
     el("class-kit-filter").events.change();
     assert.equal(host.children.length, 0, "Submissions follow the kit filter");
