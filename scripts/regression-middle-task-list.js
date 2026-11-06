@@ -1336,12 +1336,17 @@ assert.match(taskList, /level === "Excellence" && !isMiddleDtech/);
             } };
     }
     const management = row("Project management"), decomposition = row("Decomposition"), trialling = row("Trialling");
+    decomposition.parentElement = { prepend(moved) {
+        projectRows.splice(projectRows.indexOf(moved), 1);
+        projectRows.unshift(moved);
+    } };
     const efficient = row("Efficient tools");
     projectRows.push(management, decomposition, trialling);
     mediaRows.push(efficient);
     const host = { querySelector: () => decomposition, querySelectorAll: () => [...mediaRows] };
     placementContext.moveMiddleDtechEfficientTools(host);
-    assert.deepEqual(projectRows.map(entry => entry.name), ["Project management", "Decomposition", "Efficient tools", "Trialling"]);
+    assert.deepEqual(projectRows.map(entry => entry.name), ["Decomposition", "Project management", "Efficient tools", "Trialling"]);
+    assert.equal(projectRows[0], decomposition, "Original Decomposition controls move to the top without changing their state");
     assert.equal(projectRows[2], efficient, "Move the existing row rather than rebuilding or duplicating its controls");
     assert.equal(efficient.checked, true);
     assert.equal(efficient.storageKey, "91893:4", "Original standard/index survives movement");

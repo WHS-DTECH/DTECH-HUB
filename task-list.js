@@ -3845,6 +3845,7 @@ function moveMiddleDtechEfficientTools(checklistHost) {
         anchor = row;
         if (previousGroup && !previousGroup.querySelector(".task-list-step-row")) previousGroup.remove();
     });
+    decomposition.parentElement.prepend(decomposition);
 }
 
 function moveMiddleDtechTestingTrialling(checklistHost) {

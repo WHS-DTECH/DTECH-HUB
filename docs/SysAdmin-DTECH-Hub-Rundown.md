@@ -18,7 +18,7 @@ DTECH Hub is a web application used in DTECH classes for project/activity access
 ### MiddleDTECH tools and techniques
 - The appropriate tools/techniques checklist requires **at least one** listed tool or technique for MiddleDTECH, across media types. The existing Use of Tools & Techniques template evidence requirement remains.
 - The task-list automatic tick, count guidance, linked tools detail page and teacher evidence summary use the reduced MiddleDTECH threshold. Senior task-list thresholds remain unchanged (two for video, three for other media). Existing selections and saved evidence are retained.
-- MiddleDTECH displays **Using efficient tools and techniques** directly after Decomposition in Project Development, rather than in Digital Media. Its original evidence keys, ticks, links and three-category requirement are unchanged. SeniorDTECH retains the original placement.
+- MiddleDTECH places **Decomposition** first under Project Development, above the Project Management section heading and row, followed by **Using efficient tools and techniques** (moved from Digital Media). Original evidence keys, ticks, links and the efficient-tools three-category requirement are unchanged. SeniorDTECH retains the original placement.
 - MiddleDTECH's **Digital Outcome** card (previously Digital Media) places the **Testing & Trialling** heading and both trialling/testing rows below the appropriate-tools criterion. This is presentation-only; stored standard/index keys, links, automatic evidence checks and SeniorDTECH placement are unchanged.
 
 ### Attendance-aware Typing Kit (Week 5 rollout)
