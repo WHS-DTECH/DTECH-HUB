@@ -3834,6 +3834,19 @@ function renderRelevantImplicationsCategoryGrid(standard, rows) {
     `;
 }
 
+function moveMiddleDtechEfficientTools(checklistHost) {
+    if (taskListState.course !== "MiddleDTECH") return;
+    const decomposition = checklistHost.querySelector("[data-middle-decomposition]");
+    if (!decomposition) return;
+    let anchor = decomposition;
+    checklistHost.querySelectorAll("[data-middle-efficient-tools]").forEach((row) => {
+        const previousGroup = row.closest(".task-list-level-group");
+        anchor.insertAdjacentElement("afterend", row);
+        anchor = row;
+        if (previousGroup && !previousGroup.querySelector(".task-list-step-row")) previousGroup.remove();
+    });
+}
+
 function renderChecklistCards(detail, allItems) {
     const checklistHost = document.querySelector("#task-list-checklist");
     if (!checklistHost) return;
@@ -3954,7 +3967,7 @@ function renderChecklistCards(detail, allItems) {
                                         ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepText)}</a>`
                                         : `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`);
                                 return `
-                                <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow || isLinkedTestingImprovementRow || isApplyingRelevantConventionsRow || isNonTickableUXPrinciplesMeritRow ? "is-linked-relevant-implications" : ""} ${is91893EfficientToolsRow ? "is-linked-efficient-tools" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
+                                <div ${isMiddleDtech && is91893EfficientToolsRow ? "data-middle-efficient-tools" : ""} class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow || isLinkedTestingImprovementRow || isApplyingRelevantConventionsRow || isNonTickableUXPrinciplesMeritRow ? "is-linked-relevant-implications" : ""} ${is91893EfficientToolsRow ? "is-linked-efficient-tools" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
                                         ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow || isNonTickableIntegrityTestingRow || isNonTickableUXPrinciplesMeritRow ? "" : `<input type="checkbox" class="${isUseOfToolsTechniquesRequirement || isUXPrinciplesRequirement || isWebConventionsRequirement || isWebIntegrityRequirement ? "is-auto-complete" : ""}" ${isRowChecked ? "checked" : ""} ${isUseOfToolsTechniquesRequirement ? `disabled title="Requires at least ${toolsTechniquesRequiredWord} checked subtasks and Use of Tools &amp; Techniques template"` : isUXPrinciplesRequirement ? "disabled title=\"Requires at least three UX principles to be identified and applied\"" : isWebConventionsRequirement ? "disabled title=\"Requires at least three conventions for your media type to be applied\"" : isWebIntegrityRequirement ? "disabled title=\"Automatically checked when the Integrity & Validation template has been used\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
                                         ${rowText}
@@ -4229,7 +4242,7 @@ function renderChecklistCards(detail, allItems) {
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta?.id === "relevant-implications"
                                     ? `<p class="task-list-achieved-note">Complete any 3 or more categories to mark Section 4 complete. (${relevantCategoryDoneCount}/${RELEVANT_IMPLICATIONS_CATEGORIES.length})</p>`
                                     : ""}
-                                <div ${isTestingFunctionsRow ? `id="task-list-standard-${escapeTaskListHtml(standard)}-testing-functions"` : ""} class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""} ${isInformationalRow ? "is-informational" : ""} ${isAddressRelevantImplicationsRow || isNonTickableProjectManagementMeritRow || isNonTickableProjectManagementProcessesMeritRow ? "is-linked-relevant-implications" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
+                                <div ${isMiddleDtech && isDecompositionRow ? "data-middle-decomposition" : ""} ${isTestingFunctionsRow ? `id="task-list-standard-${escapeTaskListHtml(standard)}-testing-functions"` : ""} class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""} ${isInformationalRow ? "is-informational" : ""} ${isAddressRelevantImplicationsRow || isNonTickableProjectManagementMeritRow || isNonTickableProjectManagementProcessesMeritRow ? "is-linked-relevant-implications" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
                                         ${isInformationalRow || isAddressRelevantImplicationsRow || isNonTickableProjectManagementMeritRow || isNonTickableProjectManagementProcessesMeritRow ? "" : `<input type="checkbox" class="${isDecompositionRow ? "is-auto-complete" : ""}" ${isRowChecked ? "checked" : ""} ${isTickActionDisabled || isDecompositionRow ? "disabled" : ""} ${isDecompositionRow ? "title=\"Automatically checked when every Decomposition category has at least one Trello task\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">`}
                                         ${isRelevantCategoryRow
@@ -4407,6 +4420,7 @@ function renderChecklistCards(detail, allItems) {
     }).join("");
 
     checklistHost.innerHTML = cardsHtml;
+    moveMiddleDtechEfficientTools(checklistHost);
 }
 
 function getAllocatedDigitalMediaType(standard) {
