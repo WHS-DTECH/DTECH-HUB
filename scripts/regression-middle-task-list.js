@@ -1353,6 +1353,41 @@ assert.match(taskList, /level === "Excellence" && !isMiddleDtech/);
         querySelectorAll() { assert.fail("Without Decomposition, leave the original placement intact"); } });
 }
 
+{
+    const state = { course: "MiddleDTECH" };
+    const placementContext = vm.createContext({ taskListState: state });
+    vm.runInContext(taskList.slice(taskList.indexOf("function moveMiddleDtechTestingTrialling("),
+        taskList.indexOf("function renderChecklistCards(")), placementContext);
+    const destination = [], source = [];
+    const sourceGroup = { querySelector: () => source.find(entry => entry.isRow), remove() { assert.fail("Project Management remains in its source group"); } };
+    function entry(name, isRow = true) {
+        return { name, isRow, checked: true, storageKey: "91897:3",
+            closest: () => sourceGroup,
+            insertAdjacentElement(position, moved) {
+                assert.equal(position, "afterend");
+                source.splice(source.indexOf(moved), 1);
+                destination.splice(destination.indexOf(this) + 1, 0, moved);
+            } };
+    }
+    const appropriate = entry("Appropriate tools"), heading = entry("Section 2: Testing & Trialling", false);
+    const trialling = entry("Trialling"), testing = entry("Testing");
+    const management = entry("Project management");
+    destination.push(appropriate);
+    source.push(management, heading, trialling, testing);
+    const host = { querySelector: () => appropriate, querySelectorAll: () => [heading, trialling, testing] };
+    placementContext.moveMiddleDtechTestingTrialling(host);
+    assert.deepEqual(destination.map(item => item.name), ["Appropriate tools", "Section 2: Testing & Trialling", "Trialling", "Testing"]);
+    assert.deepEqual(source, [management]);
+    assert.equal(destination[3], testing, "Original testing row and controls are moved, not copied");
+    assert.equal(testing.storageKey, "91897:3");
+    assert.equal(testing.checked, true);
+    state.course = "SeniorDTECH";
+    placementContext.moveMiddleDtechTestingTrialling({ querySelector() { assert.fail("SeniorDTECH stays unchanged"); } });
+    state.course = "MiddleDTECH";
+    placementContext.moveMiddleDtechTestingTrialling({ querySelector: () => null,
+        querySelectorAll() { assert.fail("Missing destination leaves original rows intact"); } });
+}
+
 const checklistHost = { innerHTML: "" };
 const renderState = {
     course: "MiddleDTECH",
@@ -1368,6 +1403,7 @@ const renderContext = vm.createContext({
     installDigiMedEfficientToolsHandler() {},
     installDigiMedToolsTechniquesHandler() {},
     moveMiddleDtechEfficientTools() {},
+    moveMiddleDtechTestingTrialling() {},
     getTopicTypeLabel: () => "",
     inferStudentSystemConnections: () => ({}),
     getMiddleDtechChecklistRows: context.getMiddleDtechChecklistRows,
@@ -1416,6 +1452,9 @@ assert.ok(checklistHost.innerHTML.indexOf("Using appropriate tools and technique
 assert.match(checklistHost.innerHTML, /data-digimed-tools-technique="Creating scripts" checked/);
 assert.match(checklistHost.innerHTML, /data-digimed-efficient-tool="Using stylesheets" checked/);
 assert.match(checklistHost.innerHTML, /data-middle-efficient-tools/, "MiddleDTECH marks the existing efficient-tools row for relocation");
+assert.match(checklistHost.innerHTML, /data-middle-appropriate-tools/);
+assert.match(checklistHost.innerHTML, /<summary[^>]*>Digital Outcome<\/summary>/);
+assert.match(checklistHost.innerHTML, /<h3>Digital Outcome<\/h3>/);
 assert.match(checklistHost.innerHTML, /checked[^>]+data-step-check="91893:1"/,
     "The moved tools criterion retains its checked state and original storage index");
 assert.doesNotMatch(checklistHost.innerHTML, /State how success will be measured|Identify Tools and Techniques for this outcome|Section 1: Digital Media/);
@@ -1423,13 +1462,13 @@ assert.equal(JSON.stringify(renderState.checklistState), storedStateBeforeRender
 renderState.checklistState = {};
 renderContext.renderChecklistCards({ name: "My Project" }, []);
 assert.match(checklistHost.innerHTML, /Project Development/);
-assert.match(checklistHost.innerHTML, /Digital Media/);
+assert.match(checklistHost.innerHTML, /Digital Outcome/);
 assert.match(checklistHost.innerHTML, /Digital Outcome Topic/);
 assert.doesNotMatch(checklistHost.innerHTML, /Standard \d{5}|Achieved|Merit|Excellence/,
     "MiddleDTECH uses descriptive headings without standard numbers or achievement labels");
 renderState.course = "SeniorDTECH";
 renderContext.renderChecklistCards({ name: "My Project" }, []);
-assert.doesNotMatch(checklistHost.innerHTML, /data-middle-efficient-tools|data-middle-decomposition/);
+assert.doesNotMatch(checklistHost.innerHTML, /data-middle-efficient-tools|data-middle-decomposition|data-middle-appropriate-tools|data-middle-testing-trialling/);
 assert.match(checklistHost.innerHTML, /Standard 91897/);
 assert.match(checklistHost.innerHTML, /Standard 91893/);
 for (const level of ["Achieved", "Merit", "Excellence"]) {
