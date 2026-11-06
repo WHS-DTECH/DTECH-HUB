@@ -94,7 +94,8 @@ function parseTypingResult(value) {
 }
 
 function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomain, canManagePracticalSchedule, verifyGoogleAccessTokenAndExtractIdentity,
-    certificates = null, attendanceProvider = async () => ({ active: false, status: "not-configured", weeks: [] }), now = () => new Date() }) {
+    certificates = null, attendanceProvider = async () => ({ active: false, status: "not-configured", weeks: [] }), now = () => new Date(),
+    requireAdminAccess, getClassData, getRequestUserEmail = req => req.auth_identity?.email || "" }) {
     let schemaReady;
     const certificateEmailCooldowns = new Map();
     async function ensureSchema() {
@@ -116,6 +117,12 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
                     UNIQUE (student_email, submission_id)
                 )`);
                 await pool.query(`CREATE INDEX IF NOT EXISTS typing_kit_attempts_student_idx ON typing_kit_attempts (student_email, submitted_at)`);
+                await pool.query(`CREATE TABLE IF NOT EXISTS typing_kit_book_signatures (
+                    student_email TEXT NOT NULL, week_start TEXT NOT NULL,
+                    period SMALLINT NOT NULL CHECK (period IN (1, 2)), signed BOOLEAN NOT NULL DEFAULT FALSE,
+                    updated_by_email TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    PRIMARY KEY (student_email, week_start, period)
+                )`);
             })().catch((error) => { schemaReady = null; throw error; });
         }
         await schemaReady;
@@ -172,6 +179,70 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
     }
     async function loadAttempts(email) {
         return (await pool.query(`SELECT * FROM typing_kit_attempts WHERE student_email = $1 ORDER BY submitted_at, id`, [email])).rows;
+    }
+    if (requireAdminAccess && getClassData) {
+        app.get("/api/admin/typing-kit-results", requireAdminAccess, async (req, res) => {
+            res.set("Cache-Control", "private, no-store");
+            const emails = [...new Set(String(req.query.emails || "").trim().toLowerCase().split(/[\s,;]+/).filter(Boolean))];
+            if (!emails.length || emails.length > 20 || emails.some(email => !/^[^\s@]+@[^\s@]+$/.test(email) || !email.endsWith(`@${schoolDomain}`))) {
+                return res.status(400).json({ error: "Choose 1-20 school students to review." });
+            }
+            try {
+                const directory = await getClassData();
+                if (emails.some(email => !directory.students.some(student => student.email.toLowerCase() === email))) {
+                    return res.status(404).json({ error: "Choose current students from the class list." });
+                }
+                await ensureSchema();
+                const startDate = await settings();
+                const attempts = (await pool.query(`SELECT * FROM typing_kit_attempts
+                    WHERE student_email = ANY($1::text[]) AND week_start >= $2 AND week_start <= $3 ORDER BY submitted_at, id`,
+                [emails, startDate, addDays(startDate, 42)])).rows;
+                const signatures = (await pool.query(`SELECT student_email, week_start, period, signed FROM typing_kit_book_signatures
+                    WHERE student_email = ANY($1::text[]) AND week_start >= $2 AND week_start <= $3`,
+                [emails, startDate, addDays(startDate, 42)])).rows;
+                const students = [];
+                for (let index = 0; index < emails.length; index += 4) {
+                    students.push(...await Promise.all(emails.slice(index, index + 4).map(async email => {
+                        const rows = attempts.filter(row => row.student_email === email);
+                        return { email, attempts: rows.map(shape),
+                            signatures: signatures.filter(row => row.student_email === email).map(row => ({
+                                weekStart: row.week_start, period: row.period, signed: row.signed === true
+                            })),
+                            weeklyProgress: weeklyTypingProgress(startDate, rows, await attendanceProvider(email, startDate), nzDate(now())) };
+                    })));
+                }
+                if (await settings() !== startDate) return res.status(409).json({ error: "The Typing Kit calendar changed. Refresh the class list." });
+                res.json({ startDate, students, reviewedAt: now().toISOString() });
+            } catch (error) { failure(res, error); }
+        });
+        app.put("/api/admin/typing-kit-book-signature", requireAdminAccess, async (req, res) => {
+            res.set("Cache-Control", "private, no-store");
+            const email = normalizeEmail(String(req.body?.email || "").trim());
+            const { weekStart, period, signed } = req.body || {};
+            if (!/^[^\s@]+@[^\s@]+$/.test(email) || !email.endsWith(`@${schoolDomain}`) ||
+                !isMonday(weekStart) || ![1, 2].includes(period) || typeof signed !== "boolean") {
+                return res.status(400).json({ error: "Choose a school student, valid week, Period 1 or 2 and a signed Yes/No value." });
+            }
+            try {
+                const directory = await getClassData();
+                if (!directory.students.some(student => student.email.toLowerCase() === email)) {
+                    return res.status(404).json({ error: "Choose a current student from the class list." });
+                }
+                await ensureSchema();
+                const saved = await pool.query(`INSERT INTO typing_kit_book_signatures
+                    (student_email, week_start, period, signed, updated_by_email)
+                    SELECT $1, $2, $3, $4, $5 FROM typing_kit_settings WHERE id = 'default'
+                    AND start_date <= $2 AND $2 <= to_char(start_date::date + 42, 'YYYY-MM-DD')
+                    ON CONFLICT (student_email, week_start, period) DO UPDATE SET
+                    signed = EXCLUDED.signed, updated_by_email = EXCLUDED.updated_by_email, updated_at = NOW() RETURNING signed`,
+                [email, weekStart, period, signed, normalizeEmail(getRequestUserEmail(req))]);
+                if (!saved.rows.length) return res.status(409).json({ error: "The Typing Kit calendar changed. Refresh the list before signing." });
+                res.json({ email, weekStart, period, signed: saved.rows[0].signed });
+            } catch (error) {
+                console.error("[typing-kit] Book signature save failed:", error.message);
+                res.status(503).json({ error: "Could not confirm the book signature was saved. Refresh before trying again." });
+            }
+        });
     }
     async function requiredCertificate(req, res, email) {
         await ensureSchema();

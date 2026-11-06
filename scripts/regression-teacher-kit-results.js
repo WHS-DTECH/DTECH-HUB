@@ -92,9 +92,105 @@ test("teacher course groups require enrolment, not just a year-level folder", ()
     }
     assert.equal(getTeacherKitCourse(null), "");
     const source = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
-    const provider = source.slice(source.indexOf('require("./practical-skills/teacher-results-store").registerTeacherResults'), source.indexOf('app.get("/api/admin/practical-skills/preview-users"'));
+    const provider = source.slice(source.indexOf("async function getTeacherKitClassData()"), source.indexOf('app.get("/api/admin/practical-skills/preview-users"'));
     assert.match(provider, /getTeacherKitCourse\(getHuntProfile\(row\)\)/);
     assert.doesNotMatch(provider, /getResearchReportProgrammeFolder|yearNumber/);
+});
+
+test("typing weekly table follows filters and persists independent per-week book signatures", async () => {
+    function element() {
+        return { value: "", children: [], events: {}, textContent: "", checked: false,
+            classList: { add() {}, remove() {} },
+            append(child) { this.children.push(child); }, replaceChildren(...children) { this.children = children; },
+            add(child) { this.append(child); }, setAttribute(name, value) { this[name] = value; },
+            get options() { return this.children; }, addEventListener(type, handler) { this.events[type] = handler; } };
+    }
+    const elements = new Map();
+    const el = id => { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); };
+    const weeks = Array.from({ length: 7 }, (_, index) => ({ week: index + 1,
+        weekStart: new Date(Date.UTC(2026, 9, 26 + index * 7)).toISOString().slice(0, 10),
+        status: index < 4 ? "legacy" : index === 4 ? "excused" : "future" }));
+    const signatures = [];
+    const writes = [];
+    let failSave = false, failRead = false;
+    const students = [{ name: "Ana", email: "ana@school.nz", timetableClass: "JPI", course: "JuniorDTECH" },
+        { name: "Ben", email: "ben@school.nz", timetableClass: "JVE", course: "JuniorDTECH" }];
+    const context = vm.createContext({
+        document: { getElementById: el, querySelector: el, createElement: element },
+        window: { addEventListener() {}, location: { search: "" } }, URLSearchParams,
+        localStorage: { getItem: () => JSON.stringify({ profile: { email: "teacher@school.nz" } }) },
+        Option: function(text, value) { return { textContent: text, value }; },
+        fetch: async (url, options) => {
+            if (url.includes("typing-kit-book-signature")) {
+                const body = JSON.parse(options.body);
+                writes.push(body);
+                if (!failSave) signatures.splice(0, signatures.length, { weekStart: body.weekStart, period: body.period, signed: body.signed });
+                return { ok: !failSave, json: async () => failSave ? { error: "Signature database unavailable" } : { signed: body.signed } };
+            }
+            if (url.includes("typing-kit-results")) {
+                return { ok: !failRead, json: async () => failRead ? { error: "Weekly read unavailable" } : {
+                    startDate: weeks[0].weekStart,
+                    students: students.filter(student => decodeURIComponent(url).includes(student.email)).map(student => ({
+                        email: student.email, signatures: JSON.parse(JSON.stringify(signatures)),
+                        attempts: [{ weekStart: weeks[0].weekStart, period: 1, netWpm: 35, accuracy: 97, submittedAt: "2026-10-27T00:00:00Z" },
+                            { weekStart: weeks[0].weekStart, period: 2, netWpm: 38, accuracy: 98, submittedAt: "2026-10-29T00:00:00Z" }],
+                        weeklyProgress: { sourceStatus: "available", weeks }
+                    }))
+                } };
+            }
+            return { ok: true, json: async () => url.includes("preview-users") ? { users: [] }
+                : url.includes("kit-submissions") ? { kits: [] }
+                    : { students, kits: [{ id: "kit-typing", title: "Typing Kit" }, { id: "kit-login", title: "Login Kit" }] } };
+        }
+    });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "teacher-results.js"), "utf8"), context);
+    const settle = async () => { for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve)); };
+    await settle();
+    assert.equal(el("class-typing-results").hidden, true, "Only selecting Typing Kit loads the weekly view");
+    el("class-homeroom-filter").value = "JPI";
+    el("class-homeroom-filter").events.change();
+    el("class-kit-filter").value = "kit-typing";
+    el("class-kit-filter").events.change();
+    await settle();
+    const table = () => el("class-typing-table-host").children[0];
+    const rows = () => table().children[1].children;
+    const tick = period => rows()[0].children[period + 1].children[0].children[0];
+    assert.equal(table().children[0].children[0].children.length, 22, "Seven result columns and fourteen signature columns plus Student");
+    assert.equal(rows().length, 1);
+    assert.equal(rows()[0].children.length, 22);
+    assert.equal(rows()[0].children[0].textContent, "Ana");
+    assert.ok(rows()[0].children[1].children.some(child => /35 WPM - 97%/.test(child.textContent)));
+    assert.ok(rows()[0].children[1].children.some(child => /38 WPM - 98%/.test(child.textContent)), "Both periods show their saved scores");
+    assert.equal(rows()[0].children[13].children[0].textContent, "Excused - absent");
+    assert.equal(tick(1).checked, false);
+    tick(1).checked = true;
+    await tick(1).events.change();
+    assert.equal(tick(1).checked, true);
+    assert.deepEqual(writes[0], { email: "ana@school.nz", weekStart: weeks[0].weekStart, period: 1, signed: true });
+    assert.equal(tick(2).checked, false, "Periods are independent");
+    assert.equal(rows()[0].children[5].children[0].children[0].checked, false, "Weeks are independent");
+    failSave = true;
+    tick(1).checked = false;
+    await tick(1).events.change();
+    assert.equal(tick(1).checked, true, "Failed saves restore confirmed signatures");
+    assert.match(el("typing-signature-status").textContent, /Signature database unavailable/);
+    await el("class-progress-refresh").events.click();
+    await settle();
+    assert.equal(tick(1).checked, true, "Refresh loads persisted signatures");
+    assert.equal(writes.length, 2, "Reading results never saves signatures");
+    el("class-student-filter").value = "missing";
+    el("class-student-filter").events.input();
+    assert.match(el("typing-review-status").textContent, /No students match/);
+    assert.equal(el("class-typing-table-host").children.length, 0);
+    el("class-student-filter").value = "";
+    failRead = true;
+    await el("class-progress-refresh").events.click();
+    await settle();
+    assert.match(el("typing-review-status").textContent, /could not be read/);
+    assert.equal(el("class-typing-table-host").children.length, 0, "Failed reads do not invent empty results or unsigned ticks");
+    el("class-kit-filter").value = "kit-login";
+    el("class-kit-filter").events.change();
+    assert.equal(el("class-typing-results").hidden, true);
 });
 
 async function fixture(t) {

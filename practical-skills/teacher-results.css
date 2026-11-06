@@ -79,6 +79,16 @@
     font-weight: 700;
 }
 
+#typing-review-status.is-error,
+#typing-signature-status.is-error {
+    color: #a4342f;
+    font-weight: 700;
+}
+
+.typing-review-table td {
+    min-width: 130px;
+}
+
 .class-submissions-host h3 {
     margin: 22px 0 8px;
 }

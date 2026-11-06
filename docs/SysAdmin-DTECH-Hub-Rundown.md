@@ -28,6 +28,13 @@ DTECH Hub is a web application used in DTECH classes for project/activity access
 - Without both DTECH-HUB settings, the connector/new certificate rule stays inactive and the dashboard explicitly says setup is pending; legacy certificate behavior remains. Partial/insecure configuration fails startup explicitly. Once configured, source outages show a warning and unconfirmed attendance rather than quietly awarding absence exemptions.
 - The source is `POST /integrations/typing-attendance`, protected by the dedicated server key and rate limiting. Its only request fields are `studentEmail` and `startDate`. Responses contain seven date-keyed weeks, scheduled lesson marks and a current fetch timestamp. No Planner mutations or database credentials are shared.
 
+### Teacher Typing Kit weekly review and exercise-book signatures
+- In Class Kit Completion, select **Typing Kit** to show weekly results below the main table. All existing student filters apply. Each of the seven dated weeks shows saved results for both typing periods (net WPM, accuracy and saved time), its weekly rule status, and separate **Period 1 signed** / **Period 2 signed** checkboxes.
+- The signature ticks record exercise-book signing only. They never change attempts, attendance, kit completion or certificate eligibility. Saving a tick is explicit; failed saves restore its last confirmed value and display an error.
+- `GET /api/admin/typing-kit-results?emails=...` accepts up to 20 current school students per request and reads their active-calendar attempts/signatures. Attendance calls run at most four at once. Teacher reads do not invoke student certificate routes or send emails.
+- `PUT /api/admin/typing-kit-book-signature` stores `{email, weekStart, period, signed}` in `typing_kit_book_signatures`, keyed by student, dated Monday and period, with the saving staff account and timestamp. Calendar membership is checked atomically. Changing the shared calendar does not delete older signatures or attempts.
+- Both endpoints use existing admin access checks and no-store responses. Refresh list reloads saved results, attendance and signature ticks. Unknown attendance is explicitly shown, not treated as absence; unreadable logs do not display invented results or signature values.
+
 ## 2) How Google Sign-In Is Set Up
 - Frontend uses Google Identity Services OAuth token flow.
 - User signs in with Google and the app fetches profile details from the Google userinfo API.

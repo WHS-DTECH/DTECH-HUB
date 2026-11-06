@@ -14,7 +14,7 @@ const teacher = "teacher@school.nz";
 const result = parseTypingResult(resultUrl);
 
 function database() {
-    const data = { start: DEFAULT_START_DATE, attempts: [], queries: [], fail: false };
+    const data = { start: DEFAULT_START_DATE, attempts: [], signatures: [], queries: [], fail: false };
     const pool = { async query(sql, params = []) {
         data.queries.push({ sql, params });
         if (data.fail) throw new Error("Database unavailable");
@@ -22,8 +22,22 @@ function database() {
         if (/SELECT start_date/.test(sql)) return { rows: [{ start_date: data.start }] };
         if (/UPDATE typing_kit_settings/.test(sql)) { data.start = params[0]; return { rows: [] }; }
         if (/SELECT \* FROM typing_kit_attempts/.test(sql)) {
+            if (Array.isArray(params[0])) return { rows: data.attempts.filter(row => params[0].includes(row.student_email) &&
+                row.week_start >= params[1] && row.week_start <= params[2]) };
             const rows = data.attempts.filter((row) => row.student_email === params[0] && (!params[1] || row.submission_id === params[1]));
             return { rows };
+        }
+        if (/SELECT student_email, week_start, period, signed FROM typing_kit_book_signatures/.test(sql)) {
+            return { rows: data.signatures.filter(row => params[0].includes(row.student_email) && row.week_start >= params[1] && row.week_start <= params[2]) };
+        }
+        if (/INSERT INTO typing_kit_book_signatures/.test(sql)) {
+            assert.match(sql, /FROM typing_kit_settings/, "Signature calendar is validated atomically");
+            const [email, weekStart, period, signed, teacherEmail] = params;
+            if (weekStart < data.start || weekStart > addDays(data.start, 42)) return { rows: [] };
+            let row = data.signatures.find(entry => entry.student_email === email && entry.week_start === weekStart && entry.period === period);
+            if (!row) { row = { student_email: email, week_start: weekStart, period }; data.signatures.push(row); }
+            Object.assign(row, { signed, updated_by_email: teacherEmail });
+            return { rows: [{ signed }] };
         }
         if (/INSERT INTO typing_kit_attempts/.test(sql)) {
             assert.match(sql, /FROM typing_kit_settings/, "Calendar membership is checked atomically when writing");
@@ -61,6 +75,8 @@ async function fixture(t, options = {}) {
         canManagePracticalSchedule: async (email) => email === teacher,
         certificates: options.certificates || null,
         attendanceProvider: options.attendanceProvider,
+        requireAdminAccess: (req, res, next) => req.auth_identity?.email === teacher ? next() : res.status(403).json({ error: "Admin access required." }),
+        getClassData: async () => ({ students: [{ email: student }], kits: [{ id: "kit-typing" }] }),
         now: options.now
     });
     const server = await new Promise((resolve) => {
@@ -68,7 +84,7 @@ async function fixture(t, options = {}) {
     });
     t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
     async function call(route = "", { method = "GET", email = student, body, verified = true, claimedEmail = email, bearer = "" } = {}) {
-        const response = await fetch(`http://127.0.0.1:${server.address().port}/api/practical-skills/typing-kit${route}`, {
+        const response = await fetch(`http://127.0.0.1:${server.address().port}${route.startsWith("/api/admin/") ? route : `/api/practical-skills/typing-kit${route}`}`, {
             method, headers: { "Content-Type": "application/json", "x-user-email": claimedEmail,
                 ...(verified ? { "x-test-verified-email": email } : {}),
                 ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) },
@@ -105,6 +121,53 @@ test("seven Monday weeks, fourteen periods, and safe result-link extraction", ()
         resultUrl.replace("hits=180", "hits=180&hits=100")
     ]) assert.throws(() => parseTypingResult(bad), Error, bad);
     assert.equal(parseTypingResult(resultUrl.replace("acc=97", "acc=0").replace("nwpm=35", "nwpm=0")).netWpm, 0, "A zero score remains a valid result");
+});
+
+test("teacher weekly reads and book signatures are independent of typing and certificates", async t => {
+    t.mock.method(console, "error", () => {});
+    let certificateCalls = 0;
+    const f = await fixture(t, { certificates: { get: () => { certificateCalls++; } },
+        attendanceProvider: async () => ({ active: true, status: "available", weeks: [] }) });
+    f.data.attempts.push({ id: 1, student_email: student, week_start: DEFAULT_START_DATE, period: 1,
+        result, submission_id: randomUUID(), submitted_at: "2026-10-27T00:00:00Z" });
+    const readRoute = `/api/admin/typing-kit-results?emails=${encodeURIComponent(student)}`;
+    const saveRoute = "/api/admin/typing-kit-book-signature";
+    assert.equal((await f.call(readRoute)).status, 403);
+    assert.equal((await f.call(saveRoute, { method: "PUT", body: { email: student, weekStart: DEFAULT_START_DATE, period: 1, signed: true } })).status, 403);
+    const review = await f.call(readRoute, { email: teacher });
+    assert.equal(review.status, 200);
+    assert.equal(review.body.students[0].attempts[0].netWpm, 35);
+    assert.equal(review.body.students[0].weeklyProgress.weeks.length, 7);
+    assert.match(review.headers.get("cache-control"), /no-store/);
+    const before = JSON.stringify(f.data.attempts);
+    for (const period of [1, 2]) {
+        assert.equal((await f.call(saveRoute, { email: teacher, method: "PUT",
+            body: { email: student, weekStart: DEFAULT_START_DATE, period, signed: true } })).body.signed, true);
+    }
+    assert.equal((await f.call(saveRoute, { email: teacher, method: "PUT",
+        body: { email: student, weekStart: DEFAULT_START_DATE, period: 1, signed: false } })).body.signed, false);
+    assert.deepEqual(f.data.signatures.map(row => [row.period, row.signed, row.updated_by_email]), [[1, false, teacher], [2, true, teacher]]);
+    const reread = await f.call(readRoute, { email: teacher });
+    assert.deepEqual(reread.body.students[0].signatures, [
+        { weekStart: DEFAULT_START_DATE, period: 1, signed: false }, { weekStart: DEFAULT_START_DATE, period: 2, signed: true }
+    ]);
+    assert.equal(JSON.stringify(f.data.attempts), before);
+    assert.equal(certificateCalls, 0, "Teacher reads and signatures never issue/email certificates");
+    for (const body of [
+        { email: student, weekStart: DEFAULT_START_DATE, period: 3, signed: true },
+        { email: student, weekStart: "2026-10-27", period: 1, signed: true },
+        { email: student, weekStart: DEFAULT_START_DATE, period: 1, signed: "true" }
+    ]) assert.equal((await f.call(saveRoute, { email: teacher, method: "PUT", body })).status, 400);
+    assert.equal((await f.call(saveRoute, { email: teacher, method: "PUT",
+        body: { email: "unknown@school.nz", weekStart: DEFAULT_START_DATE, period: 1, signed: true } })).status, 404);
+    assert.equal((await f.call(saveRoute, { email: teacher, method: "PUT",
+        body: { email: student, weekStart: addDays(DEFAULT_START_DATE, 49), period: 1, signed: true } })).status, 409);
+    assert.equal((await f.call("/api/admin/typing-kit-results?emails=unknown@school.nz", { email: teacher })).status, 404);
+    assert.equal((await f.call("/api/admin/typing-kit-results?emails=bad", { email: teacher })).status, 400);
+    f.data.fail = true;
+    assert.equal((await f.call(readRoute, { email: teacher })).status, 500);
+    assert.equal((await f.call(saveRoute, { email: teacher, method: "PUT",
+        body: { email: student, weekStart: DEFAULT_START_DATE, period: 1, signed: true } })).status, 503);
 });
 
 test("Typing Kit is discoverable in existing and seeded libraries without duplicates", () => {

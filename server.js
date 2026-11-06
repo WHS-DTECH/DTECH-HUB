@@ -6326,6 +6326,7 @@ require("./learning-pathways/comment-bank-store").registerCommentBank(app, {
 });
 registerTypingKit(app, {
   pool, hasDatabase, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN, canManagePracticalSchedule,
+  requireAdminAccess, getClassData: getTeacherKitClassData, getRequestUserEmail,
   attendanceProvider: createTypingAttendanceClient(),
   verifyGoogleAccessTokenAndExtractIdentity,
   certificates: {
@@ -15316,9 +15317,7 @@ app.get("/api/practical-skills/library", async (_req, res) => {
   }
 });
 
-require("./practical-skills/teacher-results-store").registerTeacherResults(app, {
-  pool, requireAdminAccess, schoolDomain: SCHOOL_EMAIL_DOMAIN, getDefaultPracticalSkillsKitContent,
-  getClassData: async () => {
+async function getTeacherKitClassData() {
     const [studentRows, kitCards] = await Promise.all([
       getStudentDirectoryRows(),
       readPracticalSkillsLibraryFile()
@@ -15344,7 +15343,10 @@ require("./practical-skills/teacher-results-store").registerTeacherResults(app, 
         && ["active", "live"].includes(String(kit.status || "").toLowerCase()))
       .map((kit) => ({ id: kit.id, title: String(kit.title || kit.id) }));
     return { students, kits };
-  }
+}
+require("./practical-skills/teacher-results-store").registerTeacherResults(app, {
+  pool, requireAdminAccess, schoolDomain: SCHOOL_EMAIL_DOMAIN, getDefaultPracticalSkillsKitContent,
+  getClassData: getTeacherKitClassData
 });
 
 app.get("/api/admin/practical-skills/preview-users", requireAdminAccess, async (_req, res) => {

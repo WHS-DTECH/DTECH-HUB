@@ -8,7 +8,7 @@
   <title>Kit Results | Teacher Review</title>
   <link rel="stylesheet" href="../styles.css">
   <link rel="stylesheet" href="./teacher-login-sites.css">
-  <link rel="stylesheet" href="./teacher-results.css?v=6">
+  <link rel="stylesheet" href="./teacher-results.css?v=7">
 </head>
 <body data-hub-read-only="true">
   <nav class="topbar" aria-label="Primary">
@@ -96,6 +96,13 @@
         <p id="class-progress-status" role="status" aria-live="polite">Sign in with an admin account to load the class list.</p>
         <p id="chocolate-status" role="status" aria-live="polite"></p>
         <div id="class-progress-table-host" class="class-progress-table-host"></div>
+        <section id="class-typing-results" hidden aria-label="Typing Kit weekly results">
+          <h3>Typing Kit - Weekly Results</h3>
+          <p>Each week shows both saved typing periods (net WPM and accuracy). Period 1 signed and Period 2 signed record your exercise-book signatures only; they do not change typing completion or certificates. From Week 5, one saved test meets the weekly requirement; confirmed fully absent weeks are excused.</p>
+          <p id="typing-review-status" role="status" aria-live="polite"></p>
+          <p id="typing-signature-status" role="status" aria-live="polite"></p>
+          <div id="class-typing-table-host" class="class-progress-table-host"></div>
+        </section>
         <p>Drawing links: Saved - sync needed means the link is saved but filing is not confirmed. Submitted - synced means DTECH-HUB successfully filed the drawing in the student's DTECH folder. Completed is the separate teacher review tick. Syncing does not change Google sharing permissions.</p>
         <p id="submission-status" role="status" aria-live="polite"></p>
         <div id="class-submissions-host" class="class-submissions-host"></div>
@@ -113,6 +120,6 @@
   </main>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="../script.js?v=teacher-review-refresh-1"></script>
-  <script src="./teacher-results.js?v=17"></script>
+  <script src="./teacher-results.js?v=18"></script>
 </body>
 </html>

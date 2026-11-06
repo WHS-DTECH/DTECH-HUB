@@ -21,6 +21,13 @@
     const statusFilter = document.getElementById("class-status-filter");
     const chocolateFilter = document.getElementById("class-chocolate-filter");
     const kitFocus = document.getElementById("class-kit-focus");
+    const typingSection = document.getElementById("class-typing-results");
+    const typingHost = document.getElementById("class-typing-table-host");
+    const typingStatus = document.getElementById("typing-review-status");
+    const signatureStatus = document.getElementById("typing-signature-status");
+    const typingReviews = new Map();
+    const pendingSignatures = new Set();
+    let typingLoadingRevision = -1;
     const classTab = document.getElementById("class-progress-tab");
     const studentTab = document.getElementById("student-review-tab");
     const classPanel = document.getElementById("class-progress-panel");
@@ -220,9 +227,137 @@
             }
         }
     }
+    async function saveBookSignature(student, review, weekStart, period, signed) {
+        if (pendingSignatures.size) return;
+        const revision = classRevision;
+        const key = `${student.email}:${weekStart}:${period}`;
+        pendingSignatures.add(key);
+        signatureStatus.classList.remove("is-error");
+        signatureStatus.textContent = `Saving book signature for ${student.name}, Period ${period}...`;
+        renderTypingResults(filteredStudents());
+        try {
+            const response = await fetch("/api/admin/typing-kit-book-signature", {
+                method: "PUT", headers: { ...adminHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify({ email: student.email, weekStart, period, signed })
+            });
+            const data = await response.json();
+            if (!response.ok || typeof data.signed !== "boolean") throw new Error(data.error || "The server did not confirm the signature. Refresh the list.");
+            if (revision !== classRevision) return;
+            const saved = review.signatures.find(entry => entry.weekStart === weekStart && entry.period === period);
+            if (saved) saved.signed = data.signed;
+            else review.signatures.push({ weekStart, period, signed: data.signed });
+            signatureStatus.textContent = `Saved book signature: ${data.signed ? "Yes" : "No"} for ${student.name}, Period ${period}, week starting ${weekStart}.`;
+        } catch (error) {
+            if (revision !== classRevision) return;
+            signatureStatus.classList.add("is-error");
+            signatureStatus.textContent = error.message || "Could not save the book signature. Refresh before trying again.";
+        } finally {
+            pendingSignatures.delete(key);
+            if (revision === classRevision && classData) renderTypingResults(filteredStudents());
+        }
+    }
+    async function loadTypingReviews(students) {
+        const revision = classRevision;
+        typingLoadingRevision = revision;
+        try {
+            for (let index = 0; index < students.length; index += 20) {
+                if (revision !== classRevision || kitFilter.value !== "kit-typing") return;
+                const visible = new Set(filteredStudents().map(student => student.email));
+                const batch = students.slice(index, index + 20).filter(student => visible.has(student.email));
+                if (!batch.length) continue;
+                try {
+                    const response = await fetch(`/api/admin/typing-kit-results?emails=${encodeURIComponent(batch.map(student => student.email).join(","))}`,
+                        { headers: adminHeaders(), cache: "no-store" });
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.error || `Could not read weekly results (${response.status}).`);
+                    if (revision !== classRevision) return;
+                    for (const student of batch) {
+                        const review = data.students?.find(entry => entry.email === student.email.toLowerCase());
+                        if (!review || !Array.isArray(review.attempts) || !Array.isArray(review.signatures) || review.weeklyProgress?.weeks?.length !== 7) {
+                            throw new Error("Weekly results were incomplete. Refresh the list.");
+                        }
+                    }
+                    for (const review of data.students) typingReviews.set(review.email, { ...review, startDate: data.startDate });
+                } catch (error) {
+                    if (revision !== classRevision) return;
+                    for (const student of batch) typingReviews.set(student.email.toLowerCase(), { error: error.message || "Could not read weekly results." });
+                }
+                if (revision === classRevision && classData) renderTypingResults(filteredStudents());
+            }
+        } finally {
+            if (typingLoadingRevision === revision) {
+                typingLoadingRevision = -1;
+                if (revision === classRevision && classData) renderTypingResults(filteredStudents());
+            }
+        }
+    }
+    function renderTypingResults(students) {
+        typingSection.hidden = kitFilter.value !== "kit-typing";
+        if (typingSection.hidden) return;
+        typingHost.replaceChildren();
+        const missing = students.filter(student => !typingReviews.has(student.email.toLowerCase()));
+        const failed = students.filter(student => typingReviews.get(student.email.toLowerCase())?.error);
+        if (failed.length) typingStatus.classList.add("is-error");
+        else typingStatus.classList.remove("is-error");
+        typingStatus.textContent = !students.length ? "No students match these filters."
+            : missing.length ? `Loading weekly results for ${missing.length} students...`
+                : failed.length ? `${failed.length} student logs could not be read: ${typingReviews.get(failed[0].email.toLowerCase()).error} Refresh the list to retry.`
+                    : `Showing weekly results for ${students.length} students. Book signatures save automatically.`;
+        const first = students.map(student => typingReviews.get(student.email.toLowerCase())).find(review => review?.weeklyProgress);
+        if (first) {
+            const table = node("table", undefined, typingHost, "class-progress-table typing-review-table");
+            const header = node("tr", undefined, node("thead", undefined, table));
+            node("th", "Student", header);
+            first.weeklyProgress.weeks.forEach(week => {
+                node("th", `Week ${week.week} (${week.weekStart}) - Results`, header);
+                node("th", `Week ${week.week} - Period 1 signed`, header);
+                node("th", `Week ${week.week} - Period 2 signed`, header);
+            });
+            const body = node("tbody", undefined, table);
+            for (const student of students) {
+                const row = node("tr", undefined, body);
+                node("th", student.name, row);
+                const review = typingReviews.get(student.email.toLowerCase());
+                if (!review || review.error) {
+                    const cell = node("td", review?.error || "Loading results...", row);
+                    cell.colSpan = 21;
+                    continue;
+                }
+                if (review.startDate !== first.startDate) {
+                    const cell = node("td", "The Typing Kit calendar changed. Refresh the list before signing.", row);
+                    cell.colSpan = 21;
+                    continue;
+                }
+                for (const week of review.weeklyProgress.weeks) {
+                    const cell = node("td", undefined, row);
+                    const labels = { legacy: "Weeks 1-4: optional", future: "Upcoming", completed: "Completed",
+                        excused: "Excused - absent", required: "Needs a test", pending: "Attendance unconfirmed" };
+                    node("strong", labels[week.status], cell);
+                    for (const period of [1, 2]) {
+                        const attempts = review.attempts.filter(attempt => attempt.weekStart === week.weekStart && attempt.period === period);
+                        node("div", `Period ${period}: ${attempts.length ? "" : "No result yet"}`, cell);
+                        for (const attempt of attempts) node("div", `${attempt.netWpm} WPM - ${attempt.accuracy}% (${date(attempt.submittedAt)})`, cell, "submission-note");
+                        const signedCell = node("td", undefined, row);
+                        const label = node("label", undefined, signedCell);
+                        const checkbox = node("input", undefined, label);
+                        checkbox.type = "checkbox";
+                        checkbox.checked = review.signatures.some(entry => entry.weekStart === week.weekStart && entry.period === period && entry.signed);
+                        checkbox.disabled = pendingSignatures.size > 0;
+                        checkbox.setAttribute("aria-label", `Book signed for ${student.name} - Week ${week.week} Period ${period}`);
+                        node("span", checkbox.checked ? " Signed" : " No", label);
+                        checkbox.addEventListener("change", () => saveBookSignature(student, review, week.weekStart, period, checkbox.checked));
+                    }
+                    if (review.weeklyProgress.sourceStatus !== "available") node("div",
+                        review.weeklyProgress.error || "Attendance connection is not configured.", cell, "submission-note");
+                }
+            }
+        }
+        if (missing.length && typingLoadingRevision !== classRevision) void loadTypingReviews(missing);
+    }
     function renderClassProgress() {
         if (!classData || !classTableHost) return;
         const students = filteredStudents();
+        renderTypingResults(students);
         const focused = kitFocus.checked && Boolean(kitFilter.value);
         const kits = focused ? classData.kits.filter((kit) => kit.id === kitFilter.value) : classData.kits;
         renderSubmissions(students);
@@ -291,6 +426,9 @@
     }
     async function loadClassProgress() {
         const current = ++classRevision;
+        typingReviews.clear();
+        typingHost.replaceChildren();
+        signatureStatus.textContent = "";
         classStatus.classList.remove("is-error");
         classStatus.textContent = "Loading students and kit completion...";
         classTableHost.replaceChildren();
