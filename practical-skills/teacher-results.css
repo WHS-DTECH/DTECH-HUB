@@ -124,6 +124,18 @@
     vertical-align: middle;
 }
 
+.class-progress-table-focused {
+    min-width: 0;
+}
+
+.class-progress-focus {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
 .class-progress-table thead th {
     background: #edf4fc;
     color: #173f63;

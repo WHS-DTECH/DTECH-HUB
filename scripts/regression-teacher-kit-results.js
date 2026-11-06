@@ -257,6 +257,10 @@ test("teacher review presents accessible tabs and all requested class filters", 
     }
     assert.match(html, /id="class-student-filter"/);
     assert.match(html, /id="class-chocolate-filter" disabled/);
+    assert.match(html, /id="class-kit-focus" type="checkbox" disabled/);
+    assert.match(html, /Show selected kit only/);
+    const css = fs.readFileSync(path.join(root, "practical-skills", "teacher-results.css"), "utf8");
+    assert.match(css, /\.class-progress-table-focused\s*\{\s*min-width: 0;/);
     assert.match(html, /<option value="yes">Yes - given<\/option>/);
     assert.match(html, /<option value="no">No - not given<\/option>/);
     const script = fs.readFileSync(path.join(root, "practical-skills", "teacher-results.js"), "utf8");
@@ -363,7 +367,7 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     const header = el("class-progress-table-host").children[0].children[0].children[0];
     assert.deepEqual(header.children.map((cell) => cell.textContent),
         ["Student", "Whānau", "Homeroom", "Course", "Login Kit", "Chocolate", "Search Kit", "Chocolate"]);
-    const chocolateCheckbox = () => rows()[0].children[5].children[0].children[0];
+    const chocolateCheckbox = () => rows()[0].children[el("class-kit-focus").checked ? 2 : 5].children[0].children[0];
     assert.equal(chocolateCheckbox().checked, false);
     chocolateCheckbox().checked = true;
     await chocolateCheckbox().events.change();
@@ -387,6 +391,7 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     };
     assert.equal(el("class-status-filter").disabled, true, "Status needs a selected kit");
     assert.equal(el("class-chocolate-filter").disabled, true, "Chocolate needs a selected kit");
+    assert.equal(el("class-kit-focus").disabled, true, "Focused view needs a selected kit");
     assert.deepEqual(el("class-kit-filter").options.map((option) => option.value), ["", "kit-login", "kit-search"]);
     select("class-kit-filter", "kit-login");
     assert.equal(el("class-status-filter").disabled, false);
@@ -399,6 +404,21 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     select("class-status-filter", "completed");
     assert.deepEqual(names(), ["Ana"], "Completed takes priority over started");
     assert.equal(rows()[0].children.length, 8, "All kit and Chocolate columns stay visible");
+    const focus = (checked) => {
+        el("class-kit-focus").checked = checked;
+        el("class-kit-focus").events.change();
+    };
+    const headers = () => el("class-progress-table-host").children[0].children[0].children[0].children.map((cell) => cell.textContent);
+    assert.equal(el("class-kit-focus").disabled, false);
+    focus(true);
+    assert.deepEqual(headers(), ["Student", "Login Kit", "Chocolate"]);
+    assert.deepEqual(rows()[0].children.slice(0, 2).map((cell) => cell.textContent), ["Ana", "Complete"]);
+    assert.equal(rows()[0].children.length, 3, "Focused rows hide all other student details and kits");
+    assert.match(el("class-progress-status").textContent, /only Login Kit/);
+    assert.deepEqual(names(), ["Ana"], "Focus preserves status filtering");
+    focus(false);
+    assert.equal(rows()[0].children.length, 8, "Turning focus off restores the full table");
+    focus(true);
     select("class-status-filter", "in-progress");
     assert.deepEqual(names(), ["Ben"]);
     select("class-status-filter", "not-started");
@@ -406,6 +426,7 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     select("class-status-filter", "");
     assert.deepEqual(names(), ["Ana", "Ben", "Cara", "Dan"]);
     select("class-kit-filter", "kit-search");
+    assert.deepEqual(headers(), ["Student", "Search Kit", "Chocolate"], "Focus follows the selected kit");
     select("class-chocolate-filter", "yes");
     assert.deepEqual(names(), ["Ben"], "Chocolate Yes uses the selected kit only");
     select("class-chocolate-filter", "no");
@@ -426,10 +447,22 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     assert.equal(el("class-status-filter").value, "completed");
     assert.equal(el("class-chocolate-filter").value, "yes");
     assert.deepEqual(names(), ["Ben"], "Refresh preserves filters");
+    assert.equal(el("class-kit-focus").checked, true, "Refresh preserves focused view");
+    assert.deepEqual(headers(), ["Student", "Search Kit", "Chocolate"]);
+    failSave = true;
+    const focusedReward = rows()[0].children[2].children[0].children[0];
+    assert.equal(focusedReward.checked, true);
+    focusedReward.checked = false;
+    await focusedReward.events.change();
+    assert.equal(rows()[0].children[2].children[0].children[0].checked, true, "Focused failed save restores confirmed Chocolate");
+    assert.deepEqual(savedRequests.at(-1), { email: "ben@school.nz", chocolate: false }, "Focused checkbox targets the selected kit/student");
+    failSave = false;
     const beforeFiltering = JSON.stringify(students);
     kits = kits.filter((kit) => kit.id !== "kit-search");
     await el("class-progress-refresh").events.click();
     assert.equal(el("class-kit-filter").value, "");
+    assert.equal(el("class-kit-focus").checked, false, "Removed kits clear focus");
+    assert.equal(el("class-kit-focus").disabled, true);
     assert.equal(el("class-status-filter").value, "");
     assert.equal(el("class-status-filter").disabled, true, "Removed kits cannot leave a hidden status filter active");
     assert.equal(el("class-chocolate-filter").value, "");
@@ -439,13 +472,16 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     select("class-status-filter", "completed");
     select("class-chocolate-filter", "no");
     assert.match(el("class-progress-status").textContent, /No students match/);
+    focus(true);
     select("class-kit-filter", "");
+    assert.equal(el("class-kit-focus").checked, false, "All kits clears focused view");
+    assert.equal(el("class-kit-focus").disabled, true);
     assert.equal(el("class-status-filter").value, "", "All kits clears the kit-specific status");
     assert.equal(el("class-status-filter").disabled, true);
     assert.equal(el("class-chocolate-filter").value, "", "All kits clears the kit-specific Chocolate filter");
     assert.equal(el("class-chocolate-filter").disabled, true);
     assert.equal(JSON.stringify(students), beforeFiltering, "Filtering never changes saved progress");
-    assert.equal(savedRequests.length, 3, "Filtering and refresh do not save Chocolate or progress");
+    assert.equal(savedRequests.length, 4, "Only explicit checkbox changes save Chocolate, not filtering or refresh");
     select("class-whanau-filter", "");
     select("class-course-filter", "");
     el("class-student-filter").value = "";
@@ -467,6 +503,7 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     select("class-status-filter", "completed");
     select("class-chocolate-filter", "no");
     assert.deepEqual(names(), ["Ana"]);
+    focus(true);
     const reward = chocolateCheckbox();
     reward.checked = true;
     await reward.events.change();
@@ -480,6 +517,10 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     await undo.events.change();
     assert.deepEqual(names(), ["Ana"], "Failed saves keep the confirmed student in the Yes list");
     assert.equal(chocolateCheckbox().checked, true);
+    assert.deepEqual(headers(), ["Student", "Login Kit", "Chocolate"], "Reward saves preserve focused view");
+    focus(false);
+    assert.equal(rows()[0].children.length, 8);
+    assert.equal(chocolateCheckbox().checked, true, "Full table retains rewards saved in focused view");
 });
 
 test("submissions list follows the class filters, links drawings and saves teacher Completed ticks", async () => {

@@ -8,7 +8,7 @@
   <title>Kit Results | Teacher Review</title>
   <link rel="stylesheet" href="../styles.css">
   <link rel="stylesheet" href="./teacher-login-sites.css">
-  <link rel="stylesheet" href="./teacher-results.css?v=5">
+  <link rel="stylesheet" href="./teacher-results.css?v=6">
 </head>
 <body data-hub-read-only="true">
   <nav class="topbar" aria-label="Primary">
@@ -88,7 +88,11 @@
             </select>
           </label>
         </div>
-        <p id="class-status-filter-help">Course filters use recorded DTECH enrolment, not year level alone; MiddleDTECH shows MDTECH students. Choose a kit to filter students by its status or whether Chocolate has been given. Use Completed with Chocolate No to see who is still owed chocolate. All kit columns stay visible for comparison.</p>
+        <label class="class-progress-focus">
+          <input id="class-kit-focus" type="checkbox" disabled aria-describedby="class-status-filter-help">
+          Show selected kit only
+        </label>
+        <p id="class-status-filter-help">Course filters use recorded DTECH enrolment, not year level alone; MiddleDTECH shows MDTECH students. Choose a kit to filter students by its status or whether Chocolate has been given. Use Completed with Chocolate No to see who is still owed chocolate. Show selected kit only displays Student, the selected kit and its Chocolate column; turn it off to compare all kits.</p>
         <p id="class-progress-status" role="status" aria-live="polite">Sign in with an admin account to load the class list.</p>
         <p id="chocolate-status" role="status" aria-live="polite"></p>
         <div id="class-progress-table-host" class="class-progress-table-host"></div>
@@ -109,6 +113,6 @@
   </main>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="../script.js?v=teacher-review-refresh-1"></script>
-  <script src="./teacher-results.js?v=16"></script>
+  <script src="./teacher-results.js?v=17"></script>
 </body>
 </html>
