@@ -683,7 +683,7 @@ assert.match(taskList, /autoChangedChecklistUX = autoTickUXPrinciplesRequirement
 
 const decompositionCategoriesStart = taskList.indexOf("const DECOMPOSITION_TASK_CATEGORIES = [");
 const decompositionCategoriesEnd = taskList.indexOf("\n];", decompositionCategoriesStart) + 3;
-const decompositionCoverageStart = taskList.indexOf("function hasCompleteDecompositionCategoryCoverage(");
+const decompositionCoverageStart = taskList.indexOf("function getRequiredDecompositionCategories(");
 const decompositionCoverageEnd = taskList.indexOf("\nfunction writeDecompositionCategoryCoverage", decompositionCoverageStart);
 const decompositionManagementStart = taskList.indexOf("function getStepAutoManagementKind(");
 const decompositionManagementEnd = taskList.indexOf("\nfunction getSessionTickKey", decompositionManagementStart);
@@ -699,6 +699,7 @@ let decompositionCoverage = { hasData: true, counts: {
     Testing: 1, "Success Criteria": 1, "Client Interaction": 1
 } };
 const decompositionContext = vm.createContext({
+    taskListState: { course: "SeniorDTECH", selectedId: "activity-1" },
     readDecompositionCategoryCoverage: () => decompositionCoverage,
     getStepLevel: (text) => String(text || "").split(":")[0].trim(),
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
@@ -726,6 +727,25 @@ assert.equal(decompositionState["91907"][0].done, true, "Every category with at 
 decompositionCoverage.counts["Client Interaction"] = 0;
 assert.equal(decompositionContext.autoTickDecompositionRequirement(decompositionState, "activity-1", "student@example.test"), true);
 assert.equal(decompositionState["91907"][0].done, false, "Missing category coverage clears the parent criterion");
+decompositionContext.taskListState.course = "MiddleDTECH";
+decompositionCoverage.counts["Success Criteria"] = 0;
+assert.equal(decompositionContext.autoTickDecompositionRequirement(decompositionState, "activity-1", "student@example.test"), true);
+assert.equal(decompositionState["91907"][0].done, true, "MiddleDTECH requires only the four displayed categories");
+decompositionCoverage.counts.Testing = 0;
+decompositionContext.autoTickDecompositionRequirement(decompositionState, "activity-1", "student@example.test");
+assert.equal(decompositionState["91907"][0].done, false, "MiddleDTECH still requires Testing coverage");
+decompositionCoverage.counts.Testing = 1;
+Object.assign(decompositionContext, {
+    getTaskListEmail: () => "student@example.test",
+    buildCustomActivityLink: () => "/activity"
+});
+vm.runInContext(taskList.slice(taskList.indexOf("function getDecompositionSubtasks("),
+    taskList.indexOf("function getStoredTriallingComponentsUrl(")), decompositionContext);
+assert.deepEqual(Array.from(decompositionContext.getDecompositionSubtasks({}), row => row.label),
+    ["Development Steps", "Tools & Techniques", "Trialling", "Testing"]);
+decompositionContext.taskListState.course = "SeniorDTECH";
+assert.deepEqual(Array.from(decompositionContext.getDecompositionSubtasks({}), row => row.label),
+    ["Development Steps", "Tools & Techniques", "Trialling", "Testing", "Success Criteria", "Client Interaction"]);
 decompositionCoverage = { hasData: false, counts: {} };
 decompositionState["91907"][0].done = true;
 assert.equal(decompositionContext.autoTickDecompositionRequirement(decompositionState, "activity-1", "student@example.test"), true);

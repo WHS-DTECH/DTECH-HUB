@@ -1228,8 +1228,14 @@ function countDecompositionTaskCategories(cards, toolsTechniquesKeywords = []) {
     }));
 }
 
+function getRequiredDecompositionCategories(categories) {
+    return taskListState.course === "MiddleDTECH"
+        ? categories.filter(category => !["Success Criteria", "Client Interaction"].includes(category.label))
+        : categories;
+}
+
 function hasCompleteDecompositionCategoryCoverage(coverage) {
-    return Boolean(coverage?.hasData && DECOMPOSITION_TASK_CATEGORIES.every((category) =>
+    return Boolean(coverage?.hasData && getRequiredDecompositionCategories(DECOMPOSITION_TASK_CATEGORIES).every((category) =>
         Number(coverage.counts?.[category.label] || 0) > 0
     ));
 }
@@ -1586,7 +1592,7 @@ function getDecompositionSubtasks(stateMap) {
         coverageSavedAt: coverage.savedAt
     });
 
-    return [
+    return getRequiredDecompositionCategories([
         withCoverage({
             label: "Development Steps",
             href: buildCustomActivityLink(activityId, "Explain how the outcome will be developed.", "Development Steps", "development-steps"),
@@ -1619,7 +1625,7 @@ function getDecompositionSubtasks(stateMap) {
             href: buildCustomActivityLink(activityId, "Client Interaction", "Client Interaction"),
             done: false
         })
-    ];
+    ]);
 }
 
 function getStoredTriallingComponentsUrl(projectId, email) {
