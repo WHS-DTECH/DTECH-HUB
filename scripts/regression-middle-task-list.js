@@ -32,12 +32,14 @@ const standardCard = fs.readFileSync(path.join(root, "assessment-standard-card.j
         DIGIMED_L3_TOOLS_TECHNIQUES_SUBTASKS: labels
     });
     vm.runInContext(taskList.slice(start, end), context);
-    for (const standard of ["91893", "91903"]) {
+    for (const course of ["", "SeniorDTECH", "MiddleDTECH"]) {
+      context.taskListState.course = course;
+      for (const standard of ["91893", "91903"]) {
         for (const type of ["video", " Video ", "web", "image", "graphics", "", "audio"]) {
             mediaType = type;
-            const required = type.trim().toLowerCase() === "video" ? 2 : 3;
+            const required = course === "MiddleDTECH" ? 1 : type.trim().toLowerCase() === "video" ? 2 : 3;
             assert.equal(context.getToolsTechniquesRequiredCount(standard), required);
-            for (const count of [1, 2, 3]) {
+            for (const count of [0, 1, 2, 3, 4]) {
                 for (const databaseEvidence of [false, true]) {
                     local = databaseEvidence ? {} : Object.fromEntries(labels.slice(0, count).map((label) => [label, true]));
                     const row = { text: standard === "91893"
@@ -50,15 +52,25 @@ const standardCard = fs.readFileSync(path.join(root, "assessment-standard-card.j
                     context.autoTickUseOfToolsTechniquesRequirement(state, []);
                     assert.equal(row.done, false, "The evidence template is still required");
                 }
+              }
             }
         }
     }
+    context.taskListState.course = "";
     mediaType = "video";
     assert.equal(context.getToolsTechniquesRequiredCount("91897"), 3, "Other standards do not receive the video exception");
     assert.match(taskList, /You must include \$\{toolsTechniquesRequiredWord\} of the items listed/);
     assert.match(taskList, /Requires at least \$\{toolsTechniquesRequiredWord\} checked subtasks/);
     assert.match(activityDetail, /digitalMediaType\.toLowerCase\(\) === "video" \? 2 : 3/);
     assert.match(activityDetail, /Complete any \$\{requiredCount\} or more categories/);
+    const detailRule = activityDetail.slice(activityDetail.indexOf("    const allocationYear ="), activityDetail.indexOf("    const mediaLabel =", activityDetail.indexOf("    const allocationYear =")));
+    for (const year of [9, 10, 11, 12, 13]) {
+        for (const type of ["web", "video", "image"]) {
+            const detailContext = vm.createContext({ allocation: { year_group: `Year ${year}`, course_type: "DTECH" },
+                projectTaskStandard: "91893", digitalMediaType: type });
+            assert.equal(vm.runInContext(detailRule + "\nrequiredCount;", detailContext), year <= 10 ? 1 : type === "video" ? 2 : 3);
+        }
+    }
 }
 
 {

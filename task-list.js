@@ -2115,6 +2115,7 @@ function isUseOfToolsTechniquesRequirementStep(standard, text) {
 }
 
 function getToolsTechniquesRequiredCount(standard) {
+    if (taskListState.course === "MiddleDTECH" && ["91893", "91903"].includes(String(standard || "").trim())) return 1;
     return ["91893", "91903"].includes(String(standard || "").trim())
         && String(getAllocatedDigitalMediaType(standard) || "").trim().toLowerCase() === "video" ? 2 : 3;
 }
@@ -3914,7 +3915,7 @@ function renderChecklistCards(detail, allItems) {
                                     && /iterative improvement throughout the design, development and testing process/i.test(stepText);
                                 const digitalMediaType = getAllocatedDigitalMediaType(standard).toLowerCase();
                                 const isVideoMedia = digitalMediaType === "video";
-                                const toolsTechniquesRequiredWord = getToolsTechniquesRequiredCount(standard) === 2 ? "two" : "three";
+                                const toolsTechniquesRequiredWord = ["", "one", "two", "three"][getToolsTechniquesRequiredCount(standard)];
                                 const isImageMedia = digitalMediaType === "image" || digitalMediaType === "graphics" || digitalMediaType === "vector";
                                 const toolsAndTechniquesLabel = isVideoMedia ? "Tools & Techniques (VIDEO)" : isImageMedia ? "Tools & Techniques (IMAGE)" : "Tools & Techniques (WEB)";
                                 const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
@@ -3976,7 +3977,7 @@ function renderChecklistCards(detail, allItems) {
                                                     </label>
                                                 `).join("")}
                                             </div>
-                                            ${String(standard) === "91893" || String(standard) === "91903" ? `<p class="task-list-achieved-note">You must include ${toolsTechniquesRequiredWord} of the items listed. (${toolsTechniquesSubtasksList.filter((subtask) => toolsTechniquesState[subtask]).length}/${toolsTechniquesSubtasksList.length} detected.)</p><p class="task-list-achieved-note">Auto-detected from your GitHub repo where possible \u2014 click Sync from GitHub above to check these boxes.</p>` : ""}
+                                            ${String(standard) === "91893" || String(standard) === "91903" ? `<p class="task-list-achieved-note">You must include ${toolsTechniquesRequiredWord} of the items listed${isMiddleDtech ? " (at least one tool or technique used)" : ""}. (${toolsTechniquesSubtasksList.filter((subtask) => toolsTechniquesState[subtask]).length}/${toolsTechniquesSubtasksList.length} detected.)</p><p class="task-list-achieved-note">Auto-detected from your GitHub repo where possible \u2014 click Sync from GitHub above to check these boxes.</p>` : ""}
                                         </div>
                                     ` : ""}
                                     ${is91893EfficientToolsRow ? `

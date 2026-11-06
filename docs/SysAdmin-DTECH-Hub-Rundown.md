@@ -15,6 +15,10 @@ DTECH Hub is a web application used in DTECH classes for project/activity access
 - `practical_skills_filed_drawings.synced` records actual success separately from reminder-resolved outcomes (`missing`, `not-owner`, `not-drawing`). Those outcomes remain Saved, with student guidance to correct the link.
 - Older filing markers did not distinguish success from those outcomes. They remain unconfirmed until a student-authorised filing retry checks the drawing; the filing helper leaves already-correct folders/names unchanged. Saved links, teacher ticks and email deduplication are preserved.
 
+### MiddleDTECH tools and techniques
+- The appropriate tools/techniques checklist requires **at least one** listed tool or technique for MiddleDTECH, across media types. The existing Use of Tools & Techniques template evidence requirement remains.
+- The task-list automatic tick, count guidance, linked tools detail page and teacher evidence summary use the reduced MiddleDTECH threshold. Senior task-list thresholds remain unchanged (two for video, three for other media). Existing selections and saved evidence are retained.
+
 ### Attendance-aware Typing Kit (Week 5 rollout)
 - The new requirement applies only to **Typing Kit Weeks 5-7**, not Planner term-week numbers. With the default Monday 26 October 2026 calendar, Week 5 starts **23 November 2026**.
 - One saved valid one-minute result in either typing slot satisfies that week. Weeks 1-4 have no new weekly requirement. A week with confirmed absence for every scheduled DTECH lesson is excused without catch-up; blank/missing/conflicting marks are not absences. Late counts as attendance.

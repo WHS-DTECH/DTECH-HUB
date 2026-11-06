@@ -1019,7 +1019,8 @@ function buildAllRecords() {
                 const efficientTools = Array.isArray(student?.efficient_tools) ? student.efficient_tools : [];
                 const isAdvancedToolsCriterion = /(?:using|applying) appropriate tools and techniques/.test(stripTaskTopicLevel(taskTopic).toLowerCase());
                 const isEfficientToolsCriterion = /using efficient tools and techniques/.test(stripTaskTopicLevel(taskTopic).toLowerCase());
-                const digitalMediaSubtaskComplete = (isAdvancedToolsCriterion && advancedToolsCount >= 3)
+                const toolsRequired = workState.studentCourseByEmail.get(normalizeEmail(studentEmail)) === "MiddleDTECH" ? 1 : 3;
+                const digitalMediaSubtaskComplete = (isAdvancedToolsCriterion && advancedToolsCount >= toolsRequired)
                     || (isEfficientToolsCriterion && efficientTools.length >= 3);
 
                 const mergedLinks = [];

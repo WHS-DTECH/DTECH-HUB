@@ -2353,7 +2353,9 @@ async function renderUseOfToolsTechniquesPanel(host, projectId, allocation) {
     }
 
     const detectedCount = labels.filter((label) => detected[label]).length;
-    const requiredCount = ["91893", "91903"].includes(projectTaskStandard)
+    const allocationYear = Number.parseInt(String(allocation?.year_group || "").replace(/[^0-9]/g, ""), 10);
+    const isMiddleDtech = [9, 10].includes(allocationYear) && ["DTECH", "MDTECH"].includes(String(allocation?.course_type || "").trim().toUpperCase());
+    const requiredCount = isMiddleDtech ? 1 : ["91893", "91903"].includes(projectTaskStandard)
         && digitalMediaType.toLowerCase() === "video" ? 2 : 3;
     const mediaLabel = digitalMediaType ? digitalMediaType.toUpperCase() : "";
     slot.innerHTML = `
