@@ -153,6 +153,9 @@ test("typing weekly table follows filters and persists independent per-week book
         }
     });
     el("typing-week-filter").value = "current";
+    for (const value of ["current", "all", "1", "2", "3", "4", "5", "6", "7"]) {
+        el("typing-week-filter").add({ value, textContent: value });
+    }
     vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "teacher-results.js"), "utf8"), context);
     const settle = async () => { for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve)); };
     await settle();
@@ -167,6 +170,11 @@ test("typing weekly table follows filters and persists independent per-week book
     const tick = period => rows()[0].children[period + 1].children[0].children[0];
     const header = () => table().children[0].children[0].children.map(cell => cell.textContent);
     const selectWeek = value => { el("typing-week-filter").value = value; el("typing-week-filter").events.change(); };
+    const weekOptions = () => el("typing-week-filter").options.map(option => option.textContent);
+    assert.deepEqual(weekOptions().slice(0, 2), ["current", "all"], "Current and All weeks options are unchanged");
+    assert.equal(weekOptions()[2], "Week 1 (26 Oct 2026 - 1 Nov 2026)");
+    assert.equal(weekOptions()[8], "Week 7 (7 Dec 2026 - 13 Dec 2026)");
+    assert.equal(el("typing-week-filter").value, "current", "Populating dates preserves the current selection");
     selectWeek("1");
     assert.ok(rows()[0].children[1].children.some(child => /35 WPM - 97%/.test(child.textContent)),
         "Saved results appear before attendance completes");
@@ -258,11 +266,19 @@ test("typing weekly table follows filters and persists independent per-week book
     assert.equal(tick(2).checked, true, "A calendar change does not replace saved signatures");
     assert.ok(rows()[0].children[1].children.some(child => /calendar changed/.test(child.textContent)));
     attendanceDate = "";
+    weeks.forEach((week, index) => {
+        week.weekStart = new Date(Date.UTC(2026, 11, 28 + index * 7)).toISOString().slice(0, 10);
+    });
+    await el("class-progress-refresh").events.click();
+    await settle();
+    assert.equal(el("typing-week-filter").value, "3", "Calendar refresh keeps the chosen week");
+    assert.equal(weekOptions()[2], "Week 1 (28 Dec 2026 - 3 Jan 2027)", "Calendar changes update dates across years");
     failRead = true;
     await el("class-progress-refresh").events.click();
     await settle();
     assert.match(el("typing-review-status").textContent, /could not be read/);
     assert.equal(el("class-typing-table-host").children.length, 0, "Failed reads do not invent empty results or unsigned ticks");
+    assert.equal(weekOptions()[2], "Week 1", "Failed reads clear stale calendar dates");
     el("class-kit-filter").value = "kit-login";
     el("class-kit-filter").events.change();
     assert.equal(el("class-typing-results").hidden, true);

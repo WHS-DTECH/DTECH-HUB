@@ -47,6 +47,20 @@
     function date(value) {
         return value ? new Date(value).toLocaleString("en-NZ", { timeZone: "Pacific/Auckland" }) : "Not recorded";
     }
+    function updateTypingWeekLabels(weeks) {
+        for (const option of typingWeekFilter.options) {
+            const week = weeks?.find(item => String(item.week) === option.value);
+            if (!/^[1-7]$/.test(option.value)) continue;
+            option.textContent = `Week ${option.value}`;
+            if (!week || !/^\d{4}-\d{2}-\d{2}$/.test(week.weekStart)) continue;
+            const start = new Date(`${week.weekStart}T00:00:00Z`);
+            if (Number.isNaN(start.getTime()) || start.toISOString().slice(0, 10) !== week.weekStart) continue;
+            const end = new Date(start);
+            end.setUTCDate(end.getUTCDate() + 6);
+            const format = value => value.toLocaleDateString("en-NZ", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+            option.textContent += ` (${format(start)} - ${format(end)})`;
+        }
+    }
     function adminHeaders(allowAccessToken = false) {
         const raw = localStorage.getItem("hub_google_auth_v1") || sessionStorage.getItem("hub_google_auth_v1") || "";
         const auth = raw ? JSON.parse(raw) : null;
@@ -382,6 +396,7 @@
                 : failed.length ? `${failed.length} student logs could not be read: ${typingReviews.get(failed[0].email.toLowerCase()).error} Refresh the list to retry.`
                     : `Showing weekly results for ${students.length} students. Book signatures save automatically.`;
         const first = students.map(student => typingReviews.get(student.email.toLowerCase())).find(review => review?.weeklyProgress);
+        updateTypingWeekLabels(first?.weeklyProgress.weeks);
         if (first) {
             const weeks = first.weeklyProgress.weeks;
             const today = first.weeklyProgress.today;
