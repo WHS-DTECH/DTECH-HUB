@@ -98,6 +98,17 @@
     min-width: 130px;
 }
 
+.typing-saved-result {
+    display: inline-block;
+    margin: 3px 0;
+    padding: 4px 8px;
+    border: 1px solid #86c99b;
+    border-radius: 4px;
+    background: #dcfce7;
+    color: #14532d;
+    font-weight: 700;
+}
+
 .typing-week-filter {
     max-width: 260px;
 }

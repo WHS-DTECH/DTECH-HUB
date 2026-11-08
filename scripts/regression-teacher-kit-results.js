@@ -170,6 +170,9 @@ test("typing weekly table follows filters and persists independent per-week book
     selectWeek("1");
     assert.ok(rows()[0].children[1].children.some(child => /35 WPM - 97%/.test(child.textContent)),
         "Saved results appear before attendance completes");
+    const savedResults = rows()[0].children[1].children.filter(child => child.className === "typing-saved-result");
+    assert.equal(savedResults.length, 2, "Both saved periods are highlighted");
+    assert.match(savedResults[0].textContent, /^Saved result: 35 WPM - 97%/);
     assert.ok(rows()[0].children[1].children.some(child => /Checking attendance/.test(child.textContent)));
     selectWeek("current");
     releaseAttendance();
@@ -199,6 +202,8 @@ test("typing weekly table follows filters and persists independent per-week book
     assert.deepEqual(writes[1], { email: "ana@school.nz", weekStart: weeks[0].weekStart, period: 1, signed: true });
     assert.equal(tick(2).checked, false, "Periods are independent");
     selectWeek("2");
+    assert.equal(rows()[0].children[1].children.filter(child => child.className === "typing-saved-result").length, 0,
+        "Periods with no saved results are not highlighted");
     assert.equal(tick(1).checked, false, "Weeks are independent");
     selectWeek("1");
     assert.equal(tick(1).checked, true, "Returning to the signed week preserves its confirmed tick");
@@ -564,6 +569,7 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     assert.equal(el("class-status-filter").disabled, true, "Status needs a selected kit");
     assert.equal(el("class-chocolate-filter").disabled, true, "Chocolate needs a selected kit");
     assert.equal(el("class-kit-focus").disabled, true, "Focused view needs a selected kit");
+    assert.equal(Boolean(el("class-kit-focus").checked), false);
     assert.deepEqual(el("class-kit-filter").options.map((option) => option.value), ["", "kit-login", "kit-search"]);
     select("class-kit-filter", "kit-login");
     assert.equal(el("class-status-filter").disabled, false);
@@ -575,14 +581,13 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     select("class-chocolate-filter", "");
     select("class-status-filter", "completed");
     assert.deepEqual(names(), ["Ana"], "Completed takes priority over started");
-    assert.equal(rows()[0].children.length, 8, "All kit and Chocolate columns stay visible");
+    assert.equal(el("class-kit-focus").checked, true, "Selecting a kit enables focused view by default");
     const focus = (checked) => {
         el("class-kit-focus").checked = checked;
         el("class-kit-focus").events.change();
     };
     const headers = () => el("class-progress-table-host").children[0].children[0].children[0].children.map((cell) => cell.textContent);
     assert.equal(el("class-kit-focus").disabled, false);
-    focus(true);
     assert.deepEqual(headers(), ["Student", "Login Kit", "Chocolate"]);
     assert.deepEqual(rows()[0].children.slice(0, 2).map((cell) => cell.textContent), ["Ana", "Complete"]);
     assert.equal(rows()[0].children.length, 3, "Focused rows hide all other student details and kits");
@@ -590,6 +595,9 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     assert.deepEqual(names(), ["Ana"], "Focus preserves status filtering");
     focus(false);
     assert.equal(rows()[0].children.length, 8, "Turning focus off restores the full table");
+    await el("class-progress-refresh").events.click();
+    assert.equal(el("class-kit-focus").checked, false, "Refresh preserves a teacher's choice to show all kits");
+    assert.equal(rows()[0].children.length, 8);
     focus(true);
     select("class-status-filter", "in-progress");
     assert.deepEqual(names(), ["Ben"]);
@@ -597,7 +605,9 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     assert.deepEqual(names(), ["Cara", "Dan"], "Missing and explicitly unstarted progress both match");
     select("class-status-filter", "");
     assert.deepEqual(names(), ["Ana", "Ben", "Cara", "Dan"]);
+    focus(false);
     select("class-kit-filter", "kit-search");
+    assert.equal(el("class-kit-focus").checked, true, "Selecting another kit defaults back to focused view");
     assert.deepEqual(headers(), ["Student", "Search Kit", "Chocolate"], "Focus follows the selected kit");
     select("class-chocolate-filter", "yes");
     assert.deepEqual(names(), ["Ben"], "Chocolate Yes uses the selected kit only");
@@ -757,6 +767,7 @@ test("submissions list follows the class filters, links drawings and saves teach
     assert.equal(el("results-kit").value, "kit-google-drawings", "Emailed link presets Student Review");
     assert.equal(el("results-emails").value, "ana@school.nz");
     assert.equal(el("class-kit-filter").value, "kit-google-drawings", "Emailed link presets the kit filter");
+    assert.equal(el("class-kit-focus").checked, true, "Emailed link defaults to focused view");
     assert.equal(el("class-student-filter").value, "ana@school.nz");
     const host = el("class-submissions-host");
     assert.match(host.children[0].textContent, /Google Drawings Kit - Submissions/);

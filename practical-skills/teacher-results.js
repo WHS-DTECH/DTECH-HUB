@@ -438,7 +438,7 @@
                     for (const period of [1, 2]) {
                         const attempts = review.attempts.filter(attempt => attempt.weekStart === week.weekStart && attempt.period === period);
                         node("div", `Period ${period}: ${attempts.length ? "" : "No result yet"}`, cell);
-                        for (const attempt of attempts) node("div", `${attempt.netWpm} WPM - ${attempt.accuracy}% (${date(attempt.submittedAt)})`, cell, "submission-note");
+                        for (const attempt of attempts) node("div", `Saved result: ${attempt.netWpm} WPM - ${attempt.accuracy}% (${date(attempt.submittedAt)})`, cell, "typing-saved-result");
                         const signedCell = node("td", undefined, row);
                         const label = node("label", undefined, signedCell);
                         const checkbox = node("input", undefined, label);
@@ -567,6 +567,7 @@
                 if (classData.kits.some((kit) => kit.id === pendingLinkFilters.kit)) {
                     kitFilter.value = pendingLinkFilters.kit;
                     updateStatusFilter();
+                    kitFocus.checked = true;
                 }
                 if (pendingLinkFilters.student) studentFilter.value = pendingLinkFilters.student;
                 pendingLinkFilters = null;
@@ -615,6 +616,7 @@
     [courseFilter, whanauFilter, homeroomFilter, statusFilter, chocolateFilter, kitFocus].forEach((filter) => filter.addEventListener("change", renderClassProgress));
     kitFilter.addEventListener("change", () => {
         updateStatusFilter();
+        if (kitFilter.value) kitFocus.checked = true;
         renderClassProgress();
     });
     studentFilter.addEventListener("input", renderClassProgress);
