@@ -138,6 +138,10 @@ test("teacher weekly reads and book signatures are independent of typing and cer
     assert.equal(review.status, 200);
     assert.equal(review.body.students[0].attempts[0].netWpm, 35);
     assert.equal(review.body.students[0].weeklyProgress.weeks.length, 7);
+    const deferred = await f.call(readRoute + "&attendance=deferred", { email: teacher });
+    assert.equal(deferred.status, 200);
+    assert.equal(deferred.body.students[0].weeklyProgress.sourceStatus, "loading");
+    assert.equal(deferred.body.students[0].attempts[0].netWpm, 35);
     assert.match(review.headers.get("cache-control"), /no-store/);
     const before = JSON.stringify(f.data.attempts);
     for (const period of [1, 2]) {

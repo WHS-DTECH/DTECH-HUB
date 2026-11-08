@@ -200,6 +200,8 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
                 const signatures = (await pool.query(`SELECT student_email, week_start, period, signed FROM typing_kit_book_signatures
                     WHERE student_email = ANY($1::text[]) AND week_start >= $2 AND week_start <= $3`,
                 [emails, startDate, addDays(startDate, 42)])).rows;
+                const deferred = req.query.attendance === "deferred";
+                const attendance = deferred ? null : attendanceProvider.batch ? await attendanceProvider.batch(emails, startDate) : null;
                 const students = [];
                 for (let index = 0; index < emails.length; index += 4) {
                     students.push(...await Promise.all(emails.slice(index, index + 4).map(async email => {
@@ -208,7 +210,9 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
                             signatures: signatures.filter(row => row.student_email === email).map(row => ({
                                 weekStart: row.week_start, period: row.period, signed: row.signed === true
                             })),
-                            weeklyProgress: weeklyTypingProgress(startDate, rows, await attendanceProvider(email, startDate), nzDate(now())) };
+                            weeklyProgress: weeklyTypingProgress(startDate, rows, deferred ?
+                                { active: true, status: "loading", weeks: [] } :
+                                attendance ? attendance[email] : await attendanceProvider(email, startDate), nzDate(now())) };
                     })));
                 }
                 if (await settings() !== startDate) return res.status(409).json({ error: "The Typing Kit calendar changed. Refresh the class list." });

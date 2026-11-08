@@ -38,7 +38,22 @@ function createTypingAttendanceClient({ env = process.env, fetchSource = fetch }
     const endpoint = new URL(url);
     if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || endpoint.search || endpoint.hash ||
         endpoint.pathname !== "/integrations/typing-attendance") throw new Error("TYPING_ATTENDANCE_URL must be an HTTPS typing-attendance integration endpoint.");
-    return async (studentEmail, startDate) => {
+    function validate(data, studentEmail, startDate) {
+        if (data.version !== 1 || data.studentEmail !== studentEmail || data.startDate !== startDate ||
+            !Array.isArray(data.weeks) || data.weeks.length !== 7 || !Number.isFinite(Date.parse(data.fetchedAt)) ||
+            Date.parse(data.fetchedAt) < Date.now() - 5 * 60000 || Date.parse(data.fetchedAt) > Date.now() + 60000 ||
+            data.weeks.some((week, index) => week.weekStart !== addDays(startDate, index * 7) ||
+                typeof week.confirmed !== "boolean" || !Array.isArray(week.lessons) || week.lessons.length > 25 ||
+                new Set(week.lessons.map(lesson => `${lesson.date}:${lesson.period}`)).size !== week.lessons.length ||
+                week.lessons.some(lesson => !["", "P", "A", "L"].includes(lesson.mark) || !/^p[1-5]$/.test(lesson.period) ||
+                    !Array.from({ length: 5 }, (_, day) => addDays(week.weekStart, day)).includes(lesson.date)))) {
+            throw new Error("Planner attendance response is invalid or stale");
+        }
+        return { active: true, status: "available", fetchedAt: data.fetchedAt, weeks: data.weeks };
+    }
+    const unavailable = () => ({ active: true, status: "unavailable", weeks: [],
+        error: "Teacher Planner attendance could not be confirmed. Retry shortly or ask your teacher. Saved typing results are safe." });
+    const client = async (studentEmail, startDate) => {
         try {
             const response = await fetchSource(endpoint.href, {
                 method: "POST", redirect: "error", signal: AbortSignal.timeout(45000),
@@ -47,23 +62,47 @@ function createTypingAttendanceClient({ env = process.env, fetchSource = fetch }
             });
             if (!response.ok) throw new Error(`Planner returned ${response.status}`);
             const data = await response.json();
-            if (data.version !== 1 || data.studentEmail !== studentEmail || data.startDate !== startDate ||
-                !Array.isArray(data.weeks) || data.weeks.length !== 7 || !Number.isFinite(Date.parse(data.fetchedAt)) ||
-                Date.parse(data.fetchedAt) < Date.now() - 5 * 60000 || Date.parse(data.fetchedAt) > Date.now() + 60000 ||
-                data.weeks.some((week, index) => week.weekStart !== addDays(startDate, index * 7) ||
-                    typeof week.confirmed !== "boolean" || !Array.isArray(week.lessons) || week.lessons.length > 25 ||
-                    new Set(week.lessons.map(lesson => `${lesson.date}:${lesson.period}`)).size !== week.lessons.length ||
-                    week.lessons.some(lesson => !["", "P", "A", "L"].includes(lesson.mark) || !/^p[1-5]$/.test(lesson.period) ||
-                        !Array.from({ length: 5 }, (_, day) => addDays(week.weekStart, day)).includes(lesson.date)))) {
-                throw new Error("Planner attendance response is invalid or stale");
-            }
-            return { active: true, status: "available", fetchedAt: data.fetchedAt, weeks: data.weeks };
+            return validate(data, studentEmail, startDate);
         } catch (error) {
             console.error("[typing-attendance] Read failed:", error.name);
-            return { active: true, status: "unavailable", weeks: [],
-                error: "Teacher Planner attendance could not be confirmed. Retry shortly or ask your teacher. Saved typing results are safe." };
+            return unavailable();
         }
     };
+    client.batch = async (studentEmails, startDate) => {
+        try {
+            const response = await fetchSource(endpoint.href + "/batch", {
+                method: "POST", redirect: "error", signal: AbortSignal.timeout(45000),
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+                body: JSON.stringify({ studentEmails, startDate })
+            });
+            if (response.status === 404) {
+                console.warn("[typing-attendance] Batch endpoint not available; using individual reads.");
+                const results = [];
+                for (let index = 0; index < studentEmails.length; index += 4) {
+                    results.push(...await Promise.all(studentEmails.slice(index, index + 4).map(email => client(email, startDate))));
+                }
+                return Object.fromEntries(studentEmails.map((email, index) => [email, results[index]]));
+            }
+            if (!response.ok) throw new Error(`Planner returned ${response.status}`);
+            const data = await response.json();
+            if (!Array.isArray(data.students) || data.students.length !== studentEmails.length ||
+                new Set(data.students.map(item => item.studentEmail)).size !== studentEmails.length ||
+                data.students.some(item => !studentEmails.includes(item.studentEmail))) throw new Error("Invalid batch response");
+            return Object.fromEntries(data.students.map(item => {
+                if (item.error) return [item.studentEmail, unavailable()];
+                try {
+                    return [item.studentEmail, validate(item, item.studentEmail, startDate)];
+                } catch (error) {
+                    console.error("[typing-attendance] Student response invalid:", error.name);
+                    return [item.studentEmail, unavailable()];
+                }
+            }));
+        } catch (error) {
+            console.error("[typing-attendance] Batch read failed:", error.name);
+            return Object.fromEntries(studentEmails.map(email => [email, unavailable()]));
+        }
+    };
+    return client;
 }
 
 module.exports = { RULE_START_WEEK, weeklyTypingProgress, createTypingAttendanceClient };

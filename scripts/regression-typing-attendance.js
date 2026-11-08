@@ -71,6 +71,18 @@ test("client sends only verified server-supplied identity and validates current,
     assert.equal(requests[0].options.redirect, "error");
     assert.match(requests[0].options.headers.Authorization, /^Bearer /);
     const original = structuredClone(data);
+    data = { students: [original, { studentEmail: "other@school.nz", error: "No class" }] };
+    const batch = await client.batch([email, "other@school.nz"], startDate);
+    assert.equal(batch[email].status, "available");
+    assert.equal(batch["other@school.nz"].status, "unavailable");
+    assert.deepEqual(JSON.parse(requests.at(-1).options.body), { studentEmails: [email, "other@school.nz"], startDate });
+    assert.ok(requests.at(-1).url.endsWith("/batch"));
+    data = { students: [original, original] };
+    assert.equal((await client.batch([email, "other@school.nz"], startDate))[email].status, "unavailable");
+    data = { students: [original, { ...structuredClone(original), studentEmail: "other@school.nz", fetchedAt: "2020-01-01" }] };
+    const partial = await client.batch([email, "other@school.nz"], startDate);
+    assert.equal(partial[email].status, "available", "One invalid response does not hide another student's attendance");
+    assert.equal(partial["other@school.nz"].status, "unavailable");
     for (const mutate of [
         data => { data.studentEmail = "another@school.nz"; },
         data => { data.startDate = "2026-11-02"; },
@@ -89,6 +101,26 @@ test("client sends only verified server-supplied identity and validates current,
     }
     status = 401;
     assert.equal((await client(email, startDate)).status, "unavailable", "Authentication failure is never a successful empty attendance response");
+});
+test("a missing batch endpoint falls back to bounded individual reads", async () => {
+    let active = 0, maximum = 0;
+    const emails = Array.from({ length: 9 }, (_, index) => `student${index}@school.nz`);
+    const client = createTypingAttendanceClient({
+        env: { TYPING_ATTENDANCE_KEY: "x".repeat(40), TYPING_ATTENDANCE_URL: "https://example.test/integrations/typing-attendance" },
+        fetchSource: async (url, options) => {
+            if (url.endsWith("/batch")) return { status: 404, ok: false };
+            active++;
+            maximum = Math.max(maximum, active);
+            await new Promise(resolve => setImmediate(resolve));
+            active--;
+            const { studentEmail } = JSON.parse(options.body);
+            return { status: 200, ok: true, json: async () => ({ version: 1, studentEmail, startDate,
+                fetchedAt: new Date().toISOString(), weeks: attendance().weeks }) };
+        }
+    });
+    const results = await client.batch(emails, startDate);
+    assert.ok(emails.every(email => results[email].status === "available"));
+    assert.equal(maximum, 4);
 });
 test("student UI labels completed and excused weeks without confusing school periods and typing slots", () => {
     const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "typing-kit.js"), "utf8");

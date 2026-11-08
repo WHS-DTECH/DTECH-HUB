@@ -316,27 +316,48 @@
         const revision = classRevision;
         typingLoadingRevision = revision;
         try {
-            for (let index = 0; index < students.length; index += 20) {
+            for (const phase of ["results", "attendance"]) for (let index = 0; index < students.length; index += 20) {
                 if (revision !== classRevision || kitFilter.value !== "kit-typing") return;
                 const visible = new Set(filteredStudents().map(student => student.email));
-                const batch = students.slice(index, index + 20).filter(student => visible.has(student.email));
+                const batch = students.slice(index, index + 20).filter(student => {
+                    const existing = typingReviews.get(student.email.toLowerCase());
+                    return visible.has(student.email) && (phase === "results" ? !existing :
+                        existing?.weeklyProgress?.sourceStatus === "loading");
+                });
                 if (!batch.length) continue;
                 try {
-                    const response = await fetch(`/api/admin/typing-kit-results?emails=${encodeURIComponent(batch.map(student => student.email).join(","))}`,
+                    const response = await fetch(`/api/admin/typing-kit-results?emails=${encodeURIComponent(batch.map(student => student.email).join(","))}${phase === "results" ? "&attendance=deferred" : ""}`,
                         { headers: adminHeaders(), cache: "no-store" });
                     const data = await response.json();
                     if (!response.ok) throw new Error(data.error || `Could not read weekly results (${response.status}).`);
                     if (revision !== classRevision) return;
+                    if (!Array.isArray(data.students) || data.students.length !== batch.length) {
+                        throw new Error("Weekly results were incomplete. Refresh the list.");
+                    }
                     for (const student of batch) {
                         const review = data.students?.find(entry => entry.email === student.email.toLowerCase());
                         if (!review || !Array.isArray(review.attempts) || !Array.isArray(review.signatures) || review.weeklyProgress?.weeks?.length !== 7) {
                             throw new Error("Weekly results were incomplete. Refresh the list.");
                         }
                     }
-                    for (const review of data.students) typingReviews.set(review.email, { ...review, startDate: data.startDate });
+                    for (const review of data.students) {
+                        const existing = typingReviews.get(review.email);
+                        if (phase === "attendance") {
+                            if (existing.startDate !== data.startDate) {
+                                existing.weeklyProgress.sourceStatus = "unavailable";
+                                existing.weeklyProgress.error = "The Typing Kit calendar changed. Refresh the list to check attendance.";
+                            } else existing.weeklyProgress = review.weeklyProgress;
+                        } else typingReviews.set(review.email, { ...review, startDate: data.startDate });
+                    }
                 } catch (error) {
                     if (revision !== classRevision) return;
-                    for (const student of batch) typingReviews.set(student.email.toLowerCase(), { error: error.message || "Could not read weekly results." });
+                    for (const student of batch) {
+                        const key = student.email.toLowerCase(), existing = typingReviews.get(key);
+                        if (phase === "attendance" && existing?.weeklyProgress) {
+                            existing.weeklyProgress.sourceStatus = "unavailable";
+                            existing.weeklyProgress.error = error.message || "Could not read attendance.";
+                        } else typingReviews.set(key, { error: error.message || "Could not read weekly results." });
+                    }
                 }
                 if (revision === classRevision && classData) renderTypingResults(filteredStudents());
             }
@@ -352,6 +373,7 @@
         if (typingSection.hidden) return;
         typingHost.replaceChildren();
         const missing = students.filter(student => !typingReviews.has(student.email.toLowerCase()));
+        const pending = students.filter(student => typingReviews.get(student.email.toLowerCase())?.weeklyProgress?.sourceStatus === "loading");
         const failed = students.filter(student => typingReviews.get(student.email.toLowerCase())?.error);
         if (failed.length) typingStatus.classList.add("is-error");
         else typingStatus.classList.remove("is-error");
@@ -382,7 +404,7 @@
                 selectedWeeks = weeks.filter(week => String(week.week) === typingWeekFilter.value);
             }
             if (!selectedWeeks.length) {
-                if (missing.length && typingLoadingRevision !== classRevision) void loadTypingReviews(missing);
+                if ((missing.length || pending.length) && typingLoadingRevision !== classRevision) void loadTypingReviews([...missing, ...pending]);
                 return;
             }
             const table = node("table", undefined, typingHost, `class-progress-table typing-review-table${selectedWeeks.length === 1 ? " class-progress-table-focused" : ""}`);
@@ -428,11 +450,12 @@
                         checkbox.addEventListener("change", () => saveBookSignature(student, review, week.weekStart, period, checkbox.checked));
                     }
                     if (review.weeklyProgress.sourceStatus !== "available") node("div",
-                        review.weeklyProgress.error || "Attendance connection is not configured.", cell, "submission-note");
+                        review.weeklyProgress.sourceStatus === "loading" ? "Checking attendance..." :
+                            review.weeklyProgress.error || "Attendance connection is not configured.", cell, "submission-note");
                 }
             }
         }
-        if (missing.length && typingLoadingRevision !== classRevision) void loadTypingReviews(missing);
+        if ((missing.length || pending.length) && typingLoadingRevision !== classRevision) void loadTypingReviews([...missing, ...pending]);
     }
     function renderClassProgress() {
         if (!classData || !classTableHost) return;

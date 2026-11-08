@@ -112,7 +112,9 @@ test("typing weekly table follows filters and persists independent per-week book
         status: index < 4 ? "legacy" : index === 4 ? "excused" : "future" }));
     const signatures = [];
     const writes = [];
-    let failSave = false, failRead = false, today = "2026-11-09";
+    let failSave = false, failRead = false, failAttendance = false, attendanceDate = "", today = "2026-11-09";
+    let releaseAttendance;
+    const attendanceGate = new Promise(resolve => { releaseAttendance = resolve; });
     const students = [{ name: "Ana", email: "ana@school.nz", timetableClass: "JPI", course: "JuniorDTECH" },
         { name: "Ben", email: "ben@school.nz", timetableClass: "JVE", course: "JuniorDTECH" }];
     const context = vm.createContext({
@@ -132,13 +134,16 @@ test("typing weekly table follows filters and persists independent per-week book
                 return { ok: !failSave, json: async () => failSave ? { error: "Signature database unavailable" } : { signed: body.signed } };
             }
             if (url.includes("typing-kit-results")) {
-                return { ok: !failRead, json: async () => failRead ? { error: "Weekly read unavailable" } : {
-                    startDate: weeks[0].weekStart,
+                const deferred = url.includes("attendance=deferred");
+                if (!deferred) await attendanceGate;
+                const failed = failRead || (!deferred && failAttendance);
+                return { ok: !failed, json: async () => failed ? { error: "Weekly read unavailable" } : {
+                    startDate: !deferred && attendanceDate || weeks[0].weekStart,
                     students: students.filter(student => decodeURIComponent(url).includes(student.email)).map(student => ({
                         email: student.email, signatures: JSON.parse(JSON.stringify(signatures)),
                         attempts: [{ weekStart: weeks[0].weekStart, period: 1, netWpm: 35, accuracy: 97, submittedAt: "2026-10-27T00:00:00Z" },
                             { weekStart: weeks[0].weekStart, period: 2, netWpm: 38, accuracy: 98, submittedAt: "2026-10-29T00:00:00Z" }],
-                        weeklyProgress: { sourceStatus: "available", today, weeks }
+                        weeklyProgress: { sourceStatus: deferred ? "loading" : "available", today, weeks }
                     }))
                 } };
             }
@@ -162,6 +167,13 @@ test("typing weekly table follows filters and persists independent per-week book
     const tick = period => rows()[0].children[period + 1].children[0].children[0];
     const header = () => table().children[0].children[0].children.map(cell => cell.textContent);
     const selectWeek = value => { el("typing-week-filter").value = value; el("typing-week-filter").events.change(); };
+    selectWeek("1");
+    assert.ok(rows()[0].children[1].children.some(child => /35 WPM - 97%/.test(child.textContent)),
+        "Saved results appear before attendance completes");
+    assert.ok(rows()[0].children[1].children.some(child => /Checking attendance/.test(child.textContent)));
+    selectWeek("current");
+    releaseAttendance();
+    await settle();
     assert.deepEqual(header(), ["Student", "Week 3 (2026-11-09) - Results", "Week 3 - Period 1 signed", "Week 3 - Period 2 signed"],
         "Current NZ Monday defaults to the current Typing Kit week");
     assert.equal(rows()[0].children.length, 4);
@@ -228,6 +240,19 @@ test("typing weekly table follows filters and persists independent per-week book
     assert.match(el("typing-review-status").textContent, /No students match/);
     assert.equal(el("class-typing-table-host").children.length, 0);
     el("class-student-filter").value = "";
+    failAttendance = true;
+    await el("class-progress-refresh").events.click();
+    await settle();
+    assert.equal(tick(2).checked, true, "Attendance failure keeps saved book signatures");
+    assert.ok(rows()[0].children[1].children.some(child => /Weekly read unavailable/.test(child.textContent)),
+        "Attendance failure is visible alongside saved typing data");
+    failAttendance = false;
+    attendanceDate = "2026-11-02";
+    await el("class-progress-refresh").events.click();
+    await settle();
+    assert.equal(tick(2).checked, true, "A calendar change does not replace saved signatures");
+    assert.ok(rows()[0].children[1].children.some(child => /calendar changed/.test(child.textContent)));
+    attendanceDate = "";
     failRead = true;
     await el("class-progress-refresh").events.click();
     await settle();
