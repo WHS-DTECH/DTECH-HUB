@@ -60,7 +60,10 @@ function createTypingAttendanceClient({ env = process.env, fetchSource = fetch }
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
                 body: JSON.stringify({ studentEmail, startDate })
             });
-            if (!response.ok) throw new Error(`Planner returned ${response.status}`);
+            if (!response.ok) {
+                console.error("[typing-attendance] Planner single-read HTTP status:", response.status);
+                throw new Error("Planner request failed");
+            }
             const data = await response.json();
             return validate(data, studentEmail, startDate);
         } catch (error) {
@@ -83,7 +86,10 @@ function createTypingAttendanceClient({ env = process.env, fetchSource = fetch }
                 }
                 return Object.fromEntries(studentEmails.map((email, index) => [email, results[index]]));
             }
-            if (!response.ok) throw new Error(`Planner returned ${response.status}`);
+            if (!response.ok) {
+                console.error("[typing-attendance] Planner batch HTTP status:", response.status);
+                throw new Error("Planner request failed");
+            }
             const data = await response.json();
             if (!Array.isArray(data.students) || data.students.length !== studentEmails.length ||
                 new Set(data.students.map(item => item.studentEmail)).size !== studentEmails.length ||

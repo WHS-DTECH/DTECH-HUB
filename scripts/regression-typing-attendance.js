@@ -122,6 +122,24 @@ test("a missing batch endpoint falls back to bounded individual reads", async ()
     assert.ok(emails.every(email => results[email].status === "available"));
     assert.equal(maximum, 4);
 });
+test("failed Planner requests log HTTP status without student identity or credentials", async () => {
+    const logs = [];
+    const original = console.error;
+    console.error = (...args) => logs.push(args);
+    try {
+        const client = createTypingAttendanceClient({
+            env: { TYPING_ATTENDANCE_KEY: "x".repeat(40), TYPING_ATTENDANCE_URL: "https://example.test/integrations/typing-attendance" },
+            fetchSource: async () => ({ status: 503, ok: false })
+        });
+        assert.equal((await client("synthetic@school.nz", startDate)).status, "unavailable");
+        assert.equal((await client.batch(["synthetic@school.nz"], startDate))["synthetic@school.nz"].status, "unavailable");
+    } finally {
+        console.error = original;
+    }
+    assert.ok(logs.some(args => args[0] === "[typing-attendance] Planner single-read HTTP status:" && args[1] === 503));
+    assert.ok(logs.some(args => args[0] === "[typing-attendance] Planner batch HTTP status:" && args[1] === 503));
+    assert.doesNotMatch(JSON.stringify(logs), /synthetic@school\.nz|x{40}/);
+});
 test("student UI labels completed and excused weeks without confusing school periods and typing slots", () => {
     const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "typing-kit.js"), "utf8");
     const start = source.indexOf("    function weeklyRulesNotice()");
