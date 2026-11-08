@@ -357,6 +357,12 @@ test("teacher review presents accessible tabs and all requested class filters", 
     assert.match(html, /Show selected kit only/);
     const css = fs.readFileSync(path.join(root, "practical-skills", "teacher-results.css"), "utf8");
     assert.match(css, /\.class-progress-table-focused\s*\{\s*min-width: 0;/);
+    assert.match(html, /class="sites-editor teacher-review-page"/);
+    assert.match(css, /\.sites-editor\.teacher-review-page\s*\{\s*width: calc\(100% - 32px\)/);
+    assert.match(css, /\.class-progress-table-host\s*\{\s*overflow: auto/);
+    assert.match(css, /\.class-submissions-table textarea\s*\{[^}]*width: 100%/);
+    assert.match(html, /id="class-progress-table-host"[^>]*tabindex="0" role="region"/);
+    assert.match(html, /id="class-typing-table-host"[^>]*tabindex="0" role="region"/);
     assert.match(html, /<option value="yes">Yes - given<\/option>/);
     assert.match(html, /<option value="no">No - not given<\/option>/);
     const script = fs.readFileSync(path.join(root, "practical-skills", "teacher-results.js"), "utf8");

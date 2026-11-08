@@ -235,6 +235,9 @@
                 continue;
             }
             const wrap = node("div", undefined, submissionsHost, "class-progress-table-host");
+            wrap.setAttribute("tabindex", "0");
+            wrap.setAttribute("role", "region");
+            wrap.setAttribute("aria-label", `${title} submissions table`);
             const table = node("table", undefined, wrap, "class-progress-table class-submissions-table");
             const header = node("tr", undefined, node("thead", undefined, table));
             ["Student", "Homeroom", ...kit.activities.flatMap((activity) => [activity.title, "Completed"])].forEach((label) => node("th", label, header));

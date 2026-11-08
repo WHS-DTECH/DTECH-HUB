@@ -6,6 +6,15 @@
 #results-status.is-error { color: #a4342f; font-weight: 700; }
 .sites-card summary { cursor: pointer; font-weight: 700; padding: 10px 0; }
 
+.sites-editor.teacher-review-page {
+    width: calc(100% - 32px);
+}
+
+.teacher-review-page .sites-card,
+.teacher-results-panel {
+    min-width: 0;
+}
+
 .teacher-results-tabs {
     display: flex;
     gap: 6px;
@@ -120,6 +129,11 @@
     max-width: 100%;
 }
 
+.class-progress-table-host:focus-visible {
+    outline: 3px solid #174968;
+    outline-offset: 3px;
+}
+
 .class-progress-table {
     border-collapse: collapse;
     min-width: 680px;
@@ -136,6 +150,22 @@
 
 .class-progress-table-focused {
     min-width: 0;
+}
+
+.class-submissions-table td:nth-child(2n + 3) {
+    min-width: 170px;
+}
+
+.class-submissions-table textarea {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    font: inherit;
+}
+
+.class-submissions-table label {
+    display: block;
 }
 
 .class-progress-focus {
