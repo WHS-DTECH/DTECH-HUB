@@ -11,7 +11,24 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
     syncCompletion, getRequestUserEmail, normalizeEmail, schoolDomain, verifyDriveTokenForStudent,
     driveApiRequest, requireAdminAccess, canReview, autoEmailKitCertificate, notifySubmission = async () => false,
     fileSubmission = async () => ({ filed: false }), fetchFile = fetch }) {
-    let schema, submissionSchema;
+    let schema, submissionSchema, commentSchema;
+    async function ensureCommentSchema() {
+        if (!commentSchema) commentSchema = pool.query(`CREATE TABLE IF NOT EXISTS practical_skills_drawing_comments (
+            student_email TEXT NOT NULL, kit_id TEXT NOT NULL, activity_index INTEGER NOT NULL,
+            document_key TEXT NOT NULL, comment TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (student_email, kit_id, activity_index, document_key)
+        )`).catch((error) => { commentSchema = null; throw error; });
+        await commentSchema;
+    }
+    async function getComment(student, kit, index, documentKey) {
+        if (!documentKey) return "";
+        const row = (await pool.query(`SELECT comment FROM practical_skills_drawing_comments
+            WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3 AND document_key = $4
+            AND updated_at >= COALESCE((SELECT started_at FROM practical_skills_progress
+                WHERE student_email = $1 AND kit_id = $2), '-infinity'::timestamptz)`,
+        [student, kit, index, documentKey])).rows[0];
+        return row?.comment || "";
+    }
     async function ensureSchema() {
         if (!schema) schema = pool.query(`CREATE TABLE IF NOT EXISTS practical_skills_document_checks (
             student_email TEXT NOT NULL, kit_id TEXT NOT NULL, activity_index INTEGER NOT NULL,
@@ -199,7 +216,8 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                 const item = await load(req, email);
                 res.json({ verification: await get(email, item.kit, item.index, item.activity, item.row.responses),
                     filing: TEACHER_ONLY.has(item.policy) ? await getDrawingFiling(email, item.documentKey) : null,
-                    submission: TEACHER_ONLY.has(item.policy) ? await getSubmission(email, item.kit, item.index, item.documentKey) : null });
+                    submission: TEACHER_ONLY.has(item.policy) ? await getSubmission(email, item.kit, item.index, item.documentKey) : null,
+                    teacherComment: TEACHER_ONLY.has(item.policy) ? await getComment(email, item.kit, item.index, item.documentKey) : "" });
             } catch (error) { failure(res, error); }
         });
         app.post("/api/practical-skills/blocks/:kitId/:activityIndex/submit", async (req, res) => {
@@ -218,6 +236,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                         "Save a valid HTTPS sharing link to your Google Drawing before submitting."), { status: 422 });
                 }
                 await ensureSubmissionSchema();
+                await ensureCommentSchema();
                 const previous = (await pool.query(`SELECT notified_document_key FROM practical_skills_submissions
                     WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3`, [email, item.kit, item.index])).rows[0];
                 await pool.query(`INSERT INTO practical_skills_submissions (student_email, kit_id, activity_index, document_key, url)
@@ -249,7 +268,8 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                 }
                 res.json({ submission: await getSubmission(email, item.kit, item.index, item.documentKey), emailed,
                     filing: { ...filing, ...await getDrawingFiling(email, item.documentKey), reason: filing.reason || "" },
-                    verification: await get(email, item.kit, item.index, item.activity, item.row.responses) });
+                    verification: await get(email, item.kit, item.index, item.activity, item.row.responses),
+                    teacherComment: await getComment(email, item.kit, item.index, item.documentKey) });
             } catch (error) { failure(res, error); }
         });
         // Submitted drawings not yet moved into the student's DTECH folder (e.g. submitted before auto-filing, or permission declined).
@@ -291,6 +311,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             const kits = [...new Set(String(req.query.kits || "").split(","))].filter((kit) => /^kit-[a-z0-9-]{1,60}$/.test(kit)).slice(0, 40);
             try {
                 await ensureSubmissionSchema();
+                await ensureCommentSchema();
                 const result = [];
                 const filedDrawings = (await pool.query(`SELECT student_email, document_key, synced, reason FROM practical_skills_filed_drawings
                     WHERE student_email IN (SELECT student_email FROM practical_skills_progress WHERE kit_id = ANY($1::text[]))`, [kits])).rows;
@@ -306,8 +327,10 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                         FROM practical_skills_document_checks WHERE kit_id = $1`, [kit])).rows : [];
                     const submissions = tables.submissions_table ? (await pool.query(`SELECT student_email, activity_index, document_key, submitted_at
                         FROM practical_skills_submissions WHERE kit_id = $1`, [kit])).rows : [];
+                    const comments = (await pool.query(`SELECT student_email, activity_index, document_key, comment, updated_at
+                        FROM practical_skills_drawing_comments WHERE kit_id = $1`, [kit])).rows;
                     const current = (row, email, started) => normalizeEmail(row.student_email) === email &&
-                        (!started || new Date(row.checked_at || row.submitted_at) >= new Date(started));
+                        (!started || new Date(row.checked_at || row.submitted_at || row.updated_at) >= new Date(started));
                     const students = {};
                     for (const row of progress) {
                         const email = normalizeEmail(row.student_email);
@@ -318,7 +341,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                             const check = mine(checks.filter((entry) => entry.policy === activity.documentCheck));
                             return [index, { url: documentKey ? url : "", documentKey, submittedAt: mine(submissions)?.submitted_at || null,
                                 filed: filedDrawings.some((entry) => normalizeEmail(entry.student_email) === email && entry.document_key === documentKey && entry.synced === true),
-                                completed: check?.passed === true }];
+                                completed: check?.passed === true, teacherComment: mine(comments)?.comment || "" }];
                         }));
                     }
                     result.push({ id: kit, activities: activities.map(({ worksheet, index }) => ({ index, title: worksheet.activity || `Activity ${index + 1}` })), students });
@@ -383,19 +406,33 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             try {
                 const item = await load(req, email);
                 res.json({ url: item.url || "", documentKey: item.documentKey,
-                    verification: await get(email, item.kit, item.index, item.activity, item.row.responses) });
+                    verification: await get(email, item.kit, item.index, item.activity, item.row.responses),
+                    teacherComment: TEACHER_ONLY.has(item.policy) ? await getComment(email, item.kit, item.index, item.documentKey) : "" });
             } catch (error) { failure(res, error); }
         });
         app.put(review, requireAdminAccess, reviewer, async (req, res) => {
             res.set("Cache-Control", "private, no-store");
             const email = normalizeEmail(req.body?.email || "");
-            if (!email.endsWith(`@${schoolDomain}`) || typeof req.body?.approved !== "boolean") {
+            const commentOnly = Object.hasOwn(req.body || {}, "comment");
+            if (!email.endsWith(`@${schoolDomain}`) ||
+                (commentOnly ? typeof req.body.comment !== "string" || req.body.comment.length > 2000 ||
+                    Object.hasOwn(req.body, "approved") : typeof req.body?.approved !== "boolean")) {
                 return res.status(400).json({ error: "Choose a school student and an approval state." });
             }
             try {
                 const item = await load(req, email);
                 if (!item.documentKey || req.body.documentKey !== item.documentKey) throw Object.assign(new Error("The submitted link changed. Reload the review before approving."), { status: 409 });
                 const drawing = item.policy === DRAWING_POLICY;
+                if (commentOnly) {
+                    if (!drawing) throw Object.assign(new Error("Comments are only available for drawing reviews."), { status: 400 });
+                    await ensureCommentSchema();
+                    const comment = req.body.comment.trim();
+                    await pool.query(`INSERT INTO practical_skills_drawing_comments (student_email, kit_id, activity_index, document_key, comment)
+                        VALUES ($1,$2,$3,$4,$5) ON CONFLICT (student_email, kit_id, activity_index, document_key)
+                        DO UPDATE SET comment=EXCLUDED.comment, updated_at=NOW()`,
+                    [email, item.kit, item.index, item.documentKey, comment]);
+                    return res.json({ teacherComment: comment });
+                }
                 await save(email, item.kit, item.index, item.documentKey, item.policy, req.body.approved, "teacher",
                     { message: req.body.approved
                         ? drawing ? "Teacher reviewed the drawing and marked it Completed." : "Teacher reviewed the document and approved text completion."

@@ -231,7 +231,7 @@ async function fixture(t) {
     const kit = B.withFilesFoldersLinks(base()), email = "student@school.nz", kitId = "kit-google-drawings";
     const progress = { student_email: email, kit_id: kitId, completed: false, completed_activities: {}, started_at: null,
         responses: Object.fromEntries([0, 1, 2].map((i) => [`${i}-blocks`, answer(kit, i, link(i))])) };
-    const checks = new Map(), submissions = new Map(), notices = [], certificateEmails = [], filings = [], filedDrawings = new Map();
+    const checks = new Map(), submissions = new Map(), notices = [], certificateEmails = [], filings = [], filedDrawings = new Map(), comments = new Map();
     let tables = false, emailFails = false, fileFails = false, fileReason = "";
     const key = (params) => JSON.stringify([params[0], params[1], Number(params[2]), params[3], params[4]]);
     const subKey = (params) => JSON.stringify([params[0], params[1], Number(params[2])]);
@@ -264,6 +264,16 @@ async function fixture(t) {
         if (sql.startsWith("SELECT responses")) return { rows: [{ responses: structuredClone(progress.responses) }] };
         if (sql.startsWith("SELECT student_email, started_at, responses")) return { rows: [structuredClone(progress)] };
         if (sql.startsWith("SELECT student_email, activity_index, document_key, policy")) return { rows: [...checks.values()] };
+        if (sql.startsWith("SELECT student_email, activity_index, document_key, comment")) return { rows: [...comments.values()] };
+        if (sql.startsWith("SELECT comment FROM practical_skills_drawing_comments")) {
+            const row = comments.get(JSON.stringify(params.slice(0, 4)));
+            return { rows: row ? [row] : [] };
+        }
+        if (sql.startsWith("INSERT INTO practical_skills_drawing_comments")) {
+            const [student_email, kit_id, activity_index, document_key, comment] = params;
+            comments.set(JSON.stringify(params.slice(0, 4)), { student_email, kit_id, activity_index, document_key, comment, updated_at: new Date().toISOString() });
+            return { rows: [] };
+        }
         if (sql.startsWith("SELECT student_email, activity_index, document_key, submitted_at")) return { rows: [...submissions.values()] };
         if (sql.startsWith("SELECT document_key, policy")) { const row = checks.get(key(params)); return { rows: row ? [row] : [] }; }
         if (sql.startsWith("SELECT document_key, submitted_at")) {
@@ -363,9 +373,50 @@ async function fixture(t) {
         check: (i) => request(`/api/practical-skills/blocks/${kitId}/${i}/document-check`, "POST", { driveAccessToken: "student-token" }),
         list: (headers = teacherHeaders) => request(`/api/admin/kit-submissions?kits=${kitId},kit-bad_id`, "GET", undefined, headers),
         approve: (i, approved = true, url = link(i)) => request(`/api/admin/kit-document-review/${kitId}/${i}`, "PUT",
-            { email, documentKey: B.documentLinkKey(url), approved }, teacherHeaders)
+            { email, documentKey: B.documentLinkKey(url), approved }, teacherHeaders),
+        comment: (i, comment, url = link(i), headers = teacherHeaders) => request(`/api/admin/kit-document-review/${kitId}/${i}`, "PUT",
+            { email, documentKey: B.documentLinkKey(url), comment }, headers)
     };
 }
+
+test("drawing feedback is private, link-specific and independent of completion", async (t) => {
+    const f = await fixture(t);
+    await f.submit(0);
+    assert.equal((await f.comment(0, "Add a filled shape.")).status, 200);
+    assert.equal((await f.status(0)).data.teacherComment, "Add a filled shape.");
+    assert.equal((await f.list()).data.kits[0].students["student@school.nz"][0].teacherComment, "Add a filled shape.");
+    assert.ok((await f.status(0)).data.submission, "Commenting does not remove a pending submission");
+    assert.deepEqual(f.progress.completed_activities, {});
+    await f.approve(0);
+    assert.equal((await f.status(0)).data.teacherComment, "Add a filled shape.");
+    assert.equal((await f.submit(0)).data.teacherComment, "Add a filled shape.");
+    assert.equal((await f.comment(0, "x".repeat(2001))).status, 400);
+    assert.equal((await f.comment(0, "No", link(0), { "x-user-email": "student@school.nz" })).status, 403);
+    assert.equal((await f.comment(0, "No", link(0), { "x-user-email": "student@school.nz", "x-teacher": "yes" })).status, 403);
+    f.setLink(0, link(7));
+    assert.equal((await f.status(0)).data.teacherComment, "");
+    assert.equal((await f.comment(0, "stale")).status, 409);
+    f.setLink(0, link(0));
+    assert.equal((await f.comment(0, "")).status, 200);
+    assert.equal((await f.status(0)).data.teacherComment, "");
+});
+
+test("student drawing status displays teacher feedback as text", () => {
+    const controller = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet.js"), "utf8");
+    const start = controller.indexOf("    function showDocumentVerification(");
+    const end = controller.indexOf("    async function submitForReview(", start);
+    const host = { textContent: "" };
+    const activity = { documentCheck: POLICY, blocks: [{ id: "link", kind: "studentlink" }] };
+    const context = vm.createContext({
+        document: { getElementById: () => host }, getCurrentActivityIndex: () => 0,
+        isTeacherReview: () => true,
+        state: { content: { activities: [activity] }, responses: {}, drawingFiling: {}, completedActivities: {} },
+        window: { ActivityBlocks: { savedAnswers: () => ({ link: link(0) }), documentLinkKey: B.documentLinkKey } }
+    });
+    vm.runInContext(controller.slice(start, end), context);
+    context.showDocumentVerification(null, { submittedAt: "2026-10-01" }, "<b>Use a filled shape</b>");
+    assert.match(host.textContent, /Teacher feedback: <b>Use a filled shape<\/b>/);
+});
 
 test("Submit records the current link and emails the teacher once per link without ticking the activity", async (t) => {
     const f = await fixture(t);

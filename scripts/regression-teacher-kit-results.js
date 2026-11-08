@@ -668,7 +668,9 @@ test("submissions list follows the class filters, links drawings and saves teach
                 puts.push({ url, body: JSON.parse(options.body) });
                 auths.push(options.headers.Authorization);
                 if (puts.length === 2) return { ok: false, status: 401, json: async () => ({ error: "Verify sign-in" }) };
-                return { ok: true, json: async () => ({ verification: { passed: JSON.parse(options.body).approved }, completedActivities: {} }) };
+                const body = JSON.parse(options.body);
+                return { ok: true, json: async () => Object.hasOwn(body, "comment") ? { teacherComment: body.comment }
+                    : { verification: { passed: body.approved }, completedActivities: {} } };
             }
             return { ok: true, json: async () => url.includes("kit-submissions") ? submissions
                 : url.includes("preview-users") ? { users: [] } : { students, kits } };
@@ -710,6 +712,13 @@ test("submissions list follows the class filters, links drawings and saves teach
     assert.equal(rows()[0].children[3].children[0].children[0].checked, false,
         "Same-account token refresh keeps the current list and applies the saved result");
     assert.match(el("submission-status").textContent, /Removed Completed for Ana - Ship/);
+    const feedback = rows()[0].children[2].children[2].children[0];
+    feedback.value = "Use filled shapes.";
+    await rows()[0].children[2].children[3].events.click();
+    assert.deepEqual(puts.at(-1).body, { email: "ana@school.nz", documentKey: "google-file:ana-ship", comment: "Use filled shapes." });
+    assert.match(el("submission-status").textContent, /Feedback saved/);
+    el("class-homeroom-filter").events.change();
+    assert.equal(rows()[0].children[2].children[2].children[0].value, "Use filled shapes.");
     submissions.kits[0].students["ana@school.nz"][0].filed = true;
     el("class-homeroom-filter").events.change();
     assert.match(rows()[0].children[2].children[1].textContent, /^Submitted - synced /,

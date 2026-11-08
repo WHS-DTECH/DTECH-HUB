@@ -155,7 +155,11 @@
     }
     async function saveSubmissionCompleted(student, kit, activity, entry, checked) {
         const data = classData;
-        if (pendingSubmissions.size) return;
+        if (pendingSubmissions.size) {
+            submissionStatus.classList.add("is-error");
+            submissionStatus.textContent = "Wait for the current drawing review to finish saving.";
+            return;
+        }
         const key = `${student.email}:${kit.id}:${activity.index}`;
         pendingSubmissions.add(key);
         submissionStatus.classList.remove("is-error");
@@ -181,6 +185,42 @@
         } finally {
             pendingSubmissions.delete(key);
             if (classData === data) renderSubmissions(filteredStudents());
+        }
+    }
+    async function saveDrawingComment(student, kit, activity, entry, input, button) {
+        const data = classData;
+        if (pendingSubmissions.size) {
+            submissionStatus.classList.add("is-error");
+            submissionStatus.textContent = "Wait for the current drawing review to finish saving.";
+            return;
+        }
+        const key = `${student.email}:${kit.id}:${activity.index}`;
+        pendingSubmissions.add(key);
+        button.disabled = true;
+        input.disabled = true;
+        submissionStatus.classList.remove("is-error");
+        submissionStatus.textContent = `Saving feedback for ${student.name} - ${activity.title}...`;
+        try {
+            const response = await fetchDocumentReview(`/api/admin/kit-document-review/${encodeURIComponent(kit.id)}/${activity.index}`, {
+                method: "PUT", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: student.email, documentKey: entry.documentKey, comment: input.value })
+            });
+            const saved = await response.json();
+            if (!response.ok) throw new Error(saved.error || "Could not save feedback.");
+            if (typeof saved.teacherComment !== "string") throw new Error("The server did not confirm the saved feedback. Reload before retrying.");
+            if (classData !== data) return;
+            entry.teacherComment = saved.teacherComment;
+            delete entry.commentDraft;
+            input.value = saved.teacherComment;
+            submissionStatus.textContent = `Feedback saved for ${student.name} - ${activity.title}. The student can see it in the activity.`;
+        } catch (error) {
+            if (classData !== data) return;
+            submissionStatus.classList.add("is-error");
+            submissionStatus.textContent = `${student.name} - ${activity.title}: ${error.message}`;
+        } finally {
+            pendingSubmissions.delete(key);
+            button.disabled = false;
+            input.disabled = false;
         }
     }
     function renderSubmissions(students) {
@@ -214,6 +254,18 @@
                         node("div", `${entry.filed === true ? "Submitted - synced" : "Saved - sync needed"}${entry.submittedAt ? ` ${date(entry.submittedAt)}` : ""}`, linkCell,
                             entry.filed === true ? "submission-submitted" : "submission-saved");
                     } else node("span", "No link", linkCell, "submission-note");
+                    if (entry?.documentKey) {
+                        const commentLabel = node("label", "Teacher feedback", linkCell);
+                        const comment = node("textarea", undefined, commentLabel);
+                        comment.value = entry.commentDraft ?? entry.teacherComment ?? "";
+                        comment.maxLength = 2000;
+                        comment.rows = 3;
+                        comment.setAttribute("aria-label", `Teacher feedback for ${student.name} - ${activity.title}`);
+                        comment.addEventListener("input", () => { entry.commentDraft = comment.value; });
+                        const saveComment = node("button", "Save feedback", linkCell, "button");
+                        saveComment.type = "button";
+                        saveComment.addEventListener("click", () => saveDrawingComment(student, { id: kit.id }, activity, entry, comment, saveComment));
+                    }
                     const tickCell = node("td", undefined, row, entry?.completed ? "class-progress-complete" : undefined);
                     const label = node("label", undefined, tickCell);
                     const checkbox = node("input", undefined, label);

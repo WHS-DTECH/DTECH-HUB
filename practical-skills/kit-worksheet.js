@@ -278,7 +278,7 @@
         }, RESPONSE_SAVE_DEBOUNCE_MS);
     }
 
-    function showDocumentVerification(verification, submission) {
+    function showDocumentVerification(verification, submission, teacherComment = "") {
         const host = document.getElementById("worksheet-document-check-status");
         if (!host) return;
         const when = (value) => new Date(value).toLocaleString("en-NZ");
@@ -297,6 +297,7 @@
                     : submission ? `Link received ${when(submission.submittedAt)}. Your teacher will review your drawing and tick Completed.`
                     : verification ? `${verification.feedback.message} (${when(verification.checkedAt)})`
                         : "Save your Share Link, then press Submit."}`.trim();
+            if (teacherComment) host.textContent += ` Teacher feedback: ${teacherComment}`;
             return;
         }
         host.textContent = verification
@@ -329,7 +330,7 @@
                 state.submissions[index] = result.submission;
                 if (result.filing?.documentKey) state.drawingFiling[result.filing.documentKey] = result.filing;
                 updateActivityCompleteBar();
-                showDocumentVerification(result.verification, result.submission);
+                showDocumentVerification(result.verification, result.submission, result.teacherComment);
                 const filing = result.filing || {};
                 const filed = filing.filed ? Array.isArray(filing.path) ? ` Your drawing is filed in ${filing.path.join(" > ")}.` : " Your drawing is filed in your DTECH folder."
                     : filing.reason === "not-owner" ? " This drawing belongs to someone else, so it wasn't moved to your folder."
@@ -436,7 +437,7 @@
                     updateActivityCompleteBar();
                 }
 
-                showDocumentVerification(result.verification, result.submission);
+                showDocumentVerification(result.verification, result.submission, result.teacherComment);
             })
             .catch((error) => {
                 if (status.isConnected && email === getSignedInEmail()) status.textContent = `Could not read the saved check: ${error.message}`;
