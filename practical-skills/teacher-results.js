@@ -23,6 +23,7 @@
     const kitFocus = document.getElementById("class-kit-focus");
     const typingSection = document.getElementById("class-typing-results");
     const typingHost = document.getElementById("class-typing-table-host");
+    const typingWeekFilter = document.getElementById("typing-week-filter");
     const typingStatus = document.getElementById("typing-review-status");
     const signatureStatus = document.getElementById("typing-signature-status");
     const typingReviews = new Map();
@@ -360,10 +361,34 @@
                     : `Showing weekly results for ${students.length} students. Book signatures save automatically.`;
         const first = students.map(student => typingReviews.get(student.email.toLowerCase())).find(review => review?.weeklyProgress);
         if (first) {
-            const table = node("table", undefined, typingHost, "class-progress-table typing-review-table");
+            const weeks = first.weeklyProgress.weeks;
+            const today = first.weeklyProgress.today;
+            let selectedWeeks = weeks;
+            if (typingWeekFilter.value === "current") {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(today || "")) {
+                    typingStatus.classList.add("is-error");
+                    typingStatus.textContent = "The current Typing Kit date could not be confirmed. Refresh the list or select a specific week.";
+                    selectedWeeks = [];
+                } else {
+                    const lastEnd = new Date(`${weeks[weeks.length - 1].weekStart}T00:00:00Z`);
+                    lastEnd.setUTCDate(lastEnd.getUTCDate() + 7);
+                    selectedWeeks = weeks.filter((week, index) => today >= week.weekStart &&
+                        today < (weeks[index + 1]?.weekStart || lastEnd.toISOString().slice(0, 10)));
+                    if (!selectedWeeks.length && !failed.length && !missing.length) {
+                        typingStatus.textContent = "There is no current week in the Typing Kit calendar. Choose a week or All weeks to review results.";
+                    }
+                }
+            } else if (typingWeekFilter.value !== "all") {
+                selectedWeeks = weeks.filter(week => String(week.week) === typingWeekFilter.value);
+            }
+            if (!selectedWeeks.length) {
+                if (missing.length && typingLoadingRevision !== classRevision) void loadTypingReviews(missing);
+                return;
+            }
+            const table = node("table", undefined, typingHost, `class-progress-table typing-review-table${selectedWeeks.length === 1 ? " class-progress-table-focused" : ""}`);
             const header = node("tr", undefined, node("thead", undefined, table));
             node("th", "Student", header);
-            first.weeklyProgress.weeks.forEach(week => {
+            selectedWeeks.forEach(week => {
                 node("th", `Week ${week.week} (${week.weekStart}) - Results`, header);
                 node("th", `Week ${week.week} - Period 1 signed`, header);
                 node("th", `Week ${week.week} - Period 2 signed`, header);
@@ -375,15 +400,15 @@
                 const review = typingReviews.get(student.email.toLowerCase());
                 if (!review || review.error) {
                     const cell = node("td", review?.error || "Loading results...", row);
-                    cell.colSpan = 21;
+                    cell.colSpan = selectedWeeks.length * 3;
                     continue;
                 }
                 if (review.startDate !== first.startDate) {
                     const cell = node("td", "The Typing Kit calendar changed. Refresh the list before signing.", row);
-                    cell.colSpan = 21;
+                    cell.colSpan = selectedWeeks.length * 3;
                     continue;
                 }
-                for (const week of review.weeklyProgress.weeks) {
+                for (const week of review.weeklyProgress.weeks.filter(item => selectedWeeks.some(selected => selected.weekStart === item.weekStart))) {
                     const cell = node("td", undefined, row);
                     const labels = { legacy: "Weeks 1-4: optional", future: "Upcoming", completed: "Completed",
                         excused: "Excused - absent", required: "Needs a test", pending: "Attendance unconfirmed" };
@@ -570,6 +595,7 @@
         renderClassProgress();
     });
     studentFilter.addEventListener("input", renderClassProgress);
+    typingWeekFilter.addEventListener("change", () => { if (classData) renderTypingResults(filteredStudents()); });
     if (/^kit-[a-z0-9-]+$/.test(pendingLinkFilters.kit) && pendingLinkFilters.student) {
         document.getElementById("results-kit").value = pendingLinkFilters.kit;
         document.getElementById("results-emails").value = pendingLinkFilters.student;

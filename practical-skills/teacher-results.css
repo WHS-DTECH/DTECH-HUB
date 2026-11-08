@@ -98,6 +98,10 @@
     min-width: 130px;
 }
 
+.typing-week-filter {
+    max-width: 260px;
+}
+
 .class-submissions-host h3 {
     margin: 22px 0 8px;
 }

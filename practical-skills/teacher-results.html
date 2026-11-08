@@ -8,7 +8,7 @@
   <title>Kit Results | Teacher Review</title>
   <link rel="stylesheet" href="../styles.css">
   <link rel="stylesheet" href="./teacher-login-sites.css">
-  <link rel="stylesheet" href="./teacher-results.css?v=8">
+  <link rel="stylesheet" href="./teacher-results.css?v=9">
 </head>
 <body data-hub-read-only="true">
   <nav class="topbar" aria-label="Primary">
@@ -99,6 +99,20 @@
         <section id="class-typing-results" hidden aria-label="Typing Kit weekly results">
           <h3>Typing Kit - Weekly Results</h3>
           <p>Each week shows both saved typing periods (net WPM and accuracy). Period 1 signed and Period 2 signed record your exercise-book signatures only; they do not change typing completion or certificates. From Week 5, one saved test meets the weekly requirement; confirmed fully absent weeks are excused.</p>
+          <label class="sites-field typing-week-filter">Show week
+            <select id="typing-week-filter" aria-describedby="typing-week-filter-help">
+              <option value="current">Current week</option>
+              <option value="all">All weeks</option>
+              <option value="1">Week 1</option>
+              <option value="2">Week 2</option>
+              <option value="3">Week 3</option>
+              <option value="4">Week 4</option>
+              <option value="5">Week 5</option>
+              <option value="6">Week 6</option>
+              <option value="7">Week 7</option>
+            </select>
+          </label>
+          <p id="typing-week-filter-help">Current week uses the Typing Kit calendar and New Zealand date. Choose another week or All weeks to see other results and signatures.</p>
           <p id="typing-review-status" role="status" aria-live="polite"></p>
           <p id="typing-signature-status" role="status" aria-live="polite"></p>
           <div id="class-typing-table-host" class="class-progress-table-host" tabindex="0" role="region" aria-label="Typing kit weekly results table"></div>
@@ -121,6 +135,6 @@
   </main>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="../script.js?v=teacher-review-refresh-1"></script>
-  <script src="./teacher-results.js?v=20"></script>
+  <script src="./teacher-results.js?v=21"></script>
 </body>
 </html>

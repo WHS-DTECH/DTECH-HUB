@@ -112,7 +112,7 @@ test("typing weekly table follows filters and persists independent per-week book
         status: index < 4 ? "legacy" : index === 4 ? "excused" : "future" }));
     const signatures = [];
     const writes = [];
-    let failSave = false, failRead = false;
+    let failSave = false, failRead = false, today = "2026-11-09";
     const students = [{ name: "Ana", email: "ana@school.nz", timetableClass: "JPI", course: "JuniorDTECH" },
         { name: "Ben", email: "ben@school.nz", timetableClass: "JVE", course: "JuniorDTECH" }];
     const context = vm.createContext({
@@ -124,7 +124,11 @@ test("typing weekly table follows filters and persists independent per-week book
             if (url.includes("typing-kit-book-signature")) {
                 const body = JSON.parse(options.body);
                 writes.push(body);
-                if (!failSave) signatures.splice(0, signatures.length, { weekStart: body.weekStart, period: body.period, signed: body.signed });
+                if (!failSave) {
+                    const index = signatures.findIndex(entry => entry.weekStart === body.weekStart && entry.period === body.period);
+                    if (index >= 0) signatures.splice(index, 1);
+                    signatures.push({ weekStart: body.weekStart, period: body.period, signed: body.signed });
+                }
                 return { ok: !failSave, json: async () => failSave ? { error: "Signature database unavailable" } : { signed: body.signed } };
             }
             if (url.includes("typing-kit-results")) {
@@ -134,7 +138,7 @@ test("typing weekly table follows filters and persists independent per-week book
                         email: student.email, signatures: JSON.parse(JSON.stringify(signatures)),
                         attempts: [{ weekStart: weeks[0].weekStart, period: 1, netWpm: 35, accuracy: 97, submittedAt: "2026-10-27T00:00:00Z" },
                             { weekStart: weeks[0].weekStart, period: 2, netWpm: 38, accuracy: 98, submittedAt: "2026-10-29T00:00:00Z" }],
-                        weeklyProgress: { sourceStatus: "available", weeks }
+                        weeklyProgress: { sourceStatus: "available", today, weeks }
                     }))
                 } };
             }
@@ -143,6 +147,7 @@ test("typing weekly table follows filters and persists independent per-week book
                     : { students, kits: [{ id: "kit-typing", title: "Typing Kit" }, { id: "kit-login", title: "Login Kit" }] } };
         }
     });
+    el("typing-week-filter").value = "current";
     vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "teacher-results.js"), "utf8"), context);
     const settle = async () => { for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve)); };
     await settle();
@@ -155,20 +160,36 @@ test("typing weekly table follows filters and persists independent per-week book
     const table = () => el("class-typing-table-host").children[0];
     const rows = () => table().children[1].children;
     const tick = period => rows()[0].children[period + 1].children[0].children[0];
-    assert.equal(table().children[0].children[0].children.length, 22, "Seven result columns and fourteen signature columns plus Student");
+    const header = () => table().children[0].children[0].children.map(cell => cell.textContent);
+    const selectWeek = value => { el("typing-week-filter").value = value; el("typing-week-filter").events.change(); };
+    assert.deepEqual(header(), ["Student", "Week 3 (2026-11-09) - Results", "Week 3 - Period 1 signed", "Week 3 - Period 2 signed"],
+        "Current NZ Monday defaults to the current Typing Kit week");
+    assert.equal(rows()[0].children.length, 4);
+    assert.match(table().className, /class-progress-table-focused/, "Single-week table can fit narrow screens");
+    tick(2).checked = true;
+    await tick(2).events.change();
+    assert.deepEqual(writes[0], { email: "ana@school.nz", weekStart: weeks[2].weekStart, period: 2, signed: true },
+        "Current-week tick saves the displayed week and period");
+    selectWeek("all");
+    assert.equal(table().children[0].children[0].children.length, 22, "All weeks shows every result and signature column");
     assert.equal(rows().length, 1);
     assert.equal(rows()[0].children.length, 22);
     assert.equal(rows()[0].children[0].textContent, "Ana");
     assert.ok(rows()[0].children[1].children.some(child => /35 WPM - 97%/.test(child.textContent)));
     assert.ok(rows()[0].children[1].children.some(child => /38 WPM - 98%/.test(child.textContent)), "Both periods show their saved scores");
     assert.equal(rows()[0].children[13].children[0].textContent, "Excused - absent");
+    selectWeek("1");
+    assert.deepEqual(header(), ["Student", "Week 1 (2026-10-26) - Results", "Week 1 - Period 1 signed", "Week 1 - Period 2 signed"]);
     assert.equal(tick(1).checked, false);
     tick(1).checked = true;
     await tick(1).events.change();
     assert.equal(tick(1).checked, true);
-    assert.deepEqual(writes[0], { email: "ana@school.nz", weekStart: weeks[0].weekStart, period: 1, signed: true });
+    assert.deepEqual(writes[1], { email: "ana@school.nz", weekStart: weeks[0].weekStart, period: 1, signed: true });
     assert.equal(tick(2).checked, false, "Periods are independent");
-    assert.equal(rows()[0].children[5].children[0].children[0].checked, false, "Weeks are independent");
+    selectWeek("2");
+    assert.equal(tick(1).checked, false, "Weeks are independent");
+    selectWeek("1");
+    assert.equal(tick(1).checked, true, "Returning to the signed week preserves its confirmed tick");
     failSave = true;
     tick(1).checked = false;
     await tick(1).events.change();
@@ -176,8 +197,32 @@ test("typing weekly table follows filters and persists independent per-week book
     assert.match(el("typing-signature-status").textContent, /Signature database unavailable/);
     await el("class-progress-refresh").events.click();
     await settle();
+    assert.equal(el("typing-week-filter").value, "1", "Refresh preserves a specific week");
     assert.equal(tick(1).checked, true, "Refresh loads persisted signatures");
-    assert.equal(writes.length, 2, "Reading results never saves signatures");
+    assert.equal(writes.length, 3, "Reading and selecting weeks never save signatures");
+    selectWeek("current");
+    today = "2026-10-25";
+    await el("class-progress-refresh").events.click();
+    await settle();
+    assert.match(el("typing-review-status").textContent, /no current week/i, "Before the calendar, never guess a current week");
+    assert.equal(el("class-typing-table-host").children.length, 0);
+    selectWeek("7");
+    assert.match(header()[1], /Week 7/, "Past or future weeks can still be selected");
+    today = "2026-12-14";
+    selectWeek("current");
+    await el("class-progress-refresh").events.click();
+    await settle();
+    assert.match(el("typing-review-status").textContent, /no current week/i, "After the calendar, never guess a current week");
+    today = "2026-12-13";
+    await el("class-progress-refresh").events.click();
+    await settle();
+    assert.match(header()[1], /Week 7/, "Sunday is still in the final week");
+    today = "";
+    await el("class-progress-refresh").events.click();
+    await settle();
+    assert.match(el("typing-review-status").textContent, /date could not be confirmed/, "Invalid server date is surfaced");
+    selectWeek("3");
+    assert.equal(tick(2).checked, true, "A selected week's saved signature remains available when the current date is unconfirmed");
     el("class-student-filter").value = "missing";
     el("class-student-filter").events.input();
     assert.match(el("typing-review-status").textContent, /No students match/);
