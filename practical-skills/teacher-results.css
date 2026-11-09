@@ -98,6 +98,16 @@
     min-width: 130px;
 }
 
+.typing-attendance-heading {
+    margin-top: 5px;
+    font-weight: 700;
+}
+
+.typing-attendance-absent {
+    color: #a4342f;
+    font-weight: 700;
+}
+
 .typing-saved-result {
     display: inline-block;
     margin: 3px 0;

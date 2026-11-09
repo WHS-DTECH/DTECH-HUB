@@ -450,6 +450,23 @@
                     const labels = { legacy: "Weeks 1-4: optional", future: "Upcoming", completed: "Completed",
                         excused: "Excused - absent", required: "Needs a test", pending: "Attendance unconfirmed" };
                     node("strong", labels[week.status], cell);
+                    if (review.weeklyProgress.sourceStatus === "available") {
+                        node("div", "Teacher Planner attendance (school periods):", cell, "typing-attendance-heading");
+                        if (!week.lessons.length) {
+                            node("div", "No scheduled lessons confirmed for this week.", cell, "submission-note");
+                        }
+                        for (const lesson of week.lessons) {
+                            const day = new Date(`${lesson.date}T00:00:00Z`).toLocaleDateString("en-NZ",
+                                { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+                            const mark = lesson.date > review.weeklyProgress.today ? "Not yet held"
+                                : ({ A: "Absent", P: "Present", L: "Late", "": "Not recorded" }[lesson.mark] || "Unconfirmed");
+                            node("div", `${day} - School ${lesson.period.toUpperCase()}: ${mark}`, cell,
+                                lesson.mark === "A" && lesson.date <= review.weeklyProgress.today ? "typing-attendance-absent" : "submission-note");
+                        }
+                        if (!week.attendanceConfirmed && week.lessons.length) {
+                            node("div", "The full weekly schedule could not be confirmed.", cell, "submission-note");
+                        }
+                    }
                     for (const period of [1, 2]) {
                         const attempts = review.attempts.filter(attempt => attempt.weekStart === week.weekStart && attempt.period === period);
                         node("div", `Period ${period}: ${attempts.length ? "" : "No result yet"}`, cell);

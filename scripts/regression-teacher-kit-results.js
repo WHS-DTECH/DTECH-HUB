@@ -109,7 +109,11 @@ test("typing weekly table follows filters and persists independent per-week book
     const el = id => { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); };
     const weeks = Array.from({ length: 7 }, (_, index) => ({ week: index + 1,
         weekStart: new Date(Date.UTC(2026, 9, 26 + index * 7)).toISOString().slice(0, 10),
-        status: index < 4 ? "legacy" : index === 4 ? "excused" : "future" }));
+        status: index < 4 ? "legacy" : index === 4 ? "excused" : "future", attendanceConfirmed: true, lessons: [] }));
+    weeks[0].lessons = [{ date: "2026-10-30", period: "p2", mark: "A" }];
+    weeks[1].lessons = [{ date: "2026-11-02", period: "p1", mark: "P" },
+        { date: "2026-11-03", period: "p2", mark: "L" }, { date: "2026-11-04", period: "p3", mark: "" }];
+    weeks[2].lessons = [{ date: "2026-11-13", period: "p2", mark: "A" }];
     const signatures = [];
     const writes = [];
     let failSave = false, failRead = false, failAttendance = false, attendanceDate = "", today = "2026-11-09";
@@ -182,12 +186,16 @@ test("typing weekly table follows filters and persists independent per-week book
     assert.equal(savedResults.length, 2, "Both saved periods are highlighted");
     assert.match(savedResults[0].textContent, /^Saved result: 35 WPM - 97%/);
     assert.ok(rows()[0].children[1].children.some(child => /Checking attendance/.test(child.textContent)));
+    assert.ok(!rows()[0].children[1].children.some(child => /Teacher Planner attendance \(school periods\)/.test(child.textContent)),
+        "Loading attendance never presents unconfirmed marks");
     selectWeek("current");
     releaseAttendance();
     await settle();
     assert.deepEqual(header(), ["Student", "Week 3 (2026-11-09) - Results", "Week 3 - Period 1 signed", "Week 3 - Period 2 signed"],
         "Current NZ Monday defaults to the current Typing Kit week");
     assert.equal(rows()[0].children.length, 4);
+    assert.ok(rows()[0].children[1].children.some(child => /13 Nov 2026 - School P2: Not yet held/.test(child.textContent)),
+        "Future lessons are not presented as absent");
     assert.match(table().className, /class-progress-table-focused/, "Single-week table can fit narrow screens");
     tick(2).checked = true;
     await tick(2).events.change();
@@ -198,6 +206,10 @@ test("typing weekly table follows filters and persists independent per-week book
     assert.equal(rows().length, 1);
     assert.equal(rows()[0].children.length, 22);
     assert.equal(rows()[0].children[0].textContent, "Ana");
+    assert.ok(rows()[0].children[1].children.some(child => /30 Oct 2026 - School P2: Absent/.test(child.textContent) &&
+        child.className === "typing-attendance-absent"), "Saved absence is visible even in optional weeks");
+    assert.ok(!rows()[0].children[1].children.some(child => /26 Oct 2026 - School/.test(child.textContent)),
+        "A holiday without a scheduled lesson is not invented");
     assert.ok(rows()[0].children[1].children.some(child => /35 WPM - 97%/.test(child.textContent)));
     assert.ok(rows()[0].children[1].children.some(child => /38 WPM - 98%/.test(child.textContent)), "Both periods show their saved scores");
     assert.equal(rows()[0].children[13].children[0].textContent, "Excused - absent");
@@ -210,6 +222,9 @@ test("typing weekly table follows filters and persists independent per-week book
     assert.deepEqual(writes[1], { email: "ana@school.nz", weekStart: weeks[0].weekStart, period: 1, signed: true });
     assert.equal(tick(2).checked, false, "Periods are independent");
     selectWeek("2");
+    for (const mark of ["School P1: Present", "School P2: Late", "School P3: Not recorded"]) {
+        assert.ok(rows()[0].children[1].children.some(child => child.textContent.includes(mark)), mark);
+    }
     assert.equal(rows()[0].children[1].children.filter(child => child.className === "typing-saved-result").length, 0,
         "Periods with no saved results are not highlighted");
     assert.equal(tick(1).checked, false, "Weeks are independent");
@@ -259,6 +274,8 @@ test("typing weekly table follows filters and persists independent per-week book
     assert.equal(tick(2).checked, true, "Attendance failure keeps saved book signatures");
     assert.ok(rows()[0].children[1].children.some(child => /Weekly read unavailable/.test(child.textContent)),
         "Attendance failure is visible alongside saved typing data");
+    assert.ok(!rows()[0].children[1].children.some(child => /Teacher Planner attendance \(school periods\)/.test(child.textContent)),
+        "An unavailable attendance response does not display stale marks");
     failAttendance = false;
     attendanceDate = "2026-11-02";
     await el("class-progress-refresh").events.click();
