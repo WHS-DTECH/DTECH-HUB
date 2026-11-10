@@ -271,11 +271,14 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
         try {
             await ensureSchema();
             const [startDate, attempts, canManage] = await Promise.all([settings(), loadAttempts(email), canManagePracticalSchedule(email)]);
-            const weeklyProgress = weeklyTypingProgress(startDate, attempts, await attendanceProvider(email, startDate), nzDate(now()));
+            const deferred = req.query.attendance === "deferred";
+            const weeklyProgress = weeklyTypingProgress(startDate, attempts, deferred
+                ? { active: true, status: "loading", weeks: [] }
+                : await attendanceProvider(email, startDate), nzDate(now()));
             const readOnly = res.locals.kitPreview === true;
             let certificate = null;
             let certificateEmailed = false;
-            if (!readOnly) {
+            if (!readOnly && !deferred) {
                 try {
                     certificate = await certificateFor(req, email, startDate, attempts, weeklyProgress);
                     if (certificate) certificateEmailed = await certificates.autoEmail(email, certificate);

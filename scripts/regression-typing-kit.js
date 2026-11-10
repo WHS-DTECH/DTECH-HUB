@@ -331,7 +331,7 @@ test("all attempts retained, identity isolated, retries idempotent, dated histor
     assert.equal(db.data.queries.some(({ sql }) => /DELETE|certificate|practical_skills_progress/.test(sql)), false);
 });
 
-function frontend({ search = "", snapshot, deferred, failFirstPost = false } = {}) {
+function frontend({ search = "", snapshot, deferred, fetchSource, failFirstPost = false } = {}) {
     const nodes = new Map();
     const events = {};
     const requests = [];
@@ -352,9 +352,10 @@ function frontend({ search = "", snapshot, deferred, failFirstPost = false } = {
             addEventListener(name, callback) { events[name] = callback; } },
         window: { location: { search }, addEventListener(name, callback) { events[name] = callback; } },
         localStorage: { getItem: () => auth }, sessionStorage: { getItem: () => null },
-        crypto: { randomUUID }, URLSearchParams, Intl, Date,
+        crypto: { randomUUID }, URLSearchParams, Intl, Date, AbortSignal,
         fetch: async (url, options) => {
             requests.push({ url, options });
+            if (fetchSource) return fetchSource(url, options);
             if (deferred) return new Promise((resolve) => { deferred.resolve = resolve; });
             if (options.method === "POST" && failFirstPost) {
                 failFirstPost = false;
@@ -371,6 +372,144 @@ function frontend({ search = "", snapshot, deferred, failFirstPost = false } = {
 }
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
+test("deferred student log responds within one second without waiting for Planner or issuing a certificate", { timeout: 3000 }, async (t) => {
+    let attendanceCalls = 0;
+    let release, started;
+    const waiting = new Promise(resolve => { release = resolve; });
+    const called = new Promise(resolve => { started = resolve; });
+    t.after(() => release({ active: true, status: "available", weeks: [] }));
+    const certificates = certificateMock();
+    const f = await fixture(t, { certificates: certificates.api, attendanceProvider: async () => {
+        attendanceCalls++;
+        started();
+        return waiting;
+    } });
+    await f.call("/attempts", { method: "POST", body: {
+        weekStart: DEFAULT_START_DATE, period: 1, resultUrl, submissionId: randomUUID()
+    } });
+    const begin = performance.now();
+    const fast = await f.call("?attendance=deferred");
+    assert.ok(performance.now() - begin < 1000, "Saved log must not wait for the 45-second attendance timeout");
+    assert.equal(fast.status, 200);
+    assert.equal(fast.body.attempts.length, 1);
+    assert.equal(fast.body.weeklyProgress.sourceStatus, "loading");
+    assert.equal(fast.body.weeklyProgress.excusedWeeks, 0);
+    assert.equal(fast.body.certificate, null);
+    assert.equal(attendanceCalls, 0);
+    assert.equal(certificates.calls.get.length, 0);
+    const full = f.call();
+    await called;
+    release({ active: true, status: "available", weeks: [] });
+    assert.equal((await full).body.weeklyProgress.sourceStatus, "available");
+    assert.equal(attendanceCalls, 1);
+    assert.equal(certificates.calls.get.length, 1);
+    assert.equal((await f.call("?attendance=deferred", { verified: false })).status, 401);
+});
+
+function loadingSnapshot() {
+    const { weeklyTypingProgress } = require("../practical-skills/typing-attendance");
+    return { startDate: DEFAULT_START_DATE, attempts: [], canManage: false, certificate: null,
+        certificateUnlockDate: "2026-12-11",
+        weeklyProgress: weeklyTypingProgress(DEFAULT_START_DATE, [], { active: true, status: "loading", weeks: [] }, "2026-12-12") };
+}
+
+test("daily log is usable before attendance returns; background refresh preserves form, launch and newly saved results", async () => {
+    let release;
+    const base = loadingSnapshot();
+    const ui = frontend({ search: "?week=2026-11-23&period=1", fetchSource: async (url, options) => {
+        if (url.endsWith("?attendance=deferred")) return { ok: true, json: async () => structuredClone(base) };
+        if (options.method === "POST") return { ok: true, json: async () => ({ attempt: {
+            id: "1", ...result, weekStart: "2026-11-23", period: 1, submittedAt: "2026-11-23T01:00:00Z"
+        } }) };
+        return new Promise(resolve => { release = resolve; });
+    } });
+    await settle();
+    assert.equal(ui.requests.length, 2);
+    assert.match(ui.get("typing-content").innerHTML, /typing-result-form/);
+    assert.match(ui.get("typing-content").innerHTML, /Checking attendance/);
+    assert.equal(ui.get("typing-identity-verification").hidden, true);
+    ui.get("typing-launch-easy").handlers.click();
+    ui.get("typing-result-url").value = resultUrl;
+    const form = ui.get("typing-result-form");
+    await form.handlers.submit({ preventDefault() {}, currentTarget: form });
+    ui.get("typing-launch-easy").handlers.click();
+    ui.get("typing-result-url").value = "another link being entered";
+    const html = ui.get("typing-content").innerHTML;
+    const completed = structuredClone(base);
+    completed.weeklyProgress.sourceStatus = "available";
+    release({ ok: true, json: async () => completed });
+    await settle();
+    assert.equal(ui.get("typing-content").innerHTML, html, "Background refresh must not replace the daily form or scorecard");
+    assert.equal(ui.get("typing-result-url").value, "another link being entered");
+    assert.match(ui.get("typing-attendance-2026-11-23").innerHTML, /Weekly typing requirement met/);
+    assert.match(ui.get("typing-status").textContent, /Result saved/);
+    ui.events.focus();
+    assert.match(ui.get("typing-return-prompt").textContent, /Finished your test/);
+});
+
+test("background failure leaves the log usable with an explicit warning; sign-out ignores late details", async () => {
+    for (const signOut of [false, true]) {
+        let reject;
+        const ui = frontend({ fetchSource: async (url) => {
+            if (url.endsWith("?attendance=deferred")) return { ok: true, json: async () => loadingSnapshot() };
+            return new Promise((resolve, fail) => { reject = fail; });
+        } });
+        await settle();
+        const html = ui.get("typing-content").innerHTML;
+        if (signOut) ui.signOut();
+        reject(new Error("Planner connection lost"));
+        await settle();
+        if (signOut) {
+            assert.equal(ui.get("typing-content").innerHTML, "");
+            assert.match(ui.get("typing-status").textContent, /Sign in/);
+        } else {
+            assert.equal(ui.get("typing-content").innerHTML, html);
+            assert.match(ui.get("typing-weekly-rules").innerHTML, /Planner connection lost/);
+            assert.match(ui.get(`typing-attendance-${DEFAULT_START_DATE}`).innerHTML, /typing log is still available/);
+            assert.equal(ui.get("typing-identity-verification").hidden, true);
+        }
+    }
+});
+
+test("background certificate updates the dashboard without replacing its calendar form", async () => {
+    const base = loadingSnapshot();
+    base.canManage = true;
+    let release;
+    const ui = frontend({ fetchSource: async (url) => {
+        if (url.endsWith("?attendance=deferred")) return { ok: true, json: async () => structuredClone(base) };
+        return new Promise(resolve => { release = resolve; });
+    } });
+    await settle();
+    const html = ui.get("typing-content").innerHTML;
+    ui.get("typing-start-date").value = "2027-02-01";
+    const details = structuredClone(base);
+    details.weeklyProgress.sourceStatus = "available";
+    details.certificate = { studentName: "Synthetic Student", detailText: "Seven-week log", issuer: "School" };
+    details.certificateEmailed = true;
+    release({ ok: true, json: async () => details });
+    await settle();
+    assert.equal(ui.get("typing-content").innerHTML, html);
+    assert.equal(ui.get("typing-start-date").value, "2027-02-01");
+    assert.equal(ui.get("worksheet-certificate").hidden, false);
+    assert.equal(ui.get("certificate-student-name").textContent, "Synthetic Student");
+    assert.match(ui.get("typing-certificate-notice").innerHTML, /Certificate issued/);
+    assert.match(ui.get("certificate-status").textContent, /emailed/);
+});
+
+test("log request has a bounded timeout and offers retry; only authentication errors request verification", async () => {
+    for (const kind of ["timeout", "auth"]) {
+        const ui = frontend({ fetchSource: async (url, options) => {
+            assert.ok(options.signal instanceof AbortSignal);
+            if (kind === "timeout") throw Object.assign(new Error("timed out"), { name: "TimeoutError" });
+            return { ok: false, status: 401, json: async () => ({ error: "Verify your school Google account." }) };
+        } });
+        await settle();
+        assert.equal(ui.get("typing-retry").hidden, false);
+        assert.equal(ui.get("typing-identity-verification").hidden, kind !== "auth");
+        assert.match(ui.get("typing-status").textContent, kind === "timeout" ? /took too long/ : /Verify your school/);
+    }
+});
+
 test("dashboard renders exactly seven dated weeks and fourteen daily record links", async () => {
     const ui = frontend();
     await settle();
@@ -382,7 +521,7 @@ test("dashboard renders exactly seven dated weeks and fourteen daily record link
     assert.match(html, /0 \/ 14 period records started/);
     assert.equal(ui.get("typing-identity-verification").hidden, true);
     assert.match(html, /week=2026-12-07&amp;period=2|week=2026-12-07&period=2/);
-    assert.doesNotMatch(html, /typing-settings-form|certificate|Mark Complete/);
+    assert.doesNotMatch(html, /typing-settings-form|Certificate issued|certificate unlocks|Mark Complete/);
     assert.equal(ui.requests[0].options.headers.Authorization, "Bearer test-token");
 });
 

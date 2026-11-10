@@ -32,10 +32,16 @@
         const headers = { "Content-Type": "application/json", "x-user-email": state.email };
         const googleToken = session.idToken || session.accessToken;
         if (googleToken) headers.Authorization = `Bearer ${googleToken}`;
-        const response = await fetch(`/api/practical-skills/typing-kit${path}`, { ...options, headers, cache: "no-store" });
+        const response = await fetch(`/api/practical-skills/typing-kit${path}`, {
+            ...options, headers, cache: "no-store", signal: AbortSignal.timeout(60000)
+        });
         if (options.raw && response.ok) return response;
         const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || `Request failed (${response.status}). Please try again.`);
+        if (!response.ok) {
+            const error = new Error(payload.error || `Request failed (${response.status}). Please try again.`);
+            error.status = response.status;
+            throw error;
+        }
         return payload;
     }
     function certificateStatus(text, error = false) {
@@ -64,6 +70,8 @@
         const progress = state.snapshot.weeklyProgress;
         if (!progress) return "";
         const rule = "From Typing Kit Week 5, save at least one one-minute test each week you attend DTECH. Away for every scheduled DTECH class that week? The week is excused, with no catch-up required. Weeks 1-4 have no new requirement.";
+        if (progress.sourceStatus === "loading") return `<p class="typing-attendance-note">${rule}</p>
+            <p role="status">Checking Teacher Planner attendance and certificate status... Your typing log is ready to use.</p>`;
         if (!progress.active) return `<p class="typing-attendance-note">${rule} The attendance connection is being set up; the new certificate rule is not active yet.</p>`;
         return `<p class="typing-attendance-note">${rule}</p>
             <p><strong>Weeks 5-7: ${progress.completedWeeks} completed &middot; ${progress.excusedWeeks} excused</strong></p>
@@ -75,6 +83,8 @@
         if (!progress?.active) return "";
         const week = progress.weeks.find(week => week.weekStart === weekStart);
         if (!week) return "";
+        if (progress.sourceStatus === "loading") return '<p class="typing-attendance-note" role="status">Checking attendance... You can open your daily record and save results now.</p>';
+        if (progress.sourceStatus === "unavailable") return `<p class="typing-attendance-warning" role="status">${escapeHtml(progress.error)}</p>`;
         const labels = { legacy: "Weeks 1-4: no new weekly requirement", future: "Upcoming week",
             completed: "Weekly typing requirement met", excused: "Week excused - away for all DTECH classes. No catch-up needed.",
             required: "One typing test needed this week", pending: "Attendance needs confirmation - not counted as absent" };
@@ -118,8 +128,8 @@
                 <h2>Typing Kit Dashboard</h2>
                 <p>${dateLabel(starts[0])} &ndash; ${dateLabel(addDays(starts[6], 6))}</p>
                 <p><strong>${recorded} / 14 period records started</strong> &middot; All attempts are kept.</p>
-                ${certificateNotice()}
-                ${weeklyRulesNotice()}
+                <div id="typing-certificate-notice">${certificateNotice()}</div>
+                <div id="typing-weekly-rules">${weeklyRulesNotice()}</div>
                 <p>Open your week and period. Complete a one-minute test, paste the results link here, save it, then copy your saved result into your exercise book for your teacher to sign.</p>
                 <p class="typing-note">This is your electronic log, not an electronic sign-off. Scores are student-submitted. Submission dates do not verify when a test was taken.</p>
             </section>
@@ -135,7 +145,7 @@
             <section aria-labelledby="typing-weeks-heading"><h2 id="typing-weeks-heading">Your seven-week log</h2>
                 ${starts.map((start, index) => `<article class="typing-week">
                     <div class="typing-week-heading"><h3>Week ${index + 1}</h3><p>${dateLabel(start)} &ndash; ${dateLabel(addDays(start, 6))}</p></div>
-                    ${weekAttendance(start)}
+                    <div id="typing-attendance-${start}">${weekAttendance(start)}</div>
                     <div class="typing-periods">${[1, 2].map((period) => {
                         const rows = periodAttempts(start, period);
                         const latest = rows[rows.length - 1];
@@ -158,12 +168,9 @@
             const startDate = document.getElementById("typing-start-date").value;
             form.querySelector("button").disabled = true;
             try {
-                const saved = await request("/settings", { method: "PUT", body: JSON.stringify({ startDate }) });
+                await request("/settings", { method: "PUT", body: JSON.stringify({ startDate }) });
                 if (revision !== state.revision) return;
-                state.snapshot.startDate = saved.startDate;
-                state.snapshot = await request();
-                renderOverview();
-                message("Calendar saved. All existing attempts have been kept.");
+                await load("Calendar saved. All existing attempts have been kept.");
             } catch (error) {
                 if (revision === state.revision) message(error.message, true);
             } finally {
@@ -180,7 +187,7 @@
         content.innerHTML = `<a href="./typing-kit.html">&larr; Back to Typing Kit Dashboard</a>
             <section class="typing-daily">
                 <h2>${title}</h2><p>Week of ${dateLabel(weekStart)} &ndash; ${dateLabel(addDays(weekStart, 6))}</p>
-                ${weekAttendance(weekStart)}
+                <div id="typing-attendance-${weekStart}">${weekAttendance(weekStart)}</div>
                 ${index >= 0 ? `<ol>
                     <li>Launch and complete a one-minute typing test.</li>
                     <li>Copy the address of the results page and return here.</li>
@@ -273,14 +280,7 @@
                 const saved = await request("/attempts", { method: "POST", body: JSON.stringify({ weekStart, period, resultUrl, submissionId }) });
                 if (revision !== state.revision) return;
                 if (!state.snapshot.attempts.some((attempt) => attempt.id === saved.attempt.id)) state.snapshot.attempts.push(saved.attempt);
-                const progress = state.snapshot.weeklyProgress;
-                const week = progress?.weeks.find(week => week.weekStart === weekStart);
-                if (week && week.week >= progress.ruleStartWeek && week.weekStart <= progress.today) {
-                    week.recorded = true;
-                    week.status = "completed";
-                    progress.completedWeeks = progress.weeks.filter(week => week.week >= progress.ruleStartWeek && week.status === "completed").length;
-                    progress.excusedWeeks = progress.weeks.filter(week => week.week >= progress.ruleStartWeek && week.status === "excused").length;
-                }
+                reconcileSavedWeeks();
                 state.submissionId = "";
                 state.pendingUrl = "";
                 renderDaily(weekStart, period);
@@ -309,7 +309,48 @@
         }
         renderDaily(weekStart, period);
     }
-    async function load() {
+    function reconcileSavedWeeks() {
+        const progress = state.snapshot.weeklyProgress;
+        if (!progress) return;
+        for (const week of progress.weeks) {
+            if (week.week >= progress.ruleStartWeek && week.weekStart <= progress.today &&
+                state.snapshot.attempts.some(attempt => attempt.weekStart === week.weekStart)) {
+                week.recorded = true;
+                week.status = "completed";
+            }
+        }
+        progress.completedWeeks = progress.weeks.filter(week => week.week >= progress.ruleStartWeek && week.status === "completed").length;
+        progress.excusedWeeks = progress.weeks.filter(week => week.week >= progress.ruleStartWeek && week.status === "excused").length;
+    }
+    async function refreshDetails(revision) {
+        const startDate = state.snapshot.startDate;
+        try {
+            const details = await request();
+            if (revision !== state.revision || state.snapshot?.startDate !== startDate) return;
+            if (details.startDate !== startDate) throw new Error("The Typing Kit calendar changed. Reload your log to see the current weeks.");
+            state.snapshot.weeklyProgress = details.weeklyProgress;
+            state.snapshot.certificate = details.certificate;
+            state.snapshot.certificateEmailed = details.certificateEmailed;
+            reconcileSavedWeeks();
+        } catch (error) {
+            if (revision !== state.revision || state.snapshot?.startDate !== startDate) return;
+            state.snapshot.weeklyProgress = { ...state.snapshot.weeklyProgress, active: true,
+                sourceStatus: "unavailable", error: error.name === "TimeoutError"
+                    ? "Attendance and certificate checks took too long. Reload to retry. Your typing log is still available."
+                    : `Could not finish attendance and certificate checks: ${error.message} Your typing log is still available.` };
+        }
+        const rules = document.getElementById("typing-weekly-rules");
+        if (rules) rules.innerHTML = weeklyRulesNotice();
+        for (const start of weeks()) {
+            const host = document.getElementById(`typing-attendance-${start}`);
+            if (host) host.innerHTML = weekAttendance(start);
+        }
+        const notice = document.getElementById("typing-certificate-notice");
+        if (notice) notice.innerHTML = certificateNotice();
+        const params = new URLSearchParams(window.location.search);
+        updateCertificate(!params.has("week") && !params.has("period"));
+    }
+    async function load(successMessage = "") {
         const revision = ++state.revision;
         state.snapshot = null;
         state.launched = false;
@@ -326,20 +367,24 @@
                 message("Sign in with your school Google account to open your Typing Kit and saved log.");
                 return;
             }
+            document.getElementById("typing-identity-verification").hidden = true;
             message("Loading your typing log...");
-            const snapshot = await request();
+            const snapshot = await request("?attendance=deferred");
             if (revision !== state.revision) return;
             state.snapshot = snapshot;
             document.getElementById("typing-identity-verification").hidden = true;
-            message("");
+            message(successMessage);
             render();
             if (snapshot.readOnly) {
                 content.querySelectorAll("form input, form button, button[id^='typing-launch-']").forEach((field) => { field.disabled = true; });
                 message("Teacher preview: Typing Kit is Not Live. Saved results are view-only; new attempts and calendar changes are paused.");
             }
+            if (snapshot.weeklyProgress?.sourceStatus === "loading") void refreshDetails(revision);
         } catch (error) {
             if (revision !== state.revision) return;
-            message(error.message || "Could not load your typing log.", true);
+            document.getElementById("typing-identity-verification").hidden = error.status !== 401;
+            message(error.name === "TimeoutError" ? "Loading your typing log took too long. Please retry."
+                : error.message || "Could not load your typing log.", true);
             retry.hidden = false;
         }
     }
