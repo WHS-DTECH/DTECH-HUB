@@ -28,6 +28,13 @@
                     <h3>Required Installation Modules <small>(Teacher managed)</small></h3>
                     <p class="activity-block-text">${e(unityEditor.modules?.trim() || "No additional modules specified by your teacher.")}</p>
                 </aside>`;
+            if (unityEditor && b.id === "unity-editor-install") body += `
+                <aside aria-label="Teacher-managed Unity Editor folder">
+                    <h3>Editor folder name <small>(Teacher managed)</small></h3>
+                    ${unityEditor.folderName?.trim()
+                        ? `<p>Locate the folder named:</p><p class="activity-block-text"><strong>${e(unityEditor.folderName.trim())}</strong></p><p>Use this folder for the required Unity Editor version ${e(unityEditor.version)}.</p>`
+                        : "<p>The Editor folder name has not been set. Ask your teacher which folder to use.</p>"}
+                </aside>`;
             if (b.kind === "studentlink") {
                 const studentLink = B.studentUrl(value, b.driveOnly, b.driveFolderOnly);
                 body = `${b.text ? `<p class="activity-block-text">${e(b.text)}</p>` : ""}

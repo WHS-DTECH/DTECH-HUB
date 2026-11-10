@@ -6,6 +6,7 @@
     const method = document.getElementById("setup-method");
     const value = document.getElementById("setup-value");
     const editorVersion = document.getElementById("setup-editor-version");
+    const editorFolder = document.getElementById("setup-editor-folder");
     const editorModules = document.getElementById("setup-editor-modules");
     const editorNotes = document.getElementById("setup-editor-notes");
     const status = document.getElementById("setup-status");
@@ -31,6 +32,7 @@
     function clearSettings() {
         value.value = "";
         editorVersion.value = "";
+        editorFolder.value = "";
         editorModules.value = "";
         editorNotes.value = "";
     }
@@ -46,6 +48,7 @@
             method.value = data.activationMethod;
             value.value = data.licenceValue;
             editorVersion.value = data.unityEditor.version;
+            editorFolder.value = data.unityEditor.folderName || "";
             editorModules.value = data.unityEditor.modules || "";
             editorNotes.value = data.unityEditor.notes || "";
             fields.disabled = false;
@@ -89,11 +92,11 @@
         try {
             await request(path(), { method: "PUT", body: JSON.stringify({
                 activationMethod: method.value, licenceValue: value.value,
-                unityEditor: { version: editorVersion.value.trim(), modules: editorModules.value, notes: editorNotes.value }
+                unityEditor: { version: editorVersion.value.trim(), folderName: editorFolder.value.trim(), modules: editorModules.value, notes: editorNotes.value }
             }) });
             if (current !== revision) return;
             dirty = false;
-            message("Unity settings saved. Activity 1 uses the current school licence; Activity 2 shows the saved Editor version, modules and notes when opened or reloaded.");
+            message("Unity settings saved. Activity 1 uses the current school licence; Activity 2 shows the saved Editor version, folder name, modules and notes when opened or reloaded.");
         } catch (error) {
             if (current === revision) message(error.message, true);
         } finally {

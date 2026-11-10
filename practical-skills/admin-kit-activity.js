@@ -156,6 +156,7 @@
             questions, images, ...(researchReport ? { researchReport } : {}),
             ...(existing?.unityEditor ? { unityEditor: {
                 version: document.querySelector("#activity-unity-version").value.trim(),
+                folderName: document.querySelector("#activity-unity-folder").value.trim(),
                 modules: document.querySelector("#activity-unity-modules").value,
                 notes: document.querySelector("#activity-unity-notes").value
             } } : {}),
@@ -174,6 +175,7 @@
         evidenceInput.value = activity.taskBrief?.evidenceRequired || "";
         document.querySelector("#activity-unity-editor").hidden = !activity.unityEditor;
         document.querySelector("#activity-unity-version").value = activity.unityEditor?.version || "";
+        document.querySelector("#activity-unity-folder").value = activity.unityEditor?.folderName || "";
         document.querySelector("#activity-unity-modules").value = activity.unityEditor?.modules || "";
         document.querySelector("#activity-unity-notes").value = activity.unityEditor?.notes || "";
         document.querySelector("#activity-page-title").textContent = `Activity Details: ${titleInput.value}`;

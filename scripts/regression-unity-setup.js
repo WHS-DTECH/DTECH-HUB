@@ -102,18 +102,21 @@ test("Unity Editor migrates once, renders current teacher settings and accepts f
     assert.equal((host.innerHTML.match(/class="activity-content-block"/g) || []).length, 4);
     assert.match(host.innerHTML, /font-size:1.5em">6000\.5/);
     assert.match(host.innerHTML, /No additional modules specified by your teacher\./);
+    assert.match(host.innerHTML, /Editor folder name has not been set/);
     assert.doesNotMatch(host.innerHTML, /<input|<textarea|Additional installation notes/);
     for (const version of ["6000.5.0f1", "6000.5.1b12", "6000.5.0a3"]) {
-        activity.unityEditor = { version, modules: "Windows Build Support\nWeb Build Support", notes: "<script>unsafe</script>" };
+        activity.unityEditor = { version, folderName: "School Editor <folder>", modules: "Windows Build Support\nWeb Build Support", notes: "<script>unsafe</script>" };
         B.validate(activity);
         render();
         assert.ok(host.innerHTML.includes(version));
+        assert.match(host.innerHTML, /Step 4 - Install the Editor[\s\S]*School Editor &lt;folder&gt;/);
         assert.match(host.innerHTML, /Windows Build Support\nWeb Build Support/);
         assert.match(host.innerHTML, /&lt;script&gt;unsafe&lt;\/script&gt;/);
         assert.doesNotMatch(host.innerHTML, /<script>/);
         assert.equal(withUnityHubLicence(content), content, "Reopening never resets teacher configuration");
     }
-    for (const config of [null, [], { version: "" }, { version: 6000.5 }, { version: "6000.5", modules: [] }]) {
+    for (const config of [null, [], { version: "" }, { version: 6000.5 }, { version: "6000.5", modules: [] },
+        { version: "6000.5", folderName: [] }, { version: "6000.5", folderName: "x".repeat(201) }]) {
         assert.throws(() => B.validate({ ...activity, unityEditor: config }), /Unity Editor settings/);
     }
     assert.match(activity.taskBrief.evidenceRequired, /do not need to reinstall/);
@@ -411,16 +414,19 @@ test("teachers preview, save and reopen Editor configuration without changing th
     assert.equal(get("#activity-unity-editor").hidden, false);
     assert.equal(get("#activity-unity-version").value, "6000.5");
     get("#activity-unity-version").value = "6000.5.2f1";
+    get("#activity-unity-folder").value = "School Editor";
     get("#activity-unity-modules").value = "Windows Build Support";
     get("#activity-unity-notes").value = "Keep Unity Hub open.";
     get("#activity-editor-fields").handlers.input();
     timer();
     assert.equal(preview.unityEditor.version, "6000.5.2f1");
+    assert.equal(preview.unityEditor.folderName, "School Editor");
     assert.equal(stored.activities[1].unityEditor.version, "6000.5", "Preview is not a save");
     get("#activity-save").handlers.click();
     await tick();
     assert.equal(stored.activities[1].unityEditor.modules, "Windows Build Support");
     assert.equal(stored.activities[1].unityEditor.notes, "Keep Unity Hub open.");
+    assert.equal(stored.activities[1].unityEditor.folderName, "School Editor");
     assert.equal(stored.activities[0].blocks[2].licenceValue, mockLicence);
     vm.runInContext(admin, ctx);
     await tick();
@@ -640,15 +646,22 @@ test("Licence Kit Setup restricts settings to admins and updates only the curren
     assert.deepEqual(content.worksheets, original.worksheets);
     const reloaded = await (await fetch(url, { headers })).json();
     assert.equal(reloaded.licenceValue, mockLicence);
-    const editorConfig = { version: "6000.5.2f1", modules: "Windows Build Support\nWeb Build Support", notes: "Use the school network." };
-    for (const invalid of [{ version: "" }, { version: 6000.5 }, { version: "6000.5", modules: [] }]) {
+    const editorConfig = { version: "6000.5.2f1", folderName: "School Editor", modules: "Windows Build Support\nWeb Build Support", notes: "Use the school network." };
+    for (const invalid of [{ version: "" }, { version: 6000.5 }, { version: "6000.5", modules: [] },
+        { version: "6000.5", folderName: 123 }, { version: "6000.5", folderName: "x".repeat(201) }]) {
         assert.equal((await save({ activationMethod: "serial", licenceValue: mockLicence, unityEditor: invalid })).status, 400);
     }
     assert.equal((await save({ activationMethod: "serial", licenceValue: mockLicence, unityEditor: editorConfig })).status, 200);
     assert.deepEqual((await (await fetch(url, { headers })).json()).unityEditor, editorConfig);
+    const { folderName, ...legacyConfig } = editorConfig;
+    assert.equal((await save({ activationMethod: "serial", licenceValue: mockLicence, unityEditor: legacyConfig })).status, 200);
+    assert.equal((await (await fetch(url, { headers })).json()).unityEditor.folderName, folderName, "Older clients preserve the saved folder");
     assert.equal(content.activities[0].blocks[2].licenceValue, mockLicence);
     assert.deepEqual(content.activities[1].blocks, original.activities[1].blocks);
     assert.deepEqual(content.activities.slice(2), original.activities.slice(2));
+    assert.equal((await save({ activationMethod: "serial", licenceValue: mockLicence,
+        unityEditor: { ...editorConfig, folderName: "   " } })).status, 200);
+    assert.equal((await (await fetch(url, { headers })).json()).unityEditor.folderName, "", "The folder can be explicitly cleared");
     const beforeFailure = structuredClone(content);
     fail = true;
     assert.equal((await save({ activationMethod: "instructions", licenceValue: "Unsaved" })).status, 500);
@@ -731,17 +744,20 @@ test("Licence Kit Setup loads, saves and clears the teacher licence on account c
     get("setup-method").value = "serial";
     get("setup-value").value = mockLicence;
     get("setup-editor-version").value = "6000.5.2f1";
+    get("setup-editor-folder").value = "School Editor";
     get("setup-editor-modules").value = "Web Build Support";
     get("setup-editor-notes").value = "Keep Unity Hub open.";
     await get("setup-form").handlers.submit({ preventDefault() {} });
     assert.equal(stored.licenceValue, mockLicence);
     assert.equal(stored.unityEditor.version, "6000.5.2f1");
+    assert.equal(stored.unityEditor.folderName, "School Editor");
     assert.equal(stored.unityEditor.modules, "Web Build Support");
     assert.equal(stored.unityEditor.notes, "Keep Unity Hub open.");
     assert.match(get("setup-status").textContent, /Unity settings saved/);
     events["hub-auth-state-changed"]();
     await tick();
     assert.equal(get("setup-editor-version").value, "6000.5.2f1");
+    assert.equal(get("setup-editor-folder").value, "School Editor");
     assert.equal(get("setup-value").value, mockLicence);
     fail = true;
     await get("setup-form").handlers.submit({ preventDefault() {} });
@@ -753,6 +769,7 @@ test("Licence Kit Setup loads, saves and clears the teacher licence on account c
     assert.equal(get("setup-form").hidden, true);
     assert.equal(get("setup-value").value, "");
     assert.equal(get("setup-editor-version").value, "");
+    assert.equal(get("setup-editor-folder").value, "");
     assert.equal(get("setup-editor-modules").value, "");
 });
 

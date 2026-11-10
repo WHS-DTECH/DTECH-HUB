@@ -6,6 +6,10 @@ Audience: Westland High School System Administration
 ## 1) What This Website Is
 DTECH Hub is a web application used in DTECH classes for project/activity access, uploads, assessment resources, and teacher/admin workflows.
 
+### Unity Editor folder configuration
+- Licence Kit Setup and Activity 2 Details share the optional **Editor folder name** setting (`unityEditor.folderName`, up to 200 characters). It is saved with the kit content and shown read-only in Activity 2, **Step 4 - Install the Editor**, when students open or reload the worksheet.
+- Existing kits need no migration. Until configured, Step 4 asks students to check the folder with their teacher. Clearing the setting restores this message; saving from an older client without the field preserves the existing folder name.
+
 ### Google Drawings filing statuses
 - **Saved - sync needed**: a drawing link is saved, but successful filing in `WHS-DTECH > course > KITS > Google Drawings` has not been confirmed.
 - **Submitted - synced**: DTECH-HUB successfully filed the linked drawing. Moving does not grant the teacher sharing access.

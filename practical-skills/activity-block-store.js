@@ -73,7 +73,9 @@ function registerActivityBlocks(app, deps) {
             const updated = { ...content, activities: content.activities.map((entry) => entry === activity
                 ? { ...entry, blocks: entry.blocks.map((item) => item === block ? { ...item, activationMethod, licenceValue } : item) }
                 : entry === editor && unityEditor !== undefined ? { ...entry, unityEditor: {
-                    version: unityEditor.version.trim(), modules: unityEditor.modules || "", notes: unityEditor.notes || ""
+                    ...entry.unityEditor,
+                    version: unityEditor.version.trim(), modules: unityEditor.modules || "", notes: unityEditor.notes || "",
+                    ...(unityEditor.folderName !== undefined ? { folderName: unityEditor.folderName.trim() } : {})
                 } }
                 : entry) };
             await savePracticalSkillsKitContent(req.params.kitId, updated, normalizeEmail(getRequestUserEmail(req)));

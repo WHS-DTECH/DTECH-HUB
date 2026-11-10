@@ -245,9 +245,10 @@
             const config = activity.unityEditor;
             if (!config || typeof config !== "object" || Array.isArray(config) ||
                 typeof config.version !== "string" || !config.version.trim() || config.version.length > 200 ||
+                (config.folderName !== undefined && (typeof config.folderName !== "string" || config.folderName.length > 200)) ||
                 ["modules", "notes"].some((key) => config[key] !== undefined &&
                     (typeof config[key] !== "string" || config[key].length > 10000))) {
-                throw new Error("Unity Editor settings need a version (up to 200 characters) and optional modules and notes (up to 10,000 characters each).");
+                throw new Error("Unity Editor settings need a version and optional folder name (up to 200 characters each) and optional modules and notes (up to 10,000 characters each).");
             }
         }
         if (activity.completionMode !== undefined && !["manual", "auto"].includes(activity.completionMode)) throw new Error("Choose manual or automatic activity completion.");
