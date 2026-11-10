@@ -4646,31 +4646,37 @@ async function ensureTrelloConnectionsSchema() {
   await pool.query(`ALTER TABLE student_trello_connections ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
+let practicalSkillsProgressSchemaReady;
 async function ensurePracticalSkillsProgressSchema() {
   if (!hasDatabase) {
     return;
   }
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS practical_skills_progress (
-      student_email TEXT NOT NULL,
-      kit_id TEXT NOT NULL,
-      started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      completed BOOLEAN NOT NULL DEFAULT FALSE,
-      completed_at TIMESTAMPTZ,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (student_email, kit_id)
-    );
-  `);
+  if (!practicalSkillsProgressSchemaReady) {
+    practicalSkillsProgressSchemaReady = (async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS practical_skills_progress (
+          student_email TEXT NOT NULL,
+          kit_id TEXT NOT NULL,
+          started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          completed BOOLEAN NOT NULL DEFAULT FALSE,
+          completed_at TIMESTAMPTZ,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (student_email, kit_id)
+        );
+      `);
 
-  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed BOOLEAN NOT NULL DEFAULT FALSE`);
-  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`);
-  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS responses JSONB NOT NULL DEFAULT '{}'::jsonb`);
-  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed_activities JSONB NOT NULL DEFAULT '{}'::jsonb`);
-  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS certificate_emailed_at TIMESTAMPTZ`);
-  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS search_tick_recovery_version INTEGER NOT NULL DEFAULT 0`);
+      await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+      await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed BOOLEAN NOT NULL DEFAULT FALSE`);
+      await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`);
+      await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+      await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS responses JSONB NOT NULL DEFAULT '{}'::jsonb`);
+      await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed_activities JSONB NOT NULL DEFAULT '{}'::jsonb`);
+      await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS certificate_emailed_at TIMESTAMPTZ`);
+      await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS search_tick_recovery_version INTEGER NOT NULL DEFAULT 0`);
+    })().catch((error) => { practicalSkillsProgressSchemaReady = null; throw error; });
+  }
+  await practicalSkillsProgressSchemaReady;
 }
 
 // Starter drafts only — teachers edit the real content via the Kit Content Builder admin page.
@@ -5608,23 +5614,29 @@ function getDefaultPracticalSkillsKitContent(kitId) {
   };
 }
 
+let practicalSkillsKitContentSchemaReady;
 async function ensurePracticalSkillsKitContentSchema() {
   if (!hasDatabase) {
     return;
   }
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS practical_skills_kit_content (
-      kit_id TEXT PRIMARY KEY,
-      content JSONB NOT NULL DEFAULT '{}'::jsonb,
-      updated_by_email TEXT,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
+  if (!practicalSkillsKitContentSchemaReady) {
+    practicalSkillsKitContentSchemaReady = (async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS practical_skills_kit_content (
+          kit_id TEXT PRIMARY KEY,
+          content JSONB NOT NULL DEFAULT '{}'::jsonb,
+          updated_by_email TEXT,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
 
-  await pool.query(`ALTER TABLE practical_skills_kit_content ADD COLUMN IF NOT EXISTS content JSONB NOT NULL DEFAULT '{}'::jsonb`);
-  await pool.query(`ALTER TABLE practical_skills_kit_content ADD COLUMN IF NOT EXISTS updated_by_email TEXT`);
-  await pool.query(`ALTER TABLE practical_skills_kit_content ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+      await pool.query(`ALTER TABLE practical_skills_kit_content ADD COLUMN IF NOT EXISTS content JSONB NOT NULL DEFAULT '{}'::jsonb`);
+      await pool.query(`ALTER TABLE practical_skills_kit_content ADD COLUMN IF NOT EXISTS updated_by_email TEXT`);
+      await pool.query(`ALTER TABLE practical_skills_kit_content ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    })().catch((error) => { practicalSkillsKitContentSchemaReady = null; throw error; });
+  }
+  await practicalSkillsKitContentSchemaReady;
 }
 
 async function getPracticalSkillsKitContent(kitId) {
@@ -15544,15 +15556,24 @@ app.get("/api/practical-skills/my-progress", async (req, res) => {
   }
 
   try {
-    const manager = await canManagePracticalSchedule(studentEmail);
-    const liveIds = new Set((await kitPublication.catalog()).filter((kit) => kit.live).map((kit) => kit.id));
-    const definitions = [...PRACTICAL_SKILLS_KIT_DEFINITIONS, ...customPracticalSkillsKits.values()].filter((kit) => liveIds.has(kit.id));
-    await Promise.all(definitions.map((kit) => ensurePracticalSkillsProgressRow(studentEmail, kit.id)));
-    await refreshLearningSitesCheckIn(studentEmail);
-    await Promise.all(definitions.map((kit) => syncPracticalSkillsKitCompletion(studentEmail, kit.id)));
-    const rows = await getAllPracticalSkillsProgressRows(studentEmail);
-    res.json({ ...await buildPracticalSkillsLicenceSnapshot(rows, manager), student: { name: await getPracticalSkillsStudentName(req), email: studentEmail } });
+    const deferred = req.query?.refresh === "deferred";
+    if (!deferred) {
+      const liveIds = new Set((await kitPublication.catalog()).filter((kit) => kit.live).map((kit) => kit.id));
+      const definitions = [...PRACTICAL_SKILLS_KIT_DEFINITIONS, ...customPracticalSkillsKits.values()].filter((kit) => liveIds.has(kit.id));
+      await refreshLearningSitesCheckIn(studentEmail);
+      for (let index = 0; index < definitions.length; index += 4) {
+        await Promise.all(definitions.slice(index, index + 4).map((kit) => syncPracticalSkillsKitCompletion(studentEmail, kit.id)));
+      }
+    }
+    const [manager, rows, name] = await Promise.all([
+      canManagePracticalSchedule(studentEmail),
+      getAllPracticalSkillsProgressRows(studentEmail),
+      getPracticalSkillsStudentName(req)
+    ]);
+    res.json({ ...await buildPracticalSkillsLicenceSnapshot(rows, manager),
+      student: { name, email: studentEmail }, progressRefreshPending: deferred });
   } catch (error) {
+    console.error("[licence] Could not load saved progress:", error);
     res.status(500).json({ error: error.message || "Could not load Practical Skills progress." });
   }
 });

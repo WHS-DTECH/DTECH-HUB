@@ -23,17 +23,26 @@ async function main() {
     };
     let fail = false;
     let deferred;
+    let background;
+    let timeout = false;
     function node() {
         return { textContent: "", html: "", get innerHTML() { return this.html; },
             set innerHTML(value) { this.html = value; this.children = []; }, hidden: false, classList: { add() {}, remove() {} },
+            handlers: {}, addEventListener(name, callback) { this.handlers[name] = callback; },
             children: [], appendChild(item) { this.children.push(item); }, querySelectorAll() { return []; } };
     }
     const context = vm.createContext({
         document: { getElementById(id) { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id); }, createElement: node, querySelectorAll: () => [] },
         localStorage: { getItem: () => auth }, sessionStorage: { getItem: () => null },
         window: { addEventListener: (name, handler) => { events[name] = handler; }, setInterval: () => 1, clearInterval() {} },
+        AbortSignal,
         fetch: async (url, options) => {
             requests.push({ url, options });
+            assert.ok(options.signal instanceof AbortSignal, "Every request has a bounded timeout");
+            if (timeout) throw Object.assign(new Error("timed out"), { name: "TimeoutError" });
+            if (background && url === "/api/practical-skills/my-progress") {
+                return new Promise((resolve, reject) => { background.resolve = resolve; background.reject = reject; });
+            }
             if (deferred) return new Promise((resolve) => { deferred.resolve = resolve; });
             return { ok: !fail, status: fail ? 500 : 200, json: async () => fail ? { error: "Database unavailable" } : snapshot };
         }
@@ -57,6 +66,7 @@ async function main() {
     assert.match(nodes.get("ps-badge-list").innerHTML, /First Kit/);
     assert.equal(requests[0].options.headers.Authorization, "Bearer test-token");
     assert.equal(nodes.get("ps-kit-list").children.length, 4, "Original kits and the ongoing Typing Kit remain accessible");
+    assert.match(requests[0].url, /\?refresh=deferred$/);
     assert.match(nodes.get("ps-kit-list").children[0].innerHTML, /Manage progress/);
     assert.match(nodes.get("ps-kit-list").children[3].innerHTML, /typing-kit\.html/);
     assert.doesNotMatch(nodes.get("ps-kit-list").children[3].innerHTML, /data-action|certificate/, "Typing history has no completion, reset or certificate actions");
@@ -149,12 +159,57 @@ async function main() {
     assert.ok(applicationCards.indexOf("Minecraft Player Kit") < applicationCards.indexOf("Minecraft Builder Kit"));
     assert.ok(applicationCards.indexOf("Minecraft Builder Kit") < applicationCards.indexOf("Minecraft Coder Kit"));
 
+    snapshot = { ...snapshot, progressRefreshPending: true };
+    background = {};
+    events["hub-auth-state-changed"]();
+    await tick();
+    assert.equal(nodes.get("ps-student-name").textContent, "Māia Student", "Saved identity is visible before slow completion checks");
+    assert.match(nodes.get("ps-status").textContent, /Saved licence loaded/);
+    assert.ok(nodes.get("ps-stamp-list").innerHTML.includes("is-earned"), "Saved awards remain visible during refresh");
+    background.resolve({ ok: true, json: async () => ({ ...snapshot, totalPoints: 999, progressRefreshPending: false }) });
+    await tick();
+    assert.equal(nodes.get("ps-total-points").textContent, "999");
+    assert.equal(nodes.get("ps-status").hidden, true);
+
+    background = {};
+    events["hub-auth-state-changed"]();
+    await tick();
+    background.reject(new Error("Completion checks unavailable"));
+    await tick();
+    assert.equal(nodes.get("ps-student-name").textContent, "Māia Student");
+    assert.match(nodes.get("ps-status").textContent, /Showing your saved licence.*Completion checks unavailable/);
+    assert.equal(nodes.get("ps-retry").hidden, false);
+
+    background = {};
+    events["hub-auth-state-changed"]();
+    await tick();
+    auth = null;
+    events["hub-auth-state-changed"]();
+    background.resolve({ ok: true, json: async () => snapshot });
+    await tick();
+    assert.equal(nodes.get("ps-student-name").textContent, "Your name belongs here", "Late background awards never reappear after sign-out");
+    auth = JSON.stringify({ expiresAt: Date.now() + 60000, profile: { email: "student@school.nz" }, idToken: "test-token" });
+    background = null;
+    snapshot = { ...snapshot, progressRefreshPending: false };
+    timeout = true;
+    events["hub-auth-state-changed"]();
+    await tick();
+    assert.match(nodes.get("ps-status").textContent, /took too long/);
+    assert.equal(nodes.get("ps-licence-progress-count").textContent, "Progress unavailable");
+    assert.equal(nodes.get("ps-retry").hidden, false);
+    timeout = false;
+    nodes.get("ps-retry").handlers.click();
+    await tick();
+    assert.equal(nodes.get("ps-student-name").textContent, "Māia Student");
+    assert.equal(nodes.get("ps-retry").hidden, true);
+
     fail = true;
     events["hub-auth-state-changed"]();
     await tick();
     assert.equal(nodes.get("ps-status").textContent, "Database unavailable");
     assert.match(nodes.get("ps-kit-list").innerHTML, /has not been reset/);
     assert.equal(nodes.get("ps-total-points").textContent, "\u2014");
+    assert.equal(nodes.get("ps-licence-progress-count").textContent, "Progress unavailable");
 
     fail = false;
     deferred = {};

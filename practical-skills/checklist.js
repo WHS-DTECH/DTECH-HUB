@@ -39,7 +39,8 @@
         email: "",
         snapshot: null,
         signInWatcherId: 0,
-        revision: 0
+        revision: 0,
+        loading: false
     };
 
     function normalizeEmail(value) {
@@ -118,16 +119,22 @@
     }
 
     async function loadJson(url, options = {}) {
-        const response = await fetch(url, options);
-        const payload = await response.json().catch(() => ({}));
+        let response;
+        try {
+            response = await fetch(url, { ...options, cache: "no-store", signal: AbortSignal.timeout(60000) });
+        } catch (error) {
+            if (error.name === "TimeoutError") throw new Error("The licence request took too long. Retry shortly; your saved progress has not been reset.");
+            throw error;
+        }
+        const payload = await response.json();
         if (!response.ok) {
             throw new Error(payload?.error || `Request failed (${response.status})`);
         }
         return payload;
     }
 
-    function fetchSnapshot() {
-        return loadJson("/api/practical-skills/my-progress", { headers: withAuthHeaders() });
+    function fetchSnapshot(deferred = false) {
+        return loadJson(`/api/practical-skills/my-progress${deferred ? "?refresh=deferred" : ""}`, { headers: withAuthHeaders() });
     }
 
     function renderBadges(badges) {
@@ -170,7 +177,8 @@
         const kitsById = new Map((snapshot?.kits || []).map((kit) => [kit.id, kit]));
         const completed = loaded ? Number(snapshot.stampCompletedCount ?? snapshot.completedCount ?? 0) : 0;
         const total = loaded ? Number(snapshot.stampTotalKits ?? snapshot.totalKits ?? kitDefinitions.length) : kitDefinitions.length;
-        document.getElementById("ps-student-name").textContent = loaded ? snapshot.student?.name || state.email : state.email ? "Loading your licence..." : "Your name belongs here";
+        document.getElementById("ps-student-name").textContent = loaded ? snapshot.student?.name || state.email
+            : state.email ? state.loading ? "Loading your licence..." : "Your licence is unavailable" : "Your name belongs here";
         document.getElementById("ps-student-email").textContent = state.email || "Sign in with your school account to start collecting stamps.";
         document.getElementById("ps-total-points").textContent = loaded ? String(snapshot.totalPoints || 0) : "\u2014";
         document.getElementById("ps-completed-kits").textContent = loaded ? `${completed} / ${total}` : "\u2014";
@@ -178,13 +186,14 @@
         const progress = document.getElementById("ps-licence-progress");
         progress.max = total;
         progress.value = completed;
-        document.getElementById("ps-licence-progress-count").textContent = loaded ? `${completed} / ${total} stamps` : state.email ? "Loading..." : "Sign in to view";
+        document.getElementById("ps-licence-progress-count").textContent = loaded ? `${completed} / ${total} stamps`
+            : state.email ? state.loading ? "Loading..." : "Progress unavailable" : "Sign in to view";
         function renderStamp(kit) {
             const earned = loaded && kitsById.get(kit.id)?.isComplete;
             const href = snapshot?.canManageKits && kit.live === false
                 ? `./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}&preview=1`
                 : `./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}`;
-            const copy = `<span class="licence-stamp-icon" aria-hidden="true">${escapeHtml(kit.icon)}</span><strong>${escapeHtml(kit.title)}</strong><span>${earned ? "STAMP EARNED" : loaded ? "Stamp to collect" : "Waiting for you"}</span>`;
+            const copy = `<span class="licence-stamp-icon" aria-hidden="true">${escapeHtml(kit.icon)}</span><strong>${escapeHtml(kit.title)}</strong><span>${earned ? "STAMP EARNED" : loaded ? "Stamp to collect" : state.loading ? "Loading progress..." : "Progress unavailable"}</span>`;
             const stamp = `<a class="licence-stamp${earned ? " is-earned" : ""}" href="${href}" aria-label="${kit.live === false ? "Preview" : "Open"} ${escapeHtml(kit.title)}${earned ? ' and certificate' : ''}">${copy}<span class="stamp-certificate">${kit.live === false ? "Preview Not Live kit" : earned ? "Open kit & certificate" : "Open kit"} &rarr;</span></a>`;
             return snapshot?.canManageKits ? `<div class="licence-teacher-kit">${stamp}<button type="button" role="switch" aria-checked="${kit.live !== false}" aria-label="${escapeHtml(kit.title)} live for students" class="licence-live-pill${kit.live === false ? " is-not-live" : ""}" data-publication="${escapeHtml(kit.id)}" data-live="${kit.live !== false}">${kit.live === false ? "Not Live" : "Live"}</button><a class="licence-edit-link" href="./admin-kits.html?kit=${encodeURIComponent(kit.id)}">Edit kit</a></div>` : stamp;
         }
@@ -217,7 +226,7 @@
                     ? live ? "Make Typing Kit Live? Students will be able to open their logs and save new attempts." : "Make Typing Kit Not Live? Student access and new attempts will be paused. Existing results will be kept."
                     : live ? "Make this kit Live? Students will be able to open it and earn certificates." : "Make this kit Not Live? It will be hidden and student access, completion and certificates will be blocked.";
                 if (!window.confirm(confirmation)) return;
-                const revision = state.revision;
+                const revision = ++state.revision;
                 button.disabled = true;
                 try {
                     await loadJson(`/api/admin/kit-publication/${encodeURIComponent(button.dataset.publication)}`, {
@@ -251,7 +260,8 @@
         }
 
         if (!snapshot) {
-            list.innerHTML = `<p class="ps-signin-note">Loading your progress\u2026</p>`;
+            list.innerHTML = state.loading ? `<p class="ps-signin-note">Loading your progress\u2026</p>`
+                : `<p class="ps-signin-note">Could not load your saved licence. Retry shortly. Your progress has not been reset.</p>`;
             return;
         }
 
@@ -301,7 +311,7 @@
 
         list.querySelectorAll("[data-action]").forEach((button) => {
             button.addEventListener("click", async () => {
-                const revision = state.revision;
+                const revision = ++state.revision;
                 const action = button.getAttribute("data-action");
                 if (action === "reset" && !window.confirm("Reset this kit? This clears ALL activity ticks and certificate eligibility. Your saved answers and Drive files will be kept.")) return;
                 button.disabled = true;
@@ -347,6 +357,8 @@
         const revision = ++state.revision;
         state.email = getSignedInEmail();
         state.snapshot = null;
+        state.loading = Boolean(state.email);
+        document.getElementById("ps-retry").hidden = true;
         renderBadges([]);
         showStatus("");
         if (!state.email) {
@@ -357,18 +369,30 @@
 
         render();
         try {
-            const snapshot = await fetchSnapshot();
+            const snapshot = await fetchSnapshot(true);
             if (revision !== state.revision) return;
+            state.loading = false;
             state.snapshot = snapshot;
             render();
+            if (snapshot.progressRefreshPending) {
+                showStatus("Saved licence loaded. Checking for updated stamps...");
+                const refreshed = await fetchSnapshot();
+                if (revision !== state.revision) return;
+                state.snapshot = refreshed;
+                render();
+                showStatus("");
+            }
         } catch (error) {
             if (revision !== state.revision) return;
-            document.getElementById("ps-student-name").textContent = "Your licence is unavailable";
-            document.getElementById("ps-kit-list").innerHTML = `<p class="ps-signin-note">Could not load your saved licence. Refresh to try again. Your progress has not been reset.</p>`;
-            showStatus(error?.message || "Could not load Licence progress.", true);
+            state.loading = false;
+            render();
+            document.getElementById("ps-retry").hidden = false;
+            showStatus(state.snapshot ? `Showing your saved licence; updated stamps could not be checked. ${error.message}`
+                : error?.message || "Could not load Licence progress.", true);
         }
     }
 
+    document.getElementById("ps-retry").addEventListener("click", () => { void init(); });
     window.addEventListener("hub-auth-state-changed", () => { void init(); });
     void init();
 })();
