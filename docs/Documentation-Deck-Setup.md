@@ -36,9 +36,9 @@ the endpoint does not accept arbitrary slideshow URLs. Export uses the student's
 existing Google Drive permission and Google's Slides-to-PDF export, independently
 of the linked-merge Apps Script configuration. The source slideshow is not edited,
 moved, or replaced, and no sharing permissions are changed.
-Client presentation PDF export is available for any SeniorDTECH assessment; it
-does not require the Digital Media outcome allocation used by later packaging
-stages.
+Client presentation, Stage 1 documentation, and Stage 6 additional slideshow
+PDF exports are available for any SeniorDTECH assessment. They do not require
+the Digital Media outcome allocation used by later packaging stages.
 
 Each action validates the student's allocation, token identity, and owned
 `SeniorDTECH/Process Assessment` destination, checks the slideshow's version and

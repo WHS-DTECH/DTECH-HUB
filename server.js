@@ -18592,7 +18592,7 @@ app.post("/api/activities/:id/slideshow-pdf", async (req, res) => {
   try {
     const kind = String(req.body?.kind || "");
     if (!["client", "documentation"].includes(kind)) throw Object.assign(new Error("Choose the client presentation or documentation deck."), { status: 400 });
-    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: kind !== "client" });
+    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
     const { email, activityId } = context;
     const token = String(req.body?.driveAccessToken || "").trim();
     if (!token) throw Object.assign(new Error("Google Drive permission is required."), { status: 400 });
@@ -18619,7 +18619,7 @@ app.post("/api/activities/:id/slideshow-pdf", async (req, res) => {
       if (after.trashed || String(after.version || "") !== String(file.version || "") || String(after.modifiedTime || "") !== String(file.modifiedTime || "")) {
         throw Object.assign(new Error("The slideshow changed during export. Convert it again to capture the current version."), { status: 409 });
       }
-      const latest = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: kind !== "client" });
+      const latest = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
       const latestSource = kind === "client" ? latest.copies.find((entry) => entry?.templateId === "final-client-presentation") : getDocumentationRecord(latest.copies);
       if (documentationPresentationId(latestSource?.fileUrl) !== sourceId) {
         throw Object.assign(new Error("The saved slideshow link changed during export. Convert the new slideshow instead."), { status: 409 });
@@ -18648,7 +18648,7 @@ app.post("/api/activities/:id/slideshow-pdf", async (req, res) => {
 
 app.get("/api/activities/:id/submission-slideshows", async (req, res) => {
   try {
-    const context = await loadFinalOutcomeContext(req);
+    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
     res.set("Cache-Control", "no-store").json({
       template_copies: context.copies.filter((entry) =>
         entry?.templateId === "submission-additional-slideshows-answer"
@@ -18662,8 +18662,8 @@ app.get("/api/activities/:id/submission-slideshows", async (req, res) => {
 
 app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
   try {
-    const context = await loadFinalOutcomeContext(req);
     const action = String(req.body?.action || "");
+    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: action !== "pdf" });
     const token = String(req.body?.driveAccessToken || "").trim();
     if (action === "answer") {
       const answer = String(req.body?.answer || "").toLowerCase();
@@ -18696,7 +18696,7 @@ app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
     }
     await verifyDriveTokenForStudent(token, context.email);
     const result = await withFinalOutcomeLock(`${context.email}:${context.activityId}:additional-slideshows`, async () => {
-      const latest = await loadFinalOutcomeContext(req);
+      const latest = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: action !== "pdf" });
       const answer = String(latest.copies.find((entry) => entry?.templateId === "submission-additional-slideshows-answer")
         ?.additionalSlideshows?.answer || "").toLowerCase();
       if (answer !== "yes") throw Object.assign(new Error("Choose Yes in Stage 6 before adding or converting a slideshow."), { status: 409 });
@@ -18749,7 +18749,7 @@ app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
         || String(after.modifiedTime || "") !== String(file.modifiedTime || "")) {
         throw Object.assign(new Error("The slideshow changed during export. Convert it again to capture the current version."), { status: 409 });
       }
-      const current = await loadFinalOutcomeContext(req);
+      const current = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
       const currentSource = current.copies.find((entry) => entry?.templateId === sourceTemplateId);
       if (documentationPresentationId(currentSource?.fileUrl) !== sourceId) {
         throw Object.assign(new Error("The linked slideshow changed during export. Sync it again before converting."), { status: 409 });

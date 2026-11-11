@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const { createHash } = require("node:crypto");
 const slideshows = require("../submission-slideshows");
 const { additionalSlideshowTemplateId } = slideshows;
 const { submissionSummary } = require("../submission-package");
@@ -160,15 +161,31 @@ async function testAnswerEndpoint(id) {
     const copies = [];
     const handlers = new Map();
     const assessment = { email: "student@westlandhigh.school.nz", activityId: "49", copies };
+    let isDigitalMedia = true;
     const context = vm.createContext({
         ...slideshows,
+        createHash,
+        randomUUID: () => "pdf-export-id",
         app: { post: (path, handler) => handlers.set(path, handler) },
-        loadFinalOutcomeContext: async () => assessment,
+        loadFinalOutcomeContext: async (_req, options = {}) => {
+            if (!isDigitalMedia && options.requireDigitalMediaOutcome !== false) {
+                throw Object.assign(new Error("Select your digital media outcome assessment."), { status: 403 });
+            }
+            return assessment;
+        },
         verifyDriveTokenForStudent: async (token, email) => {
             assert.equal(token, "student-token");
             assert.equal(email, assessment.email);
         },
         withFinalOutcomeLock: async (_key, callback) => callback(),
+        driveApiRequest: async () => ({
+            id: "presentation-123", name: "Extra slides", mimeType: "application/vnd.google-apps.presentation",
+            trashed: false, modifiedTime: "2026-10-22T00:00:00Z", version: "3"
+        }),
+        resolveOwnedFinalPreparationFolder: async () => "folder",
+        driveDownloadExportedFile: async () => Buffer.from("%PDF-1.4 extra slideshow"),
+        driveUploadBinaryFile: async () => ({ id: "extra-pdf" }),
+        buildDriveFolderUrlFromId: (folderId) => `https://drive.google.com/drive/folders/${folderId}`,
         recordTemplateCopyInDb: async (_activityId, _email, saved) => {
             assessment.copies = assessment.copies.filter((entry) => entry.templateId !== saved.templateId).concat(saved);
         },
@@ -206,6 +223,7 @@ async function testAnswerEndpoint(id) {
     assert.equal(recovered.body.saved.templateId, additionalSlideshowTemplateId(id));
     assert.equal(assessment.copies.length, 2);
 
+    isDigitalMedia = false;
     let getHandler;
     context.app.get = (_path, handler) => { getHandler = handler; };
     const getStart = server.indexOf('app.get("/api/activities/:id/submission-slideshows"');
@@ -213,6 +231,13 @@ async function testAnswerEndpoint(id) {
     const res = { status(code) { this.statusCode = code; return this; }, set() { return this; }, json(body) { this.body = body; } };
     await getHandler({}, res);
     assert.equal(res.body.template_copies.length, 2, "Saved card read uses the same authoritative records as the submission package");
+    const syncOutsideDigitalMedia = await request({
+        action: "sync", slideshowId: id, presentationUrl: sourceUrl, driveAccessToken: "student-token"
+    });
+    assert.equal(syncOutsideDigitalMedia.statusCode, 403, "Adding/syncing a slideshow keeps its existing assessment gate");
+    const pdfOutsideDigitalMedia = await request({ action: "pdf", slideshowId: id, driveAccessToken: "student-token" });
+    assert.equal(pdfOutsideDigitalMedia.statusCode, 200, "Saved additional slideshow PDFs convert for any SeniorDTECH assessment");
+    assert.equal(pdfOutsideDigitalMedia.body.saved.templateId, pdfTemplateId);
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });

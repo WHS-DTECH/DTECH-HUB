@@ -381,8 +381,9 @@ async function testSlideshowPdfEndpoints() {
   const nonDigitalMediaClient = await request(body);
   assert.equal(nonDigitalMediaClient.statusCode, 200, "Client presentation PDFs are available for any SeniorDTECH assessment");
   assert.equal(nonDigitalMediaClient.body.saved.templateId, "client-presentation-pdf");
-  assert.equal((await request({ ...body, kind: "documentation", sourcePresentationId: "documentation" })).statusCode, 403,
-    "Documentation PDF conversion remains limited to Digital Media assessments");
+  const nonDigitalMediaDocumentation = await request({ ...body, kind: "documentation", sourcePresentationId: "documentation" });
+  assert.equal(nonDigitalMediaDocumentation.statusCode, 200, "Documentation PDFs are available for any SeniorDTECH assessment");
+  assert.equal(nonDigitalMediaDocumentation.body.saved.templateId, "submission-documentation-pdf");
   allocation.standard_1 = "91907";
   allocation.standard_2 = "91893";
   const count = uploads.length;
