@@ -41,6 +41,7 @@ DTECH Hub is a web application used in DTECH classes for project/activity access
 - The source is `POST /integrations/typing-attendance`, protected by the dedicated server key and rate limiting. Its only request fields are `studentEmail` and `startDate`. Responses contain seven date-keyed weeks, scheduled lesson marks and a current fetch timestamp. No Planner mutations or database credentials are shared.
 
 ### Teacher Typing Kit weekly review and exercise-book signatures
+- Kit Teacher Review's Homeroom selector includes JTR and MTR alongside the existing classes. It filters the recorded timetable class, independently of Whānau and Course.
 - In Class Kit Completion, selecting a kit automatically turns on **Show selected kit only**, showing Student, the selected kit and Chocolate. Teachers can turn it off to compare all kits; refresh preserves that choice. Selecting another kit turns it on again, while All kits clears it.
 - In Class Kit Completion, select **Typing Kit** to show weekly results below the main table. All existing student filters apply. Each of the seven dated weeks shows saved results for both typing periods (net WPM, accuracy and saved time), its weekly rule status, and separate **Period 1 signed** / **Period 2 signed** checkboxes.
 - Each saved typing result is highlighted and labelled **Saved result**; periods with no result are not highlighted. The highlight does not indicate that the exercise book has been signed.

@@ -456,7 +456,7 @@ test("teacher review presents accessible tabs and all requested class filters", 
     assert.match(html, /id="class-course-filter"/);
     assert.match(html, /id="class-homeroom-filter"/);
     assert.match(html, /Whānau\s*<select id="class-whanau-filter"/);
-    for (const code of ["JPI", "JVE", "JMM", "JSR", "JSD", "8S", "7S"]) {
+    for (const code of ["JPI", "JVE", "JMM", "JSR", "JSD", "JTR", "MTR", "8S", "7S"]) {
         assert.ok(html.includes(`<option value="${code}">${code}</option>`));
     }
     assert.match(html, /id="class-student-filter"/);
@@ -569,6 +569,16 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     assert.equal(rows()[0].children[1].textContent, "7WHAU");
     assert.equal(rows()[0].children[2].textContent, "JPI");
     assert.equal(rows()[3].children[3].textContent, "Not assigned", "Year-based preview course cannot override enrolment");
+    for (const code of ["JTR", "MTR"]) {
+        students[0].timetableClass = ` ${code.toLowerCase()} `;
+        await el("class-progress-refresh").events.click();
+        el("class-homeroom-filter").value = code;
+        el("class-homeroom-filter").events.change();
+        assert.deepEqual(names(), ["Ana"], `${code} filters by the normalized timetable homeroom`);
+    }
+    students[0].timetableClass = " jpi ";
+    el("class-homeroom-filter").value = "";
+    await el("class-progress-refresh").events.click();
     el("class-course-filter").value = "MiddleDTECH";
     el("class-course-filter").events.change();
     assert.match(el("class-progress-status").textContent, /No students match/);
