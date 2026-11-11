@@ -18663,7 +18663,7 @@ app.get("/api/activities/:id/submission-slideshows", async (req, res) => {
 app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
   try {
     const action = String(req.body?.action || "");
-    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: action !== "pdf" });
+    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
     const token = String(req.body?.driveAccessToken || "").trim();
     if (action === "answer") {
       const answer = String(req.body?.answer || "").toLowerCase();
@@ -18672,7 +18672,7 @@ app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
       }
       await verifyDriveTokenForStudent(token, context.email);
       const result = await withFinalOutcomeLock(`${context.email}:${context.activityId}:additional-slideshows`, async () => {
-        const latest = await loadFinalOutcomeContext(req);
+        const latest = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
         if (answer === "no" && latest.copies.some((entry) =>
           additionalSlideshowId(entry?.templateId) || additionalSlideshowId(entry?.templateId, "submission-extra-slideshow-pdf-"))) {
           throw Object.assign(new Error("A slideshow is already linked. Choose Yes so its PDF can be included in the Final Package."), { status: 409 });
@@ -18696,7 +18696,7 @@ app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
     }
     await verifyDriveTokenForStudent(token, context.email);
     const result = await withFinalOutcomeLock(`${context.email}:${context.activityId}:additional-slideshows`, async () => {
-      const latest = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: action !== "pdf" });
+      const latest = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
       const answer = String(latest.copies.find((entry) => entry?.templateId === "submission-additional-slideshows-answer")
         ?.additionalSlideshows?.answer || "").toLowerCase();
       if (answer !== "yes") throw Object.assign(new Error("Choose Yes in Stage 6 before adding or converting a slideshow."), { status: 409 });

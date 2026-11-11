@@ -182,6 +182,7 @@ async function testAnswerEndpoint(id) {
             id: "presentation-123", name: "Extra slides", mimeType: "application/vnd.google-apps.presentation",
             trashed: false, modifiedTime: "2026-10-22T00:00:00Z", version: "3"
         }),
+        googleSlidesApiRequest: async () => ({ slides: [{ objectId: "slide-1" }] }),
         resolveOwnedFinalPreparationFolder: async () => "folder",
         driveDownloadExportedFile: async () => Buffer.from("%PDF-1.4 extra slideshow"),
         driveUploadBinaryFile: async () => ({ id: "extra-pdf" }),
@@ -231,10 +232,15 @@ async function testAnswerEndpoint(id) {
     const res = { status(code) { this.statusCode = code; return this; }, set() { return this; }, json(body) { this.body = body; } };
     await getHandler({}, res);
     assert.equal(res.body.template_copies.length, 2, "Saved card read uses the same authoritative records as the submission package");
+    const newId = "550e8400-e29b-41d4-a716-446655440002";
     const syncOutsideDigitalMedia = await request({
-        action: "sync", slideshowId: id, presentationUrl: sourceUrl, driveAccessToken: "student-token"
+        action: "sync", slideshowId: newId, presentationUrl: "https://docs.google.com/presentation/d/presentation-456/edit",
+        driveAccessToken: "student-token"
     });
-    assert.equal(syncOutsideDigitalMedia.statusCode, 403, "Adding/syncing a slideshow keeps its existing assessment gate");
+    assert.equal(syncOutsideDigitalMedia.statusCode, 200, "Stage 6 slideshow sync works for any SeniorDTECH assessment");
+    assert.equal(syncOutsideDigitalMedia.body.saved.templateId, additionalSlideshowTemplateId(newId));
+    const answerOutsideDigitalMedia = await request({ action: "answer", answer: "yes", driveAccessToken: "student-token" });
+    assert.equal(answerOutsideDigitalMedia.statusCode, 200, "Stage 6 answer saves for any SeniorDTECH assessment");
     const pdfOutsideDigitalMedia = await request({ action: "pdf", slideshowId: id, driveAccessToken: "student-token" });
     assert.equal(pdfOutsideDigitalMedia.statusCode, 200, "Saved additional slideshow PDFs convert for any SeniorDTECH assessment");
     assert.equal(pdfOutsideDigitalMedia.body.saved.templateId, pdfTemplateId);
