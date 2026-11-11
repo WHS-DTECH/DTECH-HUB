@@ -59,7 +59,7 @@ async function testPdfAndStore() {
 async function testEndpoints() {
   const source = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
   const handlers = new Map();
-  let allocation = { standard_1: "91907", standard_2: "91893", evidence_steps: evidence, template_copies: [] };
+  let allocation = { standard_1: "91907", standard_2: "91897", evidence_steps: evidence, template_copies: [] };
   let connected = true;
   let ownerEmail = email;
   let existingFile = null;
@@ -72,6 +72,7 @@ async function testEndpoints() {
     getStudentProgrammeFolder: async () => "SeniorDTECH", normalizeEvidenceStepsPayload: (value) => value,
     pool: { query: async () => ({ rows: allocation ? [allocation] : [] }) },
     app: { get: (url, handler) => handlers.set(`GET ${url}`, handler), post: (url, handler) => handlers.set(`POST ${url}`, handler) },
+    requireActivityWriteAccess: (_req, _res, next) => next(),
     getStoredTrelloConnection: async () => connected ? { trello_token: "private-trello-token" } : null,
     trelloApiRequest: async (url, options) => {
       assert.equal(options.token, "private-trello-token");

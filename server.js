@@ -18264,7 +18264,7 @@ async function validateRawFileViaW3C(rawUrl, type) {
 const trelloReportStore = createTrelloReportStore();
 
 async function loadFinalTrelloContext(req) {
-  const context = await loadFinalOutcomeContext(req);
+  const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
   const sources = trelloReportSources(context.evidence);
   const connection = await getStoredTrelloConnection(context.email);
   const saved = context.copies.find((entry) => entry?.templateId === "submission-trello-report") || null;
@@ -18779,7 +18779,7 @@ app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
 
 app.get("/api/activities/:id/github-zip-size", async (req, res) => {
   try {
-    const context = await loadFinalOutcomeContext(req);
+    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
     const requested = String(req.query?.repositoryUrl || "").trim().toLowerCase();
     const repository = context.repositories.find((item) => item.url.toLowerCase() === requested);
     if (!repository) throw Object.assign(new Error("Select a GitHub repository saved on this assessment."), { status: 400 });
@@ -18792,7 +18792,7 @@ app.get("/api/activities/:id/github-zip-size", async (req, res) => {
 
 app.get("/api/activities/:id/final-outcome", async (req, res) => {
   try {
-    const context = await loadFinalOutcomeContext(req);
+    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
     res.set("Cache-Control", "no-store").json({ repositories: context.repositories, saved: context.saved, configured: Boolean(GITHUB_TOKEN) });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not load your final outcome." });
@@ -18801,7 +18801,7 @@ app.get("/api/activities/:id/final-outcome", async (req, res) => {
 
 app.post("/api/activities/:id/final-outcome", async (req, res) => {
   try {
-    const context = await loadFinalOutcomeContext(req);
+    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
     const { email, activityId, repositories } = context;
     const action = String(req.body?.action || "");
     res.set("Cache-Control", "no-store");

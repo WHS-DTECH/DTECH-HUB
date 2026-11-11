@@ -38,7 +38,8 @@ of the linked-merge Apps Script configuration. The source slideshow is not edite
 moved, or replaced, and no sharing permissions are changed.
 Client presentation, Stage 1 documentation, and Stage 6 additional slideshow
 PDF exports are available for any SeniorDTECH assessment. They do not require
-the Digital Media outcome allocation used by later packaging stages.
+the Digital Media outcome allocation required to build the combined Final
+Submission Package.
 
 Each action validates the student's allocation, token identity, and owned
 `SeniorDTECH/Process Assessment` destination, checks the slideshow's version and
@@ -164,11 +165,14 @@ repository's default branch, not only the linked folder or the linked branch.
 The card explains this scope before the student confirms and downloads.
 
 Repositories must be saved as `GITHUB_REPO_URL|...` in that student's assessment
-evidence, and a matching SeniorDTECH digital media allocation (91893 or 91903)
-must exist. When there are several saved repositories the student selects one.
-This confirms the saved assessment association, not GitHub account ownership.
+evidence. The Stage 2 ZIP is available for any SeniorDTECH assessment; it does
+not require a Digital Media outcome allocation. When there are several saved
+repositories the student selects one. This confirms the saved assessment
+association, not GitHub account ownership.
 Public repositories only are supported; the existing server `GITHUB_TOKEN` must
 be configured for GitHub metadata requests. It is never sent to archive hosts.
+The combined Final Submission Package still requires a Digital Media outcome
+allocation.
 Drive save uses the student's existing Google Drive permission, independently of
 the Slides Apps Script deployment. No extra ZIP library or Apps Script is needed.
 
@@ -253,6 +257,9 @@ explicit selection. Access is checked using that student's Trello token on
 generation, download and save. The token is never returned to the browser or
 included in the report. This uses the existing `TRELLO_API_KEY`; there is no new
 Trello credential or Apps Script deployment to configure.
+The report is available for any SeniorDTECH assessment and does not require a
+Digital Media outcome allocation. The combined Final Submission Package still
+requires that allocation.
 
 Download Trello report requests Drive permission, reads live Trello data, creates
 a PDF, starts its download and automatically saves the same bytes directly in

@@ -338,9 +338,8 @@ async function testEndpoints() {
   assert.equal((await request("GET")).statusCode, 403);
   course = "SeniorDTECH";
   allocation.standard_2 = "91897";
-  assert.equal((await request("GET")).statusCode, 403);
-  allocation.standard_2 = "91893";
-  assert.equal((await request("GET")).body.repositories[0].url, repositoryUrl);
+  assert.equal((await request("GET")).body.repositories[0].url, repositoryUrl,
+    "GitHub Outcome is available for any SeniorDTECH assessment");
   const measurement = await request("GET", {}, email, "github-zip-size", { repositoryUrl });
   assert.equal(measurement.body.measurement.bytes, zip.length);
   assert.equal((await request("GET", {}, email, "github-zip-size", { repositoryUrl: "https://github.com/stranger/outcome" })).statusCode, 400);
