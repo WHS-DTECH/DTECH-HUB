@@ -18565,7 +18565,7 @@ async function resolveOwnedFinalPreparationFolder(email, token) {
   return folderId;
 }
 
-async function loadFinalOutcomeContext(req) {
+async function loadFinalOutcomeContext(req, { requireDigitalMediaOutcome = true } = {}) {
   const email = normalizeEmail(getRequestUserEmail(req));
   if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) throw Object.assign(new Error("School sign-in required."), { status: 401 });
   const activityId = String(req.params.id || "");
@@ -18578,7 +18578,7 @@ async function loadFinalOutcomeContext(req) {
   );
   const allocation = result.rows?.[0];
   if (!allocation) throw Object.assign(new Error("Student assessment allocation not found."), { status: 404 });
-  if (!/\b(?:91893|91903)\b/.test(`${allocation.standard_1 || ""} ${allocation.standard_2 || ""}`)) {
+  if (requireDigitalMediaOutcome && !/\b(?:91893|91903)\b/.test(`${allocation.standard_1 || ""} ${allocation.standard_2 || ""}`)) {
     throw Object.assign(new Error("Select your digital media outcome assessment."), { status: 403 });
   }
   const evidence = normalizeEvidenceStepsPayload(allocation.evidence_steps);
@@ -18590,10 +18590,10 @@ async function loadFinalOutcomeContext(req) {
 
 app.post("/api/activities/:id/slideshow-pdf", async (req, res) => {
   try {
-    const context = await loadFinalOutcomeContext(req);
-    const { email, activityId } = context;
     const kind = String(req.body?.kind || "");
     if (!["client", "documentation"].includes(kind)) throw Object.assign(new Error("Choose the client presentation or documentation deck."), { status: 400 });
+    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: kind !== "client" });
+    const { email, activityId } = context;
     const token = String(req.body?.driveAccessToken || "").trim();
     if (!token) throw Object.assign(new Error("Google Drive permission is required."), { status: 400 });
     await verifyDriveTokenForStudent(token, email);
@@ -18619,7 +18619,7 @@ app.post("/api/activities/:id/slideshow-pdf", async (req, res) => {
       if (after.trashed || String(after.version || "") !== String(file.version || "") || String(after.modifiedTime || "") !== String(file.modifiedTime || "")) {
         throw Object.assign(new Error("The slideshow changed during export. Convert it again to capture the current version."), { status: 409 });
       }
-      const latest = await loadFinalOutcomeContext(req);
+      const latest = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: kind !== "client" });
       const latestSource = kind === "client" ? latest.copies.find((entry) => entry?.templateId === "final-client-presentation") : getDocumentationRecord(latest.copies);
       if (documentationPresentationId(latestSource?.fileUrl) !== sourceId) {
         throw Object.assign(new Error("The saved slideshow link changed during export. Convert the new slideshow instead."), { status: 409 });

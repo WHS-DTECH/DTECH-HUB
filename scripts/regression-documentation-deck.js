@@ -376,6 +376,15 @@ async function testSlideshowPdfEndpoints() {
   const documentation = await request({ ...body, kind: "documentation", sourcePresentationId: "documentation" });
   assert.equal(documentation.body.saved.templateId, "submission-documentation-pdf");
   assert.equal(exports[2], "documentation");
+  allocation.standard_1 = "91897";
+  allocation.standard_2 = "";
+  const nonDigitalMediaClient = await request(body);
+  assert.equal(nonDigitalMediaClient.statusCode, 200, "Client presentation PDFs are available for any SeniorDTECH assessment");
+  assert.equal(nonDigitalMediaClient.body.saved.templateId, "client-presentation-pdf");
+  assert.equal((await request({ ...body, kind: "documentation", sourcePresentationId: "documentation" })).statusCode, 403,
+    "Documentation PDF conversion remains limited to Digital Media assessments");
+  allocation.standard_1 = "91907";
+  allocation.standard_2 = "91893";
   const count = uploads.length;
   folderOwner = "teacher@westlandhigh.school.nz";
   assert.equal((await request(body)).statusCode, 409);
