@@ -18264,7 +18264,7 @@ async function validateRawFileViaW3C(rawUrl, type) {
 const trelloReportStore = createTrelloReportStore();
 
 async function loadFinalTrelloContext(req) {
-  const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
+  const context = await loadFinalOutcomeContext(req);
   const sources = trelloReportSources(context.evidence);
   const connection = await getStoredTrelloConnection(context.email);
   const saved = context.copies.find((entry) => entry?.templateId === "submission-trello-report") || null;
@@ -18565,7 +18565,7 @@ async function resolveOwnedFinalPreparationFolder(email, token) {
   return folderId;
 }
 
-async function loadFinalOutcomeContext(req, { requireDigitalMediaOutcome = true } = {}) {
+async function loadFinalOutcomeContext(req) {
   const email = normalizeEmail(getRequestUserEmail(req));
   if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) throw Object.assign(new Error("School sign-in required."), { status: 401 });
   const activityId = String(req.params.id || "");
@@ -18578,9 +18578,6 @@ async function loadFinalOutcomeContext(req, { requireDigitalMediaOutcome = true 
   );
   const allocation = result.rows?.[0];
   if (!allocation) throw Object.assign(new Error("Student assessment allocation not found."), { status: 404 });
-  if (requireDigitalMediaOutcome && !/\b(?:91893|91903)\b/.test(`${allocation.standard_1 || ""} ${allocation.standard_2 || ""}`)) {
-    throw Object.assign(new Error("Select your digital media outcome assessment."), { status: 403 });
-  }
   const evidence = normalizeEvidenceStepsPayload(allocation.evidence_steps);
   const repositories = outcomeRepositories(evidence);
   const copies = Array.isArray(allocation.template_copies) ? allocation.template_copies : [];
@@ -18592,7 +18589,7 @@ app.post("/api/activities/:id/slideshow-pdf", async (req, res) => {
   try {
     const kind = String(req.body?.kind || "");
     if (!["client", "documentation"].includes(kind)) throw Object.assign(new Error("Choose the client presentation or documentation deck."), { status: 400 });
-    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
+    const context = await loadFinalOutcomeContext(req);
     const { email, activityId } = context;
     const token = String(req.body?.driveAccessToken || "").trim();
     if (!token) throw Object.assign(new Error("Google Drive permission is required."), { status: 400 });
@@ -18619,7 +18616,7 @@ app.post("/api/activities/:id/slideshow-pdf", async (req, res) => {
       if (after.trashed || String(after.version || "") !== String(file.version || "") || String(after.modifiedTime || "") !== String(file.modifiedTime || "")) {
         throw Object.assign(new Error("The slideshow changed during export. Convert it again to capture the current version."), { status: 409 });
       }
-      const latest = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
+      const latest = await loadFinalOutcomeContext(req);
       const latestSource = kind === "client" ? latest.copies.find((entry) => entry?.templateId === "final-client-presentation") : getDocumentationRecord(latest.copies);
       if (documentationPresentationId(latestSource?.fileUrl) !== sourceId) {
         throw Object.assign(new Error("The saved slideshow link changed during export. Convert the new slideshow instead."), { status: 409 });
@@ -18648,7 +18645,7 @@ app.post("/api/activities/:id/slideshow-pdf", async (req, res) => {
 
 app.get("/api/activities/:id/submission-slideshows", async (req, res) => {
   try {
-    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
+    const context = await loadFinalOutcomeContext(req);
     res.set("Cache-Control", "no-store").json({
       template_copies: context.copies.filter((entry) =>
         entry?.templateId === "submission-additional-slideshows-answer"
@@ -18663,7 +18660,7 @@ app.get("/api/activities/:id/submission-slideshows", async (req, res) => {
 app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
   try {
     const action = String(req.body?.action || "");
-    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
+    const context = await loadFinalOutcomeContext(req);
     const token = String(req.body?.driveAccessToken || "").trim();
     if (action === "answer") {
       const answer = String(req.body?.answer || "").toLowerCase();
@@ -18672,7 +18669,7 @@ app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
       }
       await verifyDriveTokenForStudent(token, context.email);
       const result = await withFinalOutcomeLock(`${context.email}:${context.activityId}:additional-slideshows`, async () => {
-        const latest = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
+        const latest = await loadFinalOutcomeContext(req);
         if (answer === "no" && latest.copies.some((entry) =>
           additionalSlideshowId(entry?.templateId) || additionalSlideshowId(entry?.templateId, "submission-extra-slideshow-pdf-"))) {
           throw Object.assign(new Error("A slideshow is already linked. Choose Yes so its PDF can be included in the Final Package."), { status: 409 });
@@ -18696,7 +18693,7 @@ app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
     }
     await verifyDriveTokenForStudent(token, context.email);
     const result = await withFinalOutcomeLock(`${context.email}:${context.activityId}:additional-slideshows`, async () => {
-      const latest = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
+      const latest = await loadFinalOutcomeContext(req);
       const answer = String(latest.copies.find((entry) => entry?.templateId === "submission-additional-slideshows-answer")
         ?.additionalSlideshows?.answer || "").toLowerCase();
       if (answer !== "yes") throw Object.assign(new Error("Choose Yes in Stage 6 before adding or converting a slideshow."), { status: 409 });
@@ -18749,7 +18746,7 @@ app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
         || String(after.modifiedTime || "") !== String(file.modifiedTime || "")) {
         throw Object.assign(new Error("The slideshow changed during export. Convert it again to capture the current version."), { status: 409 });
       }
-      const current = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
+      const current = await loadFinalOutcomeContext(req);
       const currentSource = current.copies.find((entry) => entry?.templateId === sourceTemplateId);
       if (documentationPresentationId(currentSource?.fileUrl) !== sourceId) {
         throw Object.assign(new Error("The linked slideshow changed during export. Sync it again before converting."), { status: 409 });
@@ -18779,7 +18776,7 @@ app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
 
 app.get("/api/activities/:id/github-zip-size", async (req, res) => {
   try {
-    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
+    const context = await loadFinalOutcomeContext(req);
     const requested = String(req.query?.repositoryUrl || "").trim().toLowerCase();
     const repository = context.repositories.find((item) => item.url.toLowerCase() === requested);
     if (!repository) throw Object.assign(new Error("Select a GitHub repository saved on this assessment."), { status: 400 });
@@ -18792,7 +18789,7 @@ app.get("/api/activities/:id/github-zip-size", async (req, res) => {
 
 app.get("/api/activities/:id/final-outcome", async (req, res) => {
   try {
-    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
+    const context = await loadFinalOutcomeContext(req);
     res.set("Cache-Control", "no-store").json({ repositories: context.repositories, saved: context.saved, configured: Boolean(GITHUB_TOKEN) });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not load your final outcome." });
@@ -18801,7 +18798,7 @@ app.get("/api/activities/:id/final-outcome", async (req, res) => {
 
 app.post("/api/activities/:id/final-outcome", async (req, res) => {
   try {
-    const context = await loadFinalOutcomeContext(req, { requireDigitalMediaOutcome: false });
+    const context = await loadFinalOutcomeContext(req);
     const { email, activityId, repositories } = context;
     const action = String(req.body?.action || "");
     res.set("Cache-Control", "no-store");

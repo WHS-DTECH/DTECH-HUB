@@ -7,7 +7,7 @@ const vm = require("node:vm");
 const { createHash, randomUUID } = require("node:crypto");
 const JSZip = require("jszip");
 const submission = require("../submission-package");
-const { createOutcomeArchiveStore } = require("../github-outcome");
+const { createOutcomeArchiveStore, outcomeRepositories } = require("../github-outcome");
 const { additionalSlideshowTemplateId, additionalSlideshowPdfTemplateId } = require("../submission-slideshows");
 
 const email = "student@westlandhigh.school.nz";
@@ -32,8 +32,11 @@ async function fixture() {
   files.set("client-slides", { id: "client-slides", mimeType: "application/vnd.google-apps.presentation", version: "3", modifiedTime: date });
   files.set("documentation-slides", { id: "documentation-slides", mimeType: "application/vnd.google-apps.presentation", version: "5", modifiedTime: date });
   const documentationSource = { templateId: "submission-documentation-deck", fileUrl: slideUrl("documentation-slides"), documentation: { mode: "existing", readyForStage3: true } };
-  const context = { email, activityId: "49", repositories: [{ url: repositoryUrl }],
-    evidence: [{ steps: [{ text: "TRELLO_CARD_URL|https://trello.com/b/abcdefgh" }] }],
+  const context = { email, activityId: "49", standard_1: "91907", standard_2: "91897", repositories: [{ url: repositoryUrl }],
+    evidence: [{ steps: [
+      { text: `GITHUB_REPO_URL|${repositoryUrl}` },
+      { text: "TRELLO_CARD_URL|https://trello.com/b/abcdefgh" }
+    ] }],
     copies: [
       { templateId: "final-client-presentation", fileUrl: slideUrl("client-slides") }, documentationSource,
       { templateId: "client-presentation-pdf", fileUrl: fileUrl("client-pdf"), pdfExport: { sourcePresentationId: "client-slides", sourceVersion: "3", sourceModifiedTime: date, bytes: binaries.get("client-pdf").length } },
@@ -246,9 +249,16 @@ async function testEndpoints() {
     requireActivityWriteAccess: (req, res, next) => req.staff ? next() : res.status(403).json({ error: "Teacher/Admin access is required." }),
     normalizeEmail: (value) => String(value).trim().toLowerCase(),
     isSchoolEmail: (value) => value.endsWith("@westlandhigh.school.nz"),
+    SCHOOL_EMAIL_DOMAIN: "westlandhigh.school.nz",
     hasDatabase: true,
-    pool: { query: async (_sql, params) => ({ rows: params[1] === email ? [{ template_copies: data.context.copies }] : [] }) },
-    loadFinalOutcomeContext: async (req) => { if (req.email !== email) throw Object.assign(new Error("School sign-in required"), { status: 401 }); return data.context; },
+    getRequestUserEmail: (req) => req.email,
+    getStudentProgrammeFolder: async () => "SeniorDTECH",
+    normalizeEvidenceStepsPayload: (rows) => rows,
+    outcomeRepositories,
+    pool: { query: async (_sql, params) => ({ rows: params[1] === email ? [{
+      standard_1: data.context.standard_1, standard_2: data.context.standard_2,
+      evidence_steps: data.context.evidence, template_copies: data.context.copies
+    }] : [] }) },
     resolveOwnedFinalPreparationFolder: async (student, token) => { assert.equal(student, email); assert.equal(token, "student-token"); return "folder"; },
     getDocumentationRecord: () => data.documentationSource,
     withFinalOutcomeLock: async (_key, action) => action(),
@@ -264,6 +274,10 @@ async function testEndpoints() {
     buildDriveFolderUrlFromId: (id) => `https://drive.google.com/drive/folders/${id}`,
     recordTemplateCopyInDb: async (_id, _email, entry) => { data.context.copies = data.context.copies.filter((copy) => copy.templateId !== entry.templateId).concat(entry); }
   });
+  const contextStart = server.indexOf("async function loadFinalOutcomeContext(req)");
+  const contextEnd = server.indexOf('\napp.post("/api/activities/:id/slideshow-pdf"', contextStart);
+  assert.ok(contextStart >= 0 && contextEnd > contextStart);
+  vm.runInContext(server.slice(contextStart, contextEnd), context);
   const start = server.indexOf("async function notifyFinalSubmissionPackage(");
   const end = server.indexOf("const outcomeArchiveStore = ", start);
   vm.runInContext(server.slice(start, end), context);

@@ -160,19 +160,13 @@ async function testAnswerEndpoint(id) {
     assert.ok(start >= 0 && end > start);
     const copies = [];
     const handlers = new Map();
-    const assessment = { email: "student@westlandhigh.school.nz", activityId: "49", copies };
-    let isDigitalMedia = true;
+    const assessment = { email: "student@westlandhigh.school.nz", activityId: "49", standard_1: "91907", standard_2: "91897", copies };
     const context = vm.createContext({
         ...slideshows,
         createHash,
         randomUUID: () => "pdf-export-id",
         app: { post: (path, handler) => handlers.set(path, handler) },
-        loadFinalOutcomeContext: async (_req, options = {}) => {
-            if (!isDigitalMedia && options.requireDigitalMediaOutcome !== false) {
-                throw Object.assign(new Error("Select your digital media outcome assessment."), { status: 403 });
-            }
-            return assessment;
-        },
+        loadFinalOutcomeContext: async () => assessment,
         verifyDriveTokenForStudent: async (token, email) => {
             assert.equal(token, "student-token");
             assert.equal(email, assessment.email);
@@ -224,7 +218,6 @@ async function testAnswerEndpoint(id) {
     assert.equal(recovered.body.saved.templateId, additionalSlideshowTemplateId(id));
     assert.equal(assessment.copies.length, 2);
 
-    isDigitalMedia = false;
     let getHandler;
     context.app.get = (_path, handler) => { getHandler = handler; };
     const getStart = server.indexOf('app.get("/api/activities/:id/submission-slideshows"');
