@@ -265,6 +265,18 @@ async function testEndpoints() {
     verifyDriveTokenForStudent: async (token, student) => { assert.equal(token, "student-token"); assert.equal(student, email); },
     outcomeDriveUploader: { hasSession: () => false, upload: async (options) => {
       uploads.push(options);
+      const archive = await JSZip.loadAsync(fs.readFileSync(options.filePath));
+      assert.deepEqual(Object.keys(archive.files).sort(), [
+        "Client-Presentation.pdf", "GitHub-Outcome.zip", "Task-List-Documentation.pdf", "Trello-Report.pdf"
+      ], "The ZIP passed to Google Drive contains the PDFs as well as the GitHub ZIP");
+      for (const [entryName, fileId] of [
+        ["Client-Presentation.pdf", "client-pdf"],
+        ["Task-List-Documentation.pdf", "documentation-pdf"],
+        ["GitHub-Outcome.zip", "outcome-zip"],
+        ["Trello-Report.pdf", "trello-pdf"]
+      ]) {
+        assert.deepEqual(await archive.file(entryName).async("nodebuffer"), data.binaries.get(fileId));
+      }
       const file = { id: "submission-zip", mimeType: "application/zip", size: String(options.bytes), md5Checksum: options.md5Checksum };
       data.files.set(file.id, file);
       existing = file;
