@@ -131,16 +131,15 @@ test("Invalid data and unsafe links show errors; Retry recovers and stale reques
     assert.equal(elements["#my-lessons-status"].hidden, false);
 });
 
-test("Lessons dropdown follows Pathways course visibility and closes when hidden", () => {
+test("Pathways dropdown follows course visibility and closes when hidden", () => {
     const client = fs.readFileSync(path.join(root, "script.js"), "utf8");
     const start = client.indexOf("function updateSidebarCourseSections(");
     const end = client.indexOf('\nwindow.addEventListener("hub-course-changed"', start);
     const pathways = node();
-    const lessons = node();
     const context = vm.createContext({
         hubAuthState: { profile: { email: "student@example.test" } },
         document: { querySelector: (selector) => ({
-            "#hub-pathways-link": pathways, "#hub-my-lessons-menu": lessons
+            "#hub-pathways-menu": pathways
         })[selector] || null },
         window: { dispatchEvent() {} }, CustomEvent: function () {},
         updateSidebarExternalExamForm() {}
@@ -148,27 +147,27 @@ test("Lessons dropdown follows Pathways course visibility and closes when hidden
     vm.runInContext(client.slice(start, end), context);
     const panel = { dataset: {}, querySelector: () => null };
     for (const course of ["JuniorDTECH", "MiddleDTECH", "SeniorDTECH", ""]) {
-        lessons.open = true;
+        pathways.open = true;
         context.updateSidebarCourseSections(panel, course);
-        assert.equal(lessons.hidden, !["JuniorDTECH", "MiddleDTECH"].includes(course));
-        assert.equal(lessons.hidden, pathways.hidden);
-        assert.equal(lessons.open, !lessons.hidden, "Hidden Lessons menu is closed");
+        assert.equal(pathways.hidden, !["JuniorDTECH", "MiddleDTECH"].includes(course));
+        assert.equal(pathways.open, !pathways.hidden, "Hidden Pathways menu is closed");
     }
-    lessons.open = true;
+    pathways.open = true;
     context.hubAuthState.profile = null;
     context.updateSidebarCourseSections(panel, "JuniorDTECH");
-    assert.equal(lessons.hidden, true);
-    assert.equal(lessons.open, false);
+    assert.equal(pathways.hidden, true);
+    assert.equal(pathways.open, false);
 });
 
-test("Lessons dropdown uses shared navbar behaviour and contains both destinations", () => {
+test("Pathways is a dropdown rather than a reload link and contains both destinations", () => {
     const client = fs.readFileSync(path.join(root, "script.js"), "utf8");
-    const start = client.indexOf('<details class="nav-dropdown nav-dropdown-lessons"');
+    const start = client.indexOf('<details class="nav-dropdown nav-dropdown-pathways"');
     const end = client.indexOf("</details>", start);
     const menu = client.slice(start, end);
-    assert.match(menu, /id="hub-my-lessons-menu" data-nav-dropdown hidden>/);
-    assert.match(menu, /<summary>Lessons<\/summary>/);
+    assert.match(menu, /id="hub-pathways-menu" data-nav-dropdown hidden>/);
+    assert.match(menu, /<summary>Pathways<\/summary>/);
     assert.match(menu, /role="menuitem" href="\/learning-pathways\/my-lessons\.html">My Lessons<\/a>/);
     assert.match(menu, /role="menuitem" href="\/learning-pathways\/">Pathways Library<\/a>/);
     assert.doesNotMatch(menu, /hub-pathways-link/, "Menu items use drawer styling, not the old yellow button");
+    assert.doesNotMatch(client, /id="hub-pathways-link"|id="hub-my-lessons-menu"/, "No separate Pathways link or Lessons button remains");
 });

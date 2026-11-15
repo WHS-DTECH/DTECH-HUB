@@ -124,7 +124,7 @@ async function main() {
             addEventListener(type, fn) { assert.equal(type, "hub-course-changed"); refreshCourse = fn; },
             dispatchEvent(event) { courseEvents.push(event); }
         },
-        document: { querySelector: (selector) => selector === "#hub-pathways-link" ? pathwaysLink
+        document: { querySelector: (selector) => selector === "#hub-pathways-menu" ? pathwaysLink
             : selector === "#hub-senior-task-list-link" ? taskListLink : panel },
         hubAuthState: auth,
         normalizeEmail: context.normalizeEmail,
@@ -219,8 +219,8 @@ async function main() {
     assert.equal(element.textContent, "", "Responses from previous signed-in users are ignored");
     assert.equal(allocations.hidden, true);
     assert.equal(pathwaysLink.hidden, true, "Stale course responses cannot reveal Pathways");
-    assert.match(client, /id="hub-pathways-link"[^>]+href="\/learning-pathways\/" hidden>Pathways<\/a>/);
-    assert.match(css, /\.topbar-links a\.hub-pathways-link\[hidden\]\s*\{\s*display: none !important;/);
+    assert.match(client, /id="hub-pathways-menu" data-nav-dropdown hidden>\s*<summary>Pathways<\/summary>/);
+    assert.match(css, /\.topbar \[hidden\]\s*\{\s*display: none !important;/);
     assert.doesNotMatch(client, /allocationsHost\.hidden = false/, "Allocation fetch cannot override course visibility");
     assert.match(client, /summaryCardsContainer\.dataset\.available = "true";\s*updateSidebarCourseSections\(panel\)/);
     console.log("Sidebar actual-course regressions passed.");

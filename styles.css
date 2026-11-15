@@ -107,20 +107,18 @@ a {
     background: rgba(255, 255, 255, 0.16);
 }
 
-.nav-dropdown-practical-skills summary,
-.nav-dropdown-lessons summary {
+.nav-dropdown-practical-skills summary {
     border-color: #2867bd;
     background: #2867bd;
     color: #ffffff;
 }
 
-.nav-dropdown-practical-skills[open] summary,
-.nav-dropdown-lessons[open] summary {
+.nav-dropdown-practical-skills[open] summary {
     background: #1e4f96;
 }
 
 .nav-dropdown-practical-skills .nav-drawer,
-.nav-dropdown-lessons .nav-drawer {
+.nav-dropdown-pathways .nav-drawer {
     border-color: #2867bd;
     background: #173858;
 }
@@ -163,7 +161,7 @@ a {
     display: none !important;
 }
 
-.topbar-links a.hub-pathways-link {
+.nav-dropdown-pathways summary {
     display: inline-flex;
     align-items: center;
     min-height: 30px;
@@ -178,13 +176,13 @@ a {
     letter-spacing: 0.04em;
 }
 
-.topbar-links a.hub-pathways-link:hover {
+.nav-dropdown-pathways summary:hover {
     background: #f2bc43;
     transform: translateY(-2px);
 }
 
-.topbar-links a.hub-pathways-link[hidden] {
-    display: none !important;
+.nav-dropdown-pathways[open] summary {
+    background: #f2bc43;
 }
 
 .nav-drawer {
@@ -213,6 +211,12 @@ a {
 
 .nav-drawer a:hover {
     background: rgba(255, 255, 255, 0.14);
+}
+
+@media (max-width: 560px) {
+    .topbar-links { position: relative; }
+    .nav-dropdown-pathways { position: static; }
+    .nav-dropdown-pathways .nav-drawer { left: 0; right: 0; min-width: 0; }
 }
 
 .topbar-right {
