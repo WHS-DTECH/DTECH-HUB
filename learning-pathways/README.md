@@ -165,9 +165,12 @@ once without restoring later deletions; Lesson 2's Practical phase links to it.
 ### My Lessons
 
 `my-lessons.html` is the student activity dashboard, available from **Open My
-Lessons** on the Pathways library and the **My Lessons** navigation link for
+Lessons** on the Pathways library and **Lessons > My Lessons** in the navigation for
 JuniorDTECH and MiddleDTECH accounts. It reuses the My Licence panel and responsive
 card styling without licence stamps or completion counters.
+The **Lessons** dropdown also contains **Pathways Library** and uses the same
+blue styling and open/close behaviour as **Licence**. The separate **Pathways**
+button remains available.
 
 The page reads the published library with `cache: "no-store"` and groups active
 activities by their parent Lesson's Unit. Unit headings use the current Unit

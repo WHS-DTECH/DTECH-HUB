@@ -1416,7 +1416,15 @@ function renderGlobalNavbar() {
     `;
     const taskListLink = `<a id="hub-senior-task-list-link" class="hub-senior-task-list-link" href="/task-list.html" hidden><span class="hub-task-list-course" data-task-list-course hidden></span><span class="hub-task-list-label">Task List</span></a>`;
     const pathwaysLink = `<a id="hub-pathways-link" class="hub-pathways-link" href="/learning-pathways/" hidden>Pathways</a>`;
-    const myLessonsLink = `<a id="hub-my-lessons-link" class="hub-pathways-link" href="/learning-pathways/my-lessons.html" hidden>My Lessons</a>`;
+    const myLessonsMenu = `
+        <details class="nav-dropdown nav-dropdown-lessons" id="hub-my-lessons-menu" data-nav-dropdown hidden>
+            <summary>Lessons</summary>
+            <div class="nav-drawer" role="menu">
+                <a id="hub-my-lessons-link" role="menuitem" href="/learning-pathways/my-lessons.html">My Lessons</a>
+                <a role="menuitem" href="/learning-pathways/">Pathways Library</a>
+            </div>
+        </details>
+    `;
 
     const uploadMenu = `
         <details class="nav-dropdown" id="hub-upload-menu" data-nav-dropdown hidden>
@@ -1456,7 +1464,7 @@ function renderGlobalNavbar() {
         </details>
     `;
     const settingsLink = `<a id="hub-settings-link" href="/settings.html" hidden>Settings</a>`;
-    const topbarMenu = `${browseMenu}${uploadMenu}${practicalSkillsMenu}${pathwaysLink}${myLessonsLink}${taskListLink}${studentWorkMenu}${settingsLink}`;
+    const topbarMenu = `${browseMenu}${uploadMenu}${practicalSkillsMenu}${pathwaysLink}${myLessonsMenu}${taskListLink}${studentWorkMenu}${settingsLink}`;
 
     topbar.dataset.globalNavbar = "true";
     topbar.setAttribute("aria-label", "Primary");
@@ -2621,9 +2629,10 @@ function updateSidebarCourseSections(panel, course = panel.dataset.course || "",
     if (pathwaysLink) {
         pathwaysLink.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "MiddleDTECH"].includes(course);
     }
-    const myLessonsLink = document.querySelector("#hub-my-lessons-link");
-    if (myLessonsLink) {
-        myLessonsLink.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "MiddleDTECH"].includes(course);
+    const myLessonsMenu = document.querySelector("#hub-my-lessons-menu");
+    if (myLessonsMenu) {
+        myLessonsMenu.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "MiddleDTECH"].includes(course);
+        if (myLessonsMenu.hidden) myLessonsMenu.open = false;
     }
     const taskListLink = document.querySelector("#hub-senior-task-list-link");
     if (taskListLink) {
@@ -3579,8 +3588,11 @@ function renderHubAuthUi() {
     }
     const pathwaysLink = document.querySelector("#hub-pathways-link");
     if (pathwaysLink) pathwaysLink.hidden = true;
-    const myLessonsLink = document.querySelector("#hub-my-lessons-link");
-    if (myLessonsLink) myLessonsLink.hidden = true;
+    const myLessonsMenu = document.querySelector("#hub-my-lessons-menu");
+    if (myLessonsMenu) {
+        myLessonsMenu.hidden = true;
+        myLessonsMenu.open = false;
+    }
     routeHubCourseHomepage("");
     if (hubSeniorTaskListLink) {
         hubSeniorTaskListLink.hidden = true;

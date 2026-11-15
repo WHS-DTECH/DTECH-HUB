@@ -131,7 +131,7 @@ test("Invalid data and unsafe links show errors; Retry recovers and stale reques
     assert.equal(elements["#my-lessons-status"].hidden, false);
 });
 
-test("My Lessons navigation follows the existing Pathways course visibility", () => {
+test("Lessons dropdown follows Pathways course visibility and closes when hidden", () => {
     const client = fs.readFileSync(path.join(root, "script.js"), "utf8");
     const start = client.indexOf("function updateSidebarCourseSections(");
     const end = client.indexOf('\nwindow.addEventListener("hub-course-changed"', start);
@@ -140,7 +140,7 @@ test("My Lessons navigation follows the existing Pathways course visibility", ()
     const context = vm.createContext({
         hubAuthState: { profile: { email: "student@example.test" } },
         document: { querySelector: (selector) => ({
-            "#hub-pathways-link": pathways, "#hub-my-lessons-link": lessons
+            "#hub-pathways-link": pathways, "#hub-my-lessons-menu": lessons
         })[selector] || null },
         window: { dispatchEvent() {} }, CustomEvent: function () {},
         updateSidebarExternalExamForm() {}
@@ -148,11 +148,27 @@ test("My Lessons navigation follows the existing Pathways course visibility", ()
     vm.runInContext(client.slice(start, end), context);
     const panel = { dataset: {}, querySelector: () => null };
     for (const course of ["JuniorDTECH", "MiddleDTECH", "SeniorDTECH", ""]) {
+        lessons.open = true;
         context.updateSidebarCourseSections(panel, course);
         assert.equal(lessons.hidden, !["JuniorDTECH", "MiddleDTECH"].includes(course));
         assert.equal(lessons.hidden, pathways.hidden);
+        assert.equal(lessons.open, !lessons.hidden, "Hidden Lessons menu is closed");
     }
+    lessons.open = true;
     context.hubAuthState.profile = null;
     context.updateSidebarCourseSections(panel, "JuniorDTECH");
     assert.equal(lessons.hidden, true);
+    assert.equal(lessons.open, false);
+});
+
+test("Lessons dropdown uses shared navbar behaviour and contains both destinations", () => {
+    const client = fs.readFileSync(path.join(root, "script.js"), "utf8");
+    const start = client.indexOf('<details class="nav-dropdown nav-dropdown-lessons"');
+    const end = client.indexOf("</details>", start);
+    const menu = client.slice(start, end);
+    assert.match(menu, /id="hub-my-lessons-menu" data-nav-dropdown hidden>/);
+    assert.match(menu, /<summary>Lessons<\/summary>/);
+    assert.match(menu, /role="menuitem" href="\/learning-pathways\/my-lessons\.html">My Lessons<\/a>/);
+    assert.match(menu, /role="menuitem" href="\/learning-pathways\/">Pathways Library<\/a>/);
+    assert.doesNotMatch(menu, /hub-pathways-link/, "Menu items use drawer styling, not the old yellow button");
 });

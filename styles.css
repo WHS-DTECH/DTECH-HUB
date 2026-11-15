@@ -107,17 +107,20 @@ a {
     background: rgba(255, 255, 255, 0.16);
 }
 
-.nav-dropdown-practical-skills summary {
+.nav-dropdown-practical-skills summary,
+.nav-dropdown-lessons summary {
     border-color: #2867bd;
     background: #2867bd;
     color: #ffffff;
 }
 
-.nav-dropdown-practical-skills[open] summary {
+.nav-dropdown-practical-skills[open] summary,
+.nav-dropdown-lessons[open] summary {
     background: #1e4f96;
 }
 
-.nav-dropdown-practical-skills .nav-drawer {
+.nav-dropdown-practical-skills .nav-drawer,
+.nav-dropdown-lessons .nav-drawer {
     border-color: #2867bd;
     background: #173858;
 }
