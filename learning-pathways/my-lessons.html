@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Lessons | DTECH-HUB</title>
+    <meta name="description" content="Find your Pathways lesson activities, grouped by Unit and ordered by lesson.">
+    <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
+    <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
+    <link rel="icon" href="../images/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../styles.css?v=drawing-filing-1">
+    <link rel="stylesheet" href="../practical-skills/checklist.css?v=5">
+    <link rel="stylesheet" href="my-lessons.css?v=1">
+</head>
+<body class="licence-dashboard">
+    <div class="page-shell">
+        <header class="hero practical-skills-hero">
+            <nav class="topbar" aria-label="Primary"><a class="brand" href="/index.html">Computer Lab</a></nav>
+        </header>
+        <main class="home-grid single-column">
+            <section class="student-licence" aria-labelledby="my-lessons-title">
+                <div class="licence-card-heading">
+                    <img src="../images/whs%20logo%20circular%20reo%20.png" alt="Westland High School logo" width="80" height="80">
+                    <div><p class="section-kicker">Westland High School</p><h1 id="my-lessons-title">My Lessons</h1></div>
+                </div>
+                <h2 id="my-lessons-student-name">Your Pathways lessons</h2>
+                <p id="my-lessons-student-email">Sign in with your school account to show your name.</p>
+                <p class="my-lessons-intro">Choose an activity to start or continue.</p>
+                <p id="my-lessons-status" class="upload-status" role="status" aria-live="polite">Loading lesson activities...</p>
+                <button id="my-lessons-retry" class="button button-secondary" type="button" hidden>Retry loading lessons</button>
+                <div id="my-lessons-units" hidden></div>
+                <noscript><p>Enable JavaScript to load your lesson activities.</p></noscript>
+                <p class="licence-card-footnote">Activities are listed in lesson order. <a href="/learning-pathways/">Browse the Pathways library</a> for Units and lesson plans.</p>
+            </section>
+        </main>
+    </div>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="../script.js?v=my-lessons-1"></script>
+    <script src="my-lessons.js?v=1"></script>
+</body>
+</html>

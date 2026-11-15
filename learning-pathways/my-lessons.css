@@ -1,0 +1,13 @@
+.licence-card-heading #my-lessons-title { margin: 2px 0; font-family: Manrope, sans-serif; font-size: 1.35rem; }
+#my-lessons-student-name { margin: 10px 0 0; font-size: 1.2rem; overflow-wrap: anywhere; }
+#my-lessons-student-email { margin: 2px 0 10px; font-size: .8rem; color: #496071; overflow-wrap: anywhere; }
+.my-lessons-intro { margin: 12px 0; font-weight: 700; }
+.my-lessons-unit { margin-top: 22px; }
+.my-lessons-unit h2 { margin: 0; font-size: 1.2rem; }
+.my-lessons-activities { padding: 0; list-style: none; }
+.my-lessons-activities li { display: flex; min-width: 0; }
+.my-lessons-activity { width: 100%; box-sizing: border-box; overflow-wrap: anywhere; }
+.my-lessons-activity .my-lessons-summary { color: #496071; }
+.my-lessons-empty { margin: 10px 0; color: #496071; font-size: .9rem; }
+#my-lessons-status { margin: 12px 0; }
+#my-lessons-units[hidden], #my-lessons-status[hidden], #my-lessons-retry[hidden] { display: none; }

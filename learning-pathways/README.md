@@ -162,6 +162,26 @@ automatically (no finish button) as soon as all nine Part D letters are correct
 reopens it. Migration v13 adds this card
 once without restoring later deletions; Lesson 2's Practical phase links to it.
 
+### My Lessons
+
+`my-lessons.html` is the student activity dashboard, available from **Open My
+Lessons** on the Pathways library and the **My Lessons** navigation link for
+JuniorDTECH and MiddleDTECH accounts. It reuses the My Licence panel and responsive
+card styling without licence stamps or completion counters.
+
+The page reads the published library with `cache: "no-store"` and groups active
+activities by their parent Lesson's Unit. Unit headings use the current Unit
+titles; activities follow Lesson sequence, then activity sequence. Only active
+Units, Lessons and activities are included, and activities without a destination
+are omitted. Active Units with no published activities show an empty notice.
+Cards open the existing activity pages directly. Invalid library data or links
+show an explicit error and Retry button rather than an empty success view.
+
+Like the Pathways library, lesson navigation is public; school sign-in displays
+the student's name and email. My Lessons does not filter the published library
+by course or add progress tracking. Existing activity autosave and Task List
+completion behaviour are unchanged.
+
 `activity-progress-store.js` stores per-student answers in
 `learning_pathways_activity_progress` (Postgres; in memory without
 `DATABASE_URL`) and only accepts registered activities and school accounts:
