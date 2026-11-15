@@ -1167,6 +1167,12 @@
     line-height: 1.55;
 }
 
+.activity-slide { margin: 0 0 16px; }
+.activity-slide-preview { display: block; border-radius: 12px; overflow: hidden; }
+.activity-slide-preview img { display: block; width: 100%; height: auto; }
+.activity-slide-preview:focus-visible { outline: 3px solid #1f6b3a; outline-offset: 4px; }
+.activity-slide figcaption { margin-top: 10px; color: #213f60; }
+
 .activity-needs {
     display: flex;
     flex-wrap: wrap;

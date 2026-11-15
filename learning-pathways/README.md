@@ -147,12 +147,23 @@ the activities within a lesson. Activity cards keep a parent `lesson` ID and a
 `sequence` number, list after lessons (by lesson, then sequence with the A-Z
 sort) and are excluded from the student Task List. Add more from the admin
 editor (Card Type: Lesson Activity); `/learning-pathways/?type=activity` opens
-the filtered view. The first, **Build Your Binary Piano** (Lesson 1, Activity 1),
+the filtered view. **Build Your Binary Piano** (Lesson 1, Activity 2),
 opens the student page `activity-build-your-binary-piano.html` (green
 `activity-hero`, materials pills, numbered steps, place-value tiles and a
 a **Finished?** hand-in panel: an exercise-book illustration, "Well done! Your Binary Piano is ready to use!" and a reminder to hand in the exercise book. Reuse `.activity-handin` for exercise-book tasks with no DTECH-HUB completion requirement). The Lesson 1 Practical phase has a green **Activity card** pill
 on the right that opens the activity page directly. Migration
 v11 adds missing activity cards once without restoring later deletions.
+
+**Theory Notes - Number System** is Lesson 1, Activity 1, linked from the Starter
+phase and listed before construction in My Lessons. Students copy the "Number
+System" slide into their exercise books. `activity-number-system.html` includes
+a local snapshot of slide 2 from the shared Binary Programming slideshow
+(`images/number-system-slide.png`); clicking the picture or text link opens the
+slideshow at `g3129e50f88d_0_25`. Refresh the snapshot from the source if slide 2
+changes. This is an exercise-book task, without digital completion tracking.
+Migration v16 adds the card once when its Lesson and Unit still exist, preserves
+edited cards and custom construction sequences, and moves construction from the
+original sequence 1 to 2. It does not restore later deletions.
 
 **Encoding Binary** (Lesson 2, Activity 1) is the first interactive, tracked
 activity: `activity-encoding-binary.html` + `activity-encoding-binary.js`.

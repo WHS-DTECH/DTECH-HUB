@@ -92,7 +92,7 @@ function registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess, 
         if (!hasDatabase) return normalizeCards(JSON.parse(await fs.readFile(seedFile, "utf8")));
         await ensureSchema();
         const seed = normalizeCards(JSON.parse(await fs.readFile(seedFile, "utf8")));
-        await pool.query(`INSERT INTO learning_pathways_library_store (id, cards, seed_version) VALUES ('default', $1::jsonb, 15)
+        await pool.query(`INSERT INTO learning_pathways_library_store (id, cards, seed_version) VALUES ('default', $1::jsonb, 16)
             ON CONFLICT (id) DO NOTHING`, [JSON.stringify(seed)]);
         // Add the curriculum starter cards once without replacing existing cards or restoring later deletions.
         await pool.query(`UPDATE learning_pathways_library_store AS library
@@ -272,6 +272,35 @@ function registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess, 
                 )
             ), '[]'::jsonb), seed_version = 15, updated_at = NOW()
             WHERE id = 'default' AND seed_version < 15`, [JSON.stringify(combined)]);
+        // Add theory notes once without restoring deleted activities or replacing edited metadata.
+        const numberSystemActivity = activities.filter((card) => card.id === "activity-number-system");
+        await pool.query(`UPDATE learning_pathways_library_store AS library
+            SET cards = COALESCE((
+                SELECT jsonb_agg(CASE WHEN existing.card ->> 'id' = 'activity-build-your-binary-piano'
+                    AND existing.card ->> 'sequence' = '1'
+                    THEN existing.card || '{"sequence":2}'::jsonb || CASE
+                        WHEN existing.card #>> '{visual,icon}' = 'A1'
+                            THEN jsonb_build_object('visual', (existing.card -> 'visual') || '{"icon":"A2"}'::jsonb)
+                        ELSE '{}'::jsonb END
+                    ELSE existing.card END ORDER BY existing.position)
+                FROM jsonb_array_elements(library.cards) WITH ORDINALITY AS existing(card, position)
+            ), '[]'::jsonb) || COALESCE((
+                SELECT jsonb_agg(activity.card)
+                FROM jsonb_array_elements($1::jsonb) AS activity(card)
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(library.cards) AS existing(card)
+                    WHERE existing.card ->> 'id' = activity.card ->> 'id'
+                ) AND EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(library.cards) AS lesson(card)
+                    WHERE lesson.card ->> 'id' = 'lesson-binary-piano'
+                        AND lesson.card ->> 'cardType' = 'lesson'
+                ) AND EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(library.cards) AS unit(card)
+                    WHERE unit.card ->> 'id' = 'binary-and-data'
+                        AND unit.card ->> 'cardType' = 'unit'
+                )
+            ), '[]'::jsonb), seed_version = 16, updated_at = NOW()
+            WHERE id = 'default' AND seed_version < 16`, [JSON.stringify(numberSystemActivity)]);
         const initialized = await pool.query("SELECT cards FROM learning_pathways_library_store WHERE id = 'default'");
         return normalizeCards(initialized.rows[0].cards);
     }

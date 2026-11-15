@@ -242,9 +242,9 @@
     "status": "active",
     "cardType": "activity",
     "lesson": "lesson-binary-piano",
-    "sequence": 1,
+    "sequence": 2,
     "href": "/learning-pathways/activity-build-your-binary-piano.html",
-    "visual": { "icon": "A1" }
+    "visual": { "icon": "A2" }
   },
   {
     "id": "activity-encoding-binary",
@@ -257,6 +257,20 @@
     "lesson": "lesson-encoding-binary",
     "sequence": 1,
     "href": "/learning-pathways/activity-encoding-binary.html",
+    "visual": { "icon": "A1" }
+  },
+  {
+    "id": "activity-number-system",
+    "title": "Theory Notes - Number System",
+    "summary": "Copy the slide \"Number System\" into your exercise books.",
+    "yearLevel": "Junior DTECH",
+    "area": "Digital systems",
+    "status": "active",
+    "cardType": "activity",
+    "lesson": "lesson-binary-piano",
+    "sequence": 1,
+    "href": "/learning-pathways/activity-number-system.html",
+    "imageUrl": "/images/number-system-slide.png",
     "visual": { "icon": "A1" }
   }
 ]

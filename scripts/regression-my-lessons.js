@@ -49,12 +49,14 @@ test("My Lessons renders current Unit names and direct activity links, including
     assert.deepEqual(sections.map((section) => section.children[0].textContent),
         ["Binary & Data", "Infrastructure & Networking"]);
     const links = sections[0].children[1].children.map((item) => item.children[0]);
-    assert.deepEqual(links.map((link) => link.children[0].textContent), ["Build Your Binary Piano", "Encoding Binary"]);
+    assert.deepEqual(links.map((link) => link.children[0].textContent),
+        ["Theory Notes - Number System", "Build Your Binary Piano", "Encoding Binary"]);
     assert.deepEqual(links.map((link) => link.href), [
+        "/learning-pathways/activity-number-system.html",
         "/learning-pathways/activity-build-your-binary-piano.html",
         "/learning-pathways/activity-encoding-binary.html"
     ]);
-    assert.equal(links[1].children[1].textContent, "Lesson 2: Encoding Binary");
+    assert.equal(links[2].children[1].textContent, "Lesson 2: Encoding Binary");
     assert.equal(sections[1].children[1].textContent, "No lesson activities published yet.");
     assert.equal(elements["#my-lessons-status"].hidden, true);
     assert.equal(elements["#my-lessons-retry"].hidden, true);
