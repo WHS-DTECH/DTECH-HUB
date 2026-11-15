@@ -392,7 +392,11 @@ async function main() {
     assert.match(fs.readFileSync(path.join(root, "learning-pathways/styles.css"), "utf8"), /@media print \{[\s\S]*\.hero-stats,[\s\S]*\.curriculum-jump-links,/,
         "Print layout hides page actions and section links");
     assert.deepEqual([...lessonPage.matchAll(/<span class="lesson-time">([^<]+)</g)].map((match) => match[1]),
-        ["0&ndash;10 min", "10&ndash;20 min", "20&ndash;40 min", "40&ndash;50 min", "50&ndash;60 min"], "Lesson timeline covers 60 minutes");
+        ["0&ndash;10 min", "10&ndash;30 min", "30&ndash;40 min", "40&ndash;50 min", "50&ndash;60 min"], "Lesson timeline covers 60 minutes");
+    assert.deepEqual([...lessonPage.matchAll(/<h3>([^<]+)<\/h3>/g)].map((match) => match[1]),
+        ["Starter &mdash; What is binary?", "Practical &mdash; Construct the Binary Piano",
+            "Demonstration &mdash; Place values", "Guided practice &mdash; Make numbers", "Plenary &mdash; Explain and store"],
+        "Students construct their Binary Piano before the place-value demonstration");
     const encodingPage = fs.readFileSync(path.join(root, "learning-pathways/lesson-encoding-binary.html"), "utf8");
     assert.deepEqual([...encodingPage.matchAll(/<span class="lesson-time">([^<]+)</g)].map((match) => match[1]),
         ["0&ndash;10 min", "10&ndash;20 min", "20&ndash;35 min", "35&ndash;50 min", "50&ndash;60 min"], "Lesson 2 timeline covers 60 minutes");

@@ -117,6 +117,9 @@ Version 9 appends the ten Binary & Data **Lesson** cards when their IDs are
 missing, without changing existing cards or restoring deleted lessons.
 Version 10 links a still-blank Binary Piano lesson to `lesson-binary-piano.html`
 (Lesson 1 page, amber hero, built from the Lesson 01 PDF).
+Lesson 1's sequence is Starter (0-10 min), Practical construction (10-30 min),
+Demonstration (30-40 min), Guided practice (40-50 min) and Plenary (50-60 min).
+Students build their Binary Piano before the place-value demonstration.
 Version 12 links a still-blank Encoding Binary lesson to `lesson-encoding-binary.html`
 (Lesson 2 page, built from the Lesson 02 PDF, with a Linked Student Activity section).
 
