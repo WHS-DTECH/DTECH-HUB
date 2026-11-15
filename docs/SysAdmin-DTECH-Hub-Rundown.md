@@ -52,6 +52,16 @@ DTECH Hub is a web application used in DTECH classes for project/activity access
 - `PUT /api/admin/typing-kit-book-signature` stores `{email, weekStart, period, signed}` in `typing_kit_book_signatures`, keyed by student, dated Monday and period, with the saving staff account and timestamp. Calendar membership is checked atomically. Changing the shared calendar does not delete older signatures or attempts.
 - Both endpoints use existing admin access checks and no-store responses. Refresh list reloads saved results, attendance and signature ticks. Unknown attendance is explicitly shown, not treated as absence; unreadable logs do not display invented results or signature values.
 
+### Level 1 external assessment study resources
+
+The AS 92006 Student View in `assessment-standard-card.html` includes a
+three-column resource area below the grade criteria: the Usability slideshow on
+the left, Tutorial and Cram Cards PDFs in the middle, and a reserved empty right
+column. It stacks on small screens and is not shown for other standards.
+The slideshow cover and supplied PDF-link pictures are local snapshots in
+`images/92006-*.png`; refresh the cover if the slideshow's front slide changes.
+The pictures open their original Google Slides/Drive resources in a new tab.
+
 ## 2) How Google Sign-In Is Set Up
 - Frontend uses Google Identity Services OAuth token flow.
 - User signs in with Google and the app fetches profile details from the Google userinfo API.

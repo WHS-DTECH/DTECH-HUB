@@ -240,6 +240,55 @@
 
         .student-standard-checklist li + li { margin-top: 8px; }
 
+        .student-standard-study-resources[hidden] { display: none; }
+
+        .student-standard-study-resources > h2 {
+            margin: 0 0 12px;
+            color: #154d3b;
+            font-size: 1.2rem;
+        }
+
+        .student-standard-study-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .student-standard-study-column {
+            min-width: 0;
+            padding: 14px;
+            border: 1px solid #d6dee9;
+            border-radius: 10px;
+            background: #fff;
+        }
+
+        .student-standard-study-column h3 {
+            margin: 0 0 12px;
+            color: #25465e;
+            font-size: 1rem;
+        }
+
+        .student-standard-study-link {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            border: 1px solid #c9d9ec;
+            border-radius: 8px;
+            color: #164e7c;
+            font-weight: 700;
+            text-align: center;
+            overflow-wrap: anywhere;
+        }
+
+        .student-standard-study-link + .student-standard-study-link { margin-top: 12px; }
+        .student-standard-study-link:hover { background: #eaf4ff; }
+        .student-standard-study-link:focus-visible { outline: 3px solid #164e7c; outline-offset: 3px; }
+        .student-standard-study-link img { display: block; max-width: 100%; height: auto; }
+        .student-standard-study-link.slideshow img { width: 100%; }
+        .student-standard-study-link.pdf img { max-width: min(160px, 100%); }
+
         .standard-tracker-shell {
             margin-top: 20px;
             padding: 16px;
@@ -288,9 +337,12 @@
                 grid-template-columns: 1fr;
             }
 
-            .student-standard-criteria {
+            .student-standard-criteria,
+            .student-standard-study-grid {
                 grid-template-columns: 1fr;
             }
+
+            .student-standard-study-placeholder { display: none; }
         }
     </style>
 </head>
@@ -377,6 +429,30 @@
                     <a class="student-standard-resource hapara" id="ssg-hapara-link" href="https://bit.ly/4uO74lI" target="_blank" rel="noopener noreferrer"><img src="https://app.hapara.com/favicon.ico" alt=""> Hapara Student Dashboard</a>
                 </section>
                 <div class="student-standard-criteria" id="ssg-criteria"></div>
+                <section class="student-standard-study-resources" id="ssg-external-resources" aria-labelledby="ssg-external-resources-title" hidden>
+                    <h2 id="ssg-external-resources-title">Level 1 Exam Preparation</h2>
+                    <div class="student-standard-study-grid">
+                        <article class="student-standard-study-column">
+                            <h3>Slideshow</h3>
+                            <a class="student-standard-study-link slideshow" href="https://docs.google.com/presentation/d/1NC3TENDS_0XBDVMfFxgxdVAS2_sPn1ESp8RRP_xKYxY/edit?usp=sharing" target="_blank" rel="noopener noreferrer" aria-label="Open the Level 1 Usability slideshow (opens in a new tab)">
+                                <img src="images/92006-slideshow-front.png" alt="Front slide of the Level 1 AS 92006 Usability slideshow." width="960" height="540">
+                                <span>Open Usability Slideshow</span>
+                            </a>
+                        </article>
+                        <article class="student-standard-study-column">
+                            <h3>Tutorial &amp; Cram Cards</h3>
+                            <a class="student-standard-study-link pdf" href="https://drive.google.com/file/d/1Jy7rVeCvVH5Yzl39Apc8VZn2wP0I1B8H/view?usp=drive_link" target="_blank" rel="noopener noreferrer" aria-label="Open the Level 1 Tutorial PDF (opens in a new tab)">
+                                <img src="images/92006-tutorial.png" alt="Tutorial worksheets.">
+                                <span>Tutorial Worksheets (PDF)</span>
+                            </a>
+                            <a class="student-standard-study-link pdf" href="https://drive.google.com/file/d/16h6Uhwq7cj2BH8OTU1NYI3XIw7SlR09q/view?usp=drive_link" target="_blank" rel="noopener noreferrer" aria-label="Open the Level 1 Cram Cards PDF (opens in a new tab)">
+                                <img src="images/92006-cram-cards.png" alt="Cram Cards.">
+                                <span>Cram Cards (PDF)</span>
+                            </a>
+                        </article>
+                        <div class="student-standard-study-column student-standard-study-placeholder" aria-hidden="true"></div>
+                    </div>
+                </section>
                 <div class="standard-card-actions">
                     <a class="button button-primary" href="index.html#project-library">Back To Library</a>
                 </div>
@@ -394,6 +470,6 @@
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="script.js"></script>
-    <script src="assessment-standard-card.js"></script>
+    <script src="assessment-standard-card.js?v=external-resources-1"></script>
 </body>
 </html>

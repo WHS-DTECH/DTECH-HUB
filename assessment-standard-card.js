@@ -186,6 +186,8 @@ function renderStudentStandardGuide({ standardNumber, standardName, yearLevel, c
             </section>
         `;
     }).join("");
+    const externalResources = document.getElementById("ssg-external-resources");
+    if (externalResources) externalResources.hidden = safeText(standardNumber) !== "92006";
     guide.hidden = false;
 }
 

@@ -61,4 +61,51 @@ assert.equal(cardsByNumber.get("92004").level, "Level 1");
 assert.equal(cardsByNumber.get("91896").level, "Level 2");
 assert.equal(cardsByNumber.get("91906").level, "Level 3");
 
-console.log("Assessment standard card library regressions passed.");
+const client = fs.readFileSync(path.join(root, "assessment-standard-card.js"), "utf8");
+const html = fs.readFileSync(path.join(root, "assessment-standard-card.html"), "utf8");
+const nodes = Object.fromEntries(["sc-student-guide", "ssg-title", "ssg-purpose", "ssg-meta",
+  "ssg-criteria", "ssg-learning-link", "ssg-external-resources"].map((id) => [id, { hidden: true }]));
+const teacherShell = { hidden: false };
+const guideContext = vm.createContext({
+  document: { getElementById: (id) => nodes[id], querySelector: () => teacherShell },
+  window: {},
+  safeText: (value) => String(value || "").trim()
+});
+const guideStart = client.indexOf("function getLearningSiteUrlForStandard(");
+const guideEnd = client.indexOf("\nasync function renderAssessmentTracker(", guideStart);
+vm.runInContext(client.slice(guideStart, guideEnd), guideContext);
+for (const standardNumber of ["92006", "91898", "91908", "92007", "91897", "92006", "91909"]) {
+  const card = cardsByNumber.get(standardNumber);
+  guideContext.renderStudentStandardGuide({
+    standardNumber, standardName: card.standardName, yearLevel: card.level, credits: card.credits,
+    achievedText: card.achievedText, meritText: card.meritText, excellenceText: card.excellenceText,
+    achievedChecklist: card.achievedChecklist, meritChecklist: card.meritChecklist, excellenceChecklist: card.excellenceChecklist
+  });
+  assert.equal(nodes["ssg-external-resources"].hidden, standardNumber !== "92006",
+    "Usability resources are only shown for AS 92006, and switching standards hides them");
+  assert.equal(teacherShell.hidden, true, "Student guide retains the existing teacher-shell behaviour");
+  assert.ok(nodes["ssg-criteria"].innerHTML.includes(card.achievedText), "Grade criteria remain visible");
+}
+const resourceMarkup = html.match(/<section class="student-standard-study-resources"[\s\S]*?<\/section>/)[0];
+assert.equal((resourceMarkup.match(/class="student-standard-study-column(?: |")/g) || []).length, 3,
+  "Study area has three columns, including the reserved right column");
+assert.ok(html.indexOf('id="ssg-criteria"') < html.indexOf('id="ssg-external-resources"'),
+  "New study area appears below the existing criteria");
+assert.match(resourceMarkup, /student-standard-study-placeholder" aria-hidden="true"><\/div>/,
+  "Right column is left empty");
+const resourceLinks = [...resourceMarkup.matchAll(/<a class="student-standard-study-link[^"]*" href="([^"]+)"([^>]+)>\s*<img src="([^"]+)"/g)];
+assert.deepEqual(resourceLinks.map((match) => match[1]), [
+  "https://docs.google.com/presentation/d/1NC3TENDS_0XBDVMfFxgxdVAS2_sPn1ESp8RRP_xKYxY/edit?usp=sharing",
+  "https://drive.google.com/file/d/1Jy7rVeCvVH5Yzl39Apc8VZn2wP0I1B8H/view?usp=drive_link",
+  "https://drive.google.com/file/d/16h6Uhwq7cj2BH8OTU1NYI3XIw7SlR09q/view?usp=drive_link"
+], "Slideshow, Tutorial and Cram Cards images open the requested resources in column order");
+for (const link of resourceLinks) {
+  assert.match(link[2], /target="_blank" rel="noopener noreferrer"/);
+  const image = fs.readFileSync(path.join(root, link[3]));
+  assert.equal(image.subarray(1, 4).toString(), "PNG", "Clickable resource images are real PNG files");
+}
+assert.match(html, /@media \(max-width: 620px\)[\s\S]*\.student-standard-study-grid \{\s*grid-template-columns: 1fr;/,
+  "Study area stacks on small screens");
+assert.match(html, /\.student-standard-study-resources\[hidden\] \{ display: none; \}/);
+
+console.log("Assessment standard card library and student resource regressions passed.");
