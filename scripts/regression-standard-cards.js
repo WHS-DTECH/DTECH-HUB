@@ -88,11 +88,21 @@ for (const standardNumber of ["92006", "91898", "91908", "92007", "91897", "9200
 }
 const resourceMarkup = html.match(/<section class="student-standard-study-resources"[\s\S]*?<\/section>/)[0];
 assert.equal((resourceMarkup.match(/class="student-standard-study-column(?: |")/g) || []).length, 3,
-  "Study area has three columns, including the reserved right column");
+  "Study area has three columns, including the four-stage right column");
 assert.ok(html.indexOf('id="ssg-criteria"') < html.indexOf('id="ssg-external-resources"'),
   "New study area appears below the existing criteria");
-assert.match(resourceMarkup, /student-standard-study-placeholder" aria-hidden="true"><\/div>/,
-  "Right column is left empty");
+const stageMarkup = resourceMarkup.match(/<ol class="student-standard-study-stages"[^>]*>([\s\S]*?)<\/ol>/)[1];
+const stages = [...stageMarkup.matchAll(/<li><span>(Stage \d)<\/span><img src="([^"]+)" alt="([^"]+)"><\/li>/g)];
+assert.deepEqual(stages.map((stage) => [stage[1], stage[2], stage[3]]), [
+  ["Stage 1", "images/92006-stage-decode.png", "Decode: Read the question."],
+  ["Stage 2", "images/92006-stage-think.png", "Think: 5Ws &amp; H."],
+  ["Stage 3", "images/92006-stage-write.png", "Write: SEED."],
+  ["Stage 4", "images/92006-stage-check.png", "Check: Answer the question?"]
+], "Right column presents the four supplied stages in order, with accessible descriptions");
+for (const stage of stages) {
+  const image = fs.readFileSync(path.join(root, stage[2]));
+  assert.equal(image.subarray(1, 4).toString(), "PNG", "Stage image is available as a PNG");
+}
 const resourceLinks = [...resourceMarkup.matchAll(/<a class="student-standard-study-link[^"]*" href="([^"]+)"([^>]+)>\s*<img src="([^"]+)"/g)];
 assert.deepEqual(resourceLinks.map((match) => match[1]), [
   "https://docs.google.com/presentation/d/1NC3TENDS_0XBDVMfFxgxdVAS2_sPn1ESp8RRP_xKYxY/edit?usp=sharing",

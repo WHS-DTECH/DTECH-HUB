@@ -289,6 +289,34 @@
         .student-standard-study-link.slideshow img { width: 100%; }
         .student-standard-study-link.pdf img { max-width: min(160px, 100%); }
 
+        .student-standard-study-stages {
+            display: grid;
+            gap: 12px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .student-standard-study-stages li {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            background: #000;
+            color: #fff;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .student-standard-study-stages img {
+            display: block;
+            justify-self: center;
+            max-width: 100%;
+            height: auto;
+        }
+
         .standard-tracker-shell {
             margin-top: 20px;
             padding: 16px;
@@ -342,7 +370,6 @@
                 grid-template-columns: 1fr;
             }
 
-            .student-standard-study-placeholder { display: none; }
         }
     </style>
 </head>
@@ -450,7 +477,15 @@
                                 <span>Cram Cards (PDF)</span>
                             </a>
                         </article>
-                        <div class="student-standard-study-column student-standard-study-placeholder" aria-hidden="true"></div>
+                        <article class="student-standard-study-column">
+                            <h3>Answering in Four Stages</h3>
+                            <ol class="student-standard-study-stages" role="list">
+                                <li><span>Stage 1</span><img src="images/92006-stage-decode.png" alt="Decode: Read the question."></li>
+                                <li><span>Stage 2</span><img src="images/92006-stage-think.png" alt="Think: 5Ws &amp; H."></li>
+                                <li><span>Stage 3</span><img src="images/92006-stage-write.png" alt="Write: SEED."></li>
+                                <li><span>Stage 4</span><img src="images/92006-stage-check.png" alt="Check: Answer the question?"></li>
+                            </ol>
+                        </article>
                     </div>
                 </section>
                 <div class="standard-card-actions">
