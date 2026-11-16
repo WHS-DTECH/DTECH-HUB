@@ -19,6 +19,7 @@
     const studentFilter = document.getElementById("class-student-filter");
     const kitFilter = document.getElementById("class-kit-filter");
     const statusFilter = document.getElementById("class-status-filter");
+    const submissionStatusFilter = document.getElementById("class-submission-status-filter");
     const chocolateFilter = document.getElementById("class-chocolate-filter");
     const kitFocus = document.getElementById("class-kit-focus");
     const typingSection = document.getElementById("class-typing-results");
@@ -245,7 +246,16 @@
         for (const kit of kits) {
             const title = classData.kits.find((entry) => entry.id === kit.id)?.title || kit.id;
             node("h3", `${title} - Submissions`, submissionsHost);
-            if (!students.length) {
+            const selectedSubmissionStatus = submissionStatusFilter.value;
+            const kitStudents = selectedSubmissionStatus ? students.filter((student) =>
+                kit.activities.some((activity) => {
+                    const entry = kit.students?.[String(student.email || "").toLowerCase()]?.[activity.index];
+                    if (!entry?.url) return false;
+                    if (selectedSubmissionStatus === "saved") return entry.filed !== true;
+                    if (selectedSubmissionStatus === "awaiting-completion") return entry.filed === true && entry.completed !== true;
+                    return true;
+                })) : students;
+            if (!kitStudents.length) {
                 node("p", "No students match these filters.", submissionsHost);
                 continue;
             }
@@ -257,7 +267,7 @@
             const header = node("tr", undefined, node("thead", undefined, table));
             ["Student", "Homeroom", ...kit.activities.flatMap((activity) => [activity.title, "Completed"])].forEach((label) => node("th", label, header));
             const body = node("tbody", undefined, table);
-            for (const student of students) {
+            for (const student of kitStudents) {
                 const row = node("tr", undefined, body);
                 node("th", student.name, row);
                 node("td", student.homeroom || "Not recorded", row);
@@ -652,6 +662,9 @@
         renderClassProgress();
     });
     studentFilter.addEventListener("input", renderClassProgress);
+    submissionStatusFilter.addEventListener("change", () => {
+        if (classData) renderSubmissions(filteredStudents());
+    });
     typingWeekFilter.addEventListener("change", () => { if (classData) renderTypingResults(filteredStudents()); });
     if (/^kit-[a-z0-9-]+$/.test(pendingLinkFilters.kit) && pendingLinkFilters.student) {
         document.getElementById("results-kit").value = pendingLinkFilters.kit;

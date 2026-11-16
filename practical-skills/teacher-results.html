@@ -121,6 +121,16 @@
         </section>
         <p>Drawing links: Saved - sync needed means the link is saved but filing is not confirmed. Submitted - synced means DTECH-HUB successfully filed the drawing in the student's DTECH folder. Completed is the separate teacher review tick. Syncing does not change Google sharing permissions.</p>
         <p>Enter feedback beside each drawing and select Save feedback. The student sees it in that drawing's activity. Feedback is separate from the Completed tick and is linked to the current drawing; save or clear it before refreshing the page.</p>
+        <div class="class-progress-filters">
+          <label class="sites-field">Submission status
+            <select id="class-submission-status-filter" aria-describedby="class-submission-status-filter-help">
+              <option value="">All submissions</option>
+              <option value="saved">Saved - sync needed</option>
+              <option value="awaiting-completion">Submitted - not ticked Completed</option>
+            </select>
+          </label>
+        </div>
+        <p id="class-submission-status-filter-help">A student is shown when any drawing in a kit matches the selected status.</p>
         <p id="submission-status" role="status" aria-live="polite"></p>
         <div id="class-submissions-host" class="class-submissions-host"></div>
       </div>

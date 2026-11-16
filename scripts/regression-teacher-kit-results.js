@@ -749,6 +749,10 @@ test("class review keeps whānau and timetable homerooms separate and combines f
 });
 
 test("submissions list follows the class filters, links drawings and saves teacher Completed ticks", async () => {
+    const reviewHtml = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "teacher-results.html"), "utf8");
+    assert.match(reviewHtml, /<select id="class-submission-status-filter" aria-describedby="class-submission-status-filter-help">/);
+    assert.match(reviewHtml, /<option value="saved">Saved - sync needed<\/option>/);
+    assert.match(reviewHtml, /<option value="awaiting-completion">Submitted - not ticked Completed<\/option>/);
     function element() {
         return {
             value: "", children: [], events: {}, textContent: "",
@@ -768,13 +772,18 @@ test("submissions list follows the class filters, links drawings and saves teach
     };
     const students = [
         { name: "Ana", email: "ana@school.nz", timetableClass: "JPI", course: "JuniorDTECH", kitProgress: {} },
-        { name: "Ben", email: "ben@school.nz", timetableClass: "JVE", course: "JuniorDTECH", kitProgress: {} }
+        { name: "Ben", email: "ben@school.nz", timetableClass: "JVE", course: "JuniorDTECH", kitProgress: {} },
+        { name: "Cara", email: "cara@school.nz", timetableClass: "JTR", course: "JuniorDTECH", kitProgress: {} }
     ];
     const kits = [{ id: "kit-login", title: "Login Kit" }, { id: "kit-google-drawings", title: "Google Drawings Kit" }];
     const drawing = "https://docs.google.com/drawings/d/ana-ship/edit";
     const submissions = { kits: [{ id: "kit-google-drawings", activities: [{ index: 0, title: "Ship" }, { index: 1, title: "TV" }],
-        students: { "ana@school.nz": { 0: { url: drawing, documentKey: "google-file:ana-ship", submittedAt: "2026-05-01T00:00:00Z", completed: false, filed: false },
-            1: { url: "", documentKey: "", submittedAt: null, completed: false } } } }] };
+        students: {
+            "ana@school.nz": { 0: { url: drawing, documentKey: "google-file:ana-ship", submittedAt: "2026-05-01T00:00:00Z", completed: false, filed: false },
+                1: { url: "", documentKey: "", submittedAt: null, completed: false } },
+            "ben@school.nz": { 0: { url: "https://docs.google.com/drawings/d/ben-ship/edit", documentKey: "google-file:ben-ship", submittedAt: "2026-05-02T00:00:00Z", completed: false, filed: true } },
+            "cara@school.nz": { 0: { url: "https://docs.google.com/drawings/d/cara-ship/edit", documentKey: "google-file:cara-ship", submittedAt: "2026-05-03T00:00:00Z", completed: true, filed: true } }
+        } }] };
     const puts = [];
     const auths = [];
     const authEvents = {};
@@ -825,6 +834,18 @@ test("submissions list follows the class filters, links drawings and saves teach
     assert.match(shipCell.children[1].textContent, /^Saved - sync needed /);
     assert.equal(rows()[0].children[4].children[0].textContent, "No link");
     assert.equal(rows()[0].children[5].children[0].children[0].disabled, true, "Nothing to tick without a link");
+    el("class-student-filter").value = "";
+    el("class-student-filter").events.input();
+    assert.deepEqual(rows().map((row) => row.children[0].textContent), ["Ana", "Ben", "Cara"]);
+    el("class-submission-status-filter").value = "saved";
+    el("class-submission-status-filter").events.change();
+    assert.deepEqual(rows().map((row) => row.children[0].textContent), ["Ana"], "Saved filter finds unsynced drawings");
+    el("class-submission-status-filter").value = "awaiting-completion";
+    el("class-submission-status-filter").events.change();
+    assert.deepEqual(rows().map((row) => row.children[0].textContent), ["Ben"],
+        "Submitted filter excludes saved links and drawings already ticked Completed");
+    el("class-submission-status-filter").value = "";
+    el("class-submission-status-filter").events.change();
     const tick = rows()[0].children[3].children[0].children[0];
     assert.equal(tick.checked, false);
     tick.checked = true;
