@@ -326,8 +326,8 @@ assert.deepEqual(scenarioParagraphs, [
   "Partway through the journey, the student decides to take a different route. Google Maps allows them to select an alternative route or stop navigation if their plans change.",
   "Consider: How do these features help the student complete their journey? How effectively does Google Maps support the needs of its users?"
 ], "Check page preserves the complete supplied Google Maps scenario and reflection");
-assert.match(checkHtml, /\.check-work-grid \{ display: grid; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/,
-  "Student answer, self-check and model answer display in three desktop columns");
+assert.match(checkHtml, /\.check-work-grid \{ display: grid; grid-template-columns: minmax\(0, 1\.5fr\) repeat\(2, minmax\(0, 1fr\)\);/,
+  "Student answer column is wider than the self-check and model answer columns");
 assert.match(checkHtml, /@media \(max-width: 900px\)[\s\S]*?\.check-work-grid \{ grid-template-columns: minmax\(0, 1fr\); \}/,
   "Three-column work area stacks on smaller screens");
 assert.match(checkHtml, /href="assessment-standard-card.html\?standard=92006"/,
