@@ -176,6 +176,26 @@ assert.match(thinkHtml, /\.think-grid \{[\s\S]*?grid-template-columns: repeat\(3
   "Think prompts form a three-column desktop grid");
 assert.match(thinkHtml, /@media \(max-width: 620px\) \{\s*\.think-grid \{ grid-template-columns: minmax\(0, 1fr\);/,
   "Think prompts stack on small screens");
+const thinkSectionOrder = [...thinkHtml.matchAll(/<section[^>]* aria-labelledby="([^"]+)"/g)].map((match) => match[1]);
+assert.deepEqual(thinkSectionOrder, [
+  "think-title", "think-concepts-title", "think-types-title", "think-example-title", "think-reflection-title"
+], "Think page places the thinking types before the worked example and reflection, in the requested image order");
+assert.match(thinkHtml, /WHAT, WHO, WHERE and WHEN<\/p>\s*<h3>Build the facts<\/h3>/);
+assert.match(thinkHtml, /WHY and HOW<\/p>\s*<h3>Develop your explanation<\/h3>/);
+const thinkExample = thinkHtml.match(/<dl class="think-example-list">([\s\S]*?)<\/dl>/)[1];
+assert.deepEqual([...thinkExample.matchAll(/<dt><span[^>]*>([^<]+)<\/span>([^<]+)<\/dt>\s*<dd>([^<]+)<\/dd>/g)]
+  .map((match) => [match[1], match[2], match[3]]), [
+  ["WHAT?", "What is the technology?", "Multi-factor authentication (MFA) is a security method that requires users to verify their identity using two or more different types of authentication factors."],
+  ["WHO?", "Who uses it or is affected?", "Teachers and staff accessing student information, as well as the students whose information is protected."],
+  ["WHERE?", "Where is it used?", "When signing into school accounts or systems containing confidential information."],
+  ["WHEN?", "When is it important?", "When someone attempts to access a protected account, particularly from an unfamiliar device."],
+  ["WHY?", "Why does it matter?", "It reduces the risk of someone accessing private information using a stolen password."],
+  ["HOW?", "How does it work?", "A user enters their password and then verifies their identity using a different factor, such as an authenticator app or security key."]
+], "Worked example preserves all six supplied MFA explanations");
+assert.match(thinkHtml, /<blockquote>Explain how multi-factor authentication works and how it could help protect a school's student information from unauthorised access\.<\/blockquote>/,
+  "Worked example includes the supplied examination question");
+assert.match(thinkHtml, /Which of your 5Ws &amp; H ideas actually help answer the examination question\?/,
+  "Reflection asks students to select relevant ideas");
 const resourceLinks = [...resourceMarkup.matchAll(/<a class="student-standard-study-link[^"]*" href="([^"]+)"([^>]+)>\s*<img src="([^"]+)"/g)];
 assert.deepEqual(resourceLinks.map((match) => match[1]), [
   "https://docs.google.com/presentation/d/1NC3TENDS_0XBDVMfFxgxdVAS2_sPn1ESp8RRP_xKYxY/edit?usp=sharing",

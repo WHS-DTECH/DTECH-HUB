@@ -87,6 +87,27 @@
         }
 
         .think-grid p { margin: 0; line-height: 1.6; }
+
+        .think-types-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+        .think-type { padding: 22px; border: 1px solid #ddcfee; border-radius: 10px; background: #f2ecff; }
+        .think-type-label { margin: 0 0 10px; color: #7346a6; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em; }
+        .think-type h3 { margin: 0 0 12px; color: #7346a6; font-size: 1.1rem; }
+        .think-type p:last-child { margin: 0; line-height: 1.7; }
+        .think-types-summary { margin: 20px 0 0; padding-top: 18px; border-top: 1px solid #ddcfee; line-height: 1.7; }
+
+        .think-example-question { margin: 0 0 22px; padding: 22px; border-left: 4px solid #7346a6; border-radius: 10px; background: #f2ecff; }
+        .think-example-question figcaption { margin-bottom: 12px; color: #7346a6; font-size: 0.8rem; font-weight: 700; }
+        .think-example-question blockquote { margin: 0; font-size: 1.1rem; line-height: 1.7; }
+        .think-example-intro { margin: 0 0 18px; line-height: 1.6; }
+        .think-example-list { display: grid; gap: 12px; margin: 0; }
+        .think-example-list > div { padding: 18px; border: 1px solid #e8def2; border-radius: 10px; background: #fbf8ff; }
+        .think-example-list dt { display: flex; align-items: center; gap: 12px; color: #7346a6; font-weight: 700; }
+        .think-example-tag { min-width: 72px; padding: 7px 10px; border-radius: 8px; background: #eee3fc; font-size: 0.8rem; text-align: center; }
+        .think-example-list dd { margin: 10px 0 0 84px; line-height: 1.7; }
+
+        .think-reflection { background: #f2ecff; border-left: 4px solid #7346a6; }
+        .think-reflection h2 { margin-bottom: 12px; }
+        .think-reflection p { margin: 0; color: #533079; font-size: 1.1rem; font-weight: 700; line-height: 1.7; }
         .think-back { display: inline-block; margin-top: 24px; color: #7346a6; font-weight: 700; }
         .think-back:focus-visible { outline: 3px solid #7346a6; outline-offset: 3px; }
 
@@ -96,6 +117,8 @@
 
         @media (max-width: 620px) {
             .think-grid { grid-template-columns: minmax(0, 1fr); }
+            .think-types-grid { grid-template-columns: minmax(0, 1fr); }
+            .think-example-list dd { margin-left: 0; }
             .think-intro, .think-concepts { padding: 18px; }
         }
     </style>
@@ -143,6 +166,60 @@
                         <p>How does it work or affect the user?</p>
                     </li>
                 </ol>
+            </section>
+            <section class="think-concepts" aria-labelledby="think-types-title">
+                <h2 id="think-types-title">Two types of thinking</h2>
+                <div class="think-types-grid">
+                    <article class="think-type">
+                        <p class="think-type-label">WHAT, WHO, WHERE and WHEN</p>
+                        <h3>Build the facts</h3>
+                        <p>These questions help you identify the technical concept, people involved, context and circumstances.</p>
+                    </article>
+                    <article class="think-type">
+                        <p class="think-type-label">WHY and HOW</p>
+                        <h3>Develop your explanation</h3>
+                        <p>These questions help you explain how technology works, why it matters and what consequences it has.</p>
+                    </article>
+                </div>
+                <p class="think-types-summary"><strong>Facts tell the reader what is happening.</strong> Explanations help the reader understand how and why.</p>
+            </section>
+            <section class="think-concepts" aria-labelledby="think-example-title">
+                <h2 id="think-example-title">THINK in action</h2>
+                <figure class="think-example-question">
+                    <figcaption>Example question &ndash; adapted from AS 91898</figcaption>
+                    <blockquote>Explain how multi-factor authentication works and how it could help protect a school's student information from unauthorised access.</blockquote>
+                </figure>
+                <p class="think-example-intro">Before writing an answer, use the 5Ws &amp; H to explore what you know about the topic.</p>
+                <dl class="think-example-list">
+                    <div>
+                        <dt><span class="think-example-tag">WHAT?</span>What is the technology?</dt>
+                        <dd>Multi-factor authentication (MFA) is a security method that requires users to verify their identity using two or more different types of authentication factors.</dd>
+                    </div>
+                    <div>
+                        <dt><span class="think-example-tag">WHO?</span>Who uses it or is affected?</dt>
+                        <dd>Teachers and staff accessing student information, as well as the students whose information is protected.</dd>
+                    </div>
+                    <div>
+                        <dt><span class="think-example-tag">WHERE?</span>Where is it used?</dt>
+                        <dd>When signing into school accounts or systems containing confidential information.</dd>
+                    </div>
+                    <div>
+                        <dt><span class="think-example-tag">WHEN?</span>When is it important?</dt>
+                        <dd>When someone attempts to access a protected account, particularly from an unfamiliar device.</dd>
+                    </div>
+                    <div>
+                        <dt><span class="think-example-tag">WHY?</span>Why does it matter?</dt>
+                        <dd>It reduces the risk of someone accessing private information using a stolen password.</dd>
+                    </div>
+                    <div>
+                        <dt><span class="think-example-tag">HOW?</span>How does it work?</dt>
+                        <dd>A user enters their password and then verifies their identity using a different factor, such as an authenticator app or security key.</dd>
+                    </div>
+                </dl>
+            </section>
+            <section class="think-concepts think-reflection" aria-labelledby="think-reflection-title">
+                <h2 id="think-reflection-title">Pause and choose</h2>
+                <p>Which of your 5Ws &amp; H ideas actually help answer the examination question?</p>
             </section>
             <a class="think-back" href="assessment-standard-card.html?standard=92006">Back to Level 1 Exam Preparation</a>
         </main>

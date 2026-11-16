@@ -77,8 +77,11 @@ distinguishes DECODE from 5Ws & H (idea development) and SEED (organisation).
 Think opens `assessment-think.html` in the same tab, using the card's lavender
 palette. Its introduction explains idea development with 5Ws & H; the six
 prompts appear in What/Who/Where/When/Why/How order in three columns on desktop,
-two on tablets and one on small screens. Both concept pages link back to the
-AS 92006 guide. Write and Check remain instructional, not links.
+two on tablets and one on small screens. Below these prompts, the teaching
+sequence is: Two types of thinking (facts versus explanations), THINK in action
+(a six-prompt MFA example adapted from AS 91898), then a reflection asking which
+ideas help answer the examination question. Both concept pages link back to
+the AS 92006 guide. Write and Check remain instructional, not links.
 
 ## 2) How Google Sign-In Is Set Up
 - Frontend uses Google Identity Services OAuth token flow.
