@@ -156,6 +156,26 @@ assert.deepEqual([...answerChecks.matchAll(/<h4>([^<]+)<\/h4><p>([^<]+)<\/p>/g)]
 ], "Model answer is checked against all four requirements");
 assert.match(decodeHtml, /DECODE is <em>not<\/em> a paragraph-writing formula\.[\s\S]*?<strong>5Ws &amp; H<\/strong> to develop your ideas and <strong>SEED<\/strong> to organise longer written responses\./,
   "Reminder distinguishes decoding from idea development and paragraph organisation");
+const thinkLink = stages[1][2].match(/<a href="([^"]+)">/);
+assert.ok(thinkLink, "Entire Think card links to its concept page");
+const thinkHtml = fs.readFileSync(path.join(root, thinkLink[1]), "utf8");
+const thinkPrompts = [...thinkHtml.matchAll(/<li>\s*<h3><span[^>]*>\d<\/span>([^<]+)<\/h3>\s*<p>([^<]+)<\/p>/g)];
+assert.deepEqual(thinkPrompts.map((prompt) => [prompt[1], prompt[2]]), [
+  ["What?", "What is the technical concept or principle?"],
+  ["Who?", "Who uses it or is affected by it?"],
+  ["Where?", "Where is it used or applied?"],
+  ["When?", "When does it become important?"],
+  ["Why?", "Why does it matter to the user?"],
+  ["How?", "How does it work or affect the user?"]
+], "Think page preserves the six supplied questions in order");
+assert.ok(thinkHtml.includes("Before writing your answer, use <strong>Who, What, Where, When, Why and How</strong> to explore your technical knowledge and develop your ideas. These questions help you identify relevant examples, explain how technology works and consider its effects on users."),
+  "Think page includes the complete supplied introduction");
+assert.match(thinkHtml, /href="assessment-standard-card.html\?standard=92006"/,
+  "Think page returns to the Level 1 standard");
+assert.match(thinkHtml, /\.think-grid \{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/,
+  "Think prompts form a three-column desktop grid");
+assert.match(thinkHtml, /@media \(max-width: 620px\) \{\s*\.think-grid \{ grid-template-columns: minmax\(0, 1fr\);/,
+  "Think prompts stack on small screens");
 const resourceLinks = [...resourceMarkup.matchAll(/<a class="student-standard-study-link[^"]*" href="([^"]+)"([^>]+)>\s*<img src="([^"]+)"/g)];
 assert.deepEqual(resourceLinks.map((match) => match[1]), [
   "https://docs.google.com/presentation/d/1NC3TENDS_0XBDVMfFxgxdVAS2_sPn1ESp8RRP_xKYxY/edit?usp=sharing",

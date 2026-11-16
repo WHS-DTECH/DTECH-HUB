@@ -74,8 +74,11 @@ and check it against Action/Quantity/Context/Detail. The question and breakdown
 sit side by side on desktop and stack on tablets and small screens; the final
 checks use two columns on larger screens and one on mobile. The reminder
 distinguishes DECODE from 5Ws & H (idea development) and SEED (organisation).
-The page links back to the AS 92006 guide. The other answering cards remain
-instructional, not links.
+Think opens `assessment-think.html` in the same tab, using the card's lavender
+palette. Its introduction explains idea development with 5Ws & H; the six
+prompts appear in What/Who/Where/When/Why/How order in three columns on desktop,
+two on tablets and one on small screens. Both concept pages link back to the
+AS 92006 guide. Write and Check remain instructional, not links.
 
 ## 2) How Google Sign-In Is Set Up
 - Frontend uses Google Identity Services OAuth token flow.
