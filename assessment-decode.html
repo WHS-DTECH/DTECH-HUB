@@ -151,6 +151,31 @@
         .decode-checklist h4 { margin: 0 0 6px; color: #1d5e9f; font-size: 1rem; }
         .decode-checklist p { margin: 0; line-height: 1.6; }
 
+        .decode-practice-question { margin-top: 24px; }
+        .decode-practice-question blockquote { font-size: 1rem; }
+        .decode-practice-intro { margin: 0 0 16px; line-height: 1.6; }
+        .decode-practice-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+        .decode-practice-field { min-width: 0; }
+        .decode-practice-field label { display: block; margin-bottom: 8px; color: #1d5e9f; font-weight: 700; }
+        .decode-practice-field p { margin: 0 0 8px; font-size: 0.9rem; line-height: 1.5; }
+        .decode-practice-field textarea { display: block; width: 100%; min-height: 84px; padding: 12px; border: 1px solid #c9d9ec; border-radius: 8px; color: #334155; font: inherit; line-height: 1.5; resize: vertical; }
+        .decode-practice-field textarea:focus-visible,
+        .decode-model-disclosure summary:focus-visible { outline: 3px solid #1d5e9f; outline-offset: 3px; }
+        .decode-model-disclosure { margin-top: 16px; }
+        .decode-model-disclosure summary { position: relative; padding: 14px 18px; border: 1px solid #c9d9ec; border-radius: 10px; background: #eaf4ff; color: #174b80; font-weight: 700; text-align: center; list-style: none; cursor: pointer; }
+        .decode-model-disclosure summary::-webkit-details-marker { display: none; }
+        .decode-model-disclosure summary::after { display: inline-block; width: 8px; height: 8px; margin-left: 10px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; content: ""; transform: translateY(-2px) rotate(45deg); }
+        .decode-model-disclosure[open] summary::after { transform: translateY(2px) rotate(225deg); }
+        .decode-model-disclosure[open] summary { border-radius: 10px 10px 0 0; }
+        .decode-model-content { padding: 20px; border: 1px solid #c9d9ec; border-top: 0; border-radius: 0 0 10px 10px; background: #fff; }
+        .decode-model-content h4 { margin: 0 0 14px; color: #1d5e9f; font-size: 1.1rem; }
+        .decode-model-breakdown { display: grid; gap: 12px; }
+        .decode-model-breakdown article { padding: 16px; border: 1px solid #dce8f5; border-radius: 10px; background: #f7fbff; }
+        .decode-model-breakdown h5 { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; color: #174b80; font-size: 0.98rem; }
+        .decode-model-breakdown p { margin: 0; line-height: 1.6; }
+        .decode-model-breakdown p + p { margin-top: 8px; }
+        .decode-written-model { margin-top: 24px; padding-top: 24px; border-top: 1px solid #dce8f5; }
+
         .decode-remember {
             display: flex;
             align-items: start;
@@ -178,8 +203,9 @@
         @media (max-width: 620px) {
             .decode-grid { grid-template-columns: 1fr; }
             .decode-checklist { grid-template-columns: minmax(0, 1fr); }
+            .decode-practice-fields { grid-template-columns: minmax(0, 1fr); }
             .decode-intro, .decode-concepts { padding: 18px; }
-            .decode-answer { padding: 18px; }
+            .decode-answer, .decode-model-content { padding: 18px; }
         }
     </style>
 </head>
@@ -220,7 +246,7 @@
                 </ol>
             </section>
             <section class="decode-concepts" aria-labelledby="decode-example-title">
-                <h2 id="decode-example-title">DECODE &ndash; Model Answer</h2>
+                <h2 id="decode-example-title">DECODE &ndash; Worked Example and Practice</h2>
                 <article class="decode-model-step" aria-labelledby="decode-step-one">
                     <h3 class="decode-step-heading" id="decode-step-one"><span class="decode-number" aria-hidden="true">1</span>DECODE the question</h3>
                     <div class="decode-example-grid">
@@ -253,15 +279,7 @@
                     </div>
                 </article>
                 <article class="decode-model-step" aria-labelledby="decode-step-two">
-                    <h3 class="decode-step-heading" id="decode-step-two"><span class="decode-number" aria-hidden="true">2</span>Write the model answer</h3>
-                    <div class="decode-answer">
-                        <p>Nielsen's Error prevention heuristic means designing an interface to stop users from making mistakes before they happen.</p>
-                        <p>For example, an online appointment booking system could grey out dates that are unavailable, preventing users from selecting them.</p>
-                        <p>This reduces user errors because people can only select available appointments, avoiding incorrect bookings and saving time correcting mistakes.</p>
-                    </div>
-                </article>
-                <article class="decode-model-step" aria-labelledby="decode-step-three">
-                    <h3 class="decode-step-heading" id="decode-step-three"><span class="decode-number" aria-hidden="true">3</span>Check the answer against DECODE</h3>
+                    <h3 class="decode-step-heading" id="decode-step-two"><span class="decode-number" aria-hidden="true">2</span>Check the answer against DECODE</h3>
                     <ul class="decode-checklist" role="list">
                         <li>
                             <span class="decode-check-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"></path></svg></span>
@@ -280,6 +298,73 @@
                             <div><h4>Detail</h4><p>Explains what the principle means, how it is applied and why it helps users.</p></div>
                         </li>
                     </ul>
+                </article>
+                <article class="decode-model-step" aria-labelledby="decode-practice-title">
+                    <h3 class="decode-step-heading" id="decode-practice-title"><span class="decode-number" aria-hidden="true">3</span>Your Turn &ndash; DECODE</h3>
+                    <p class="decode-practice-intro">Read the question carefully. Identify the four requirements before looking at the model answer.</p>
+                    <figure class="decode-question decode-practice-question">
+                        <figcaption>Examination-style question</figcaption>
+                        <blockquote>Describe Nielsen's Error prevention heuristic. Give ONE specific example of how it could be applied in an interface and describe how it reduces the chance of user error.</blockquote>
+                    </figure>
+                    <div class="decode-practice-fields">
+                        <div class="decode-practice-field">
+                            <label for="decode-practice-action">1. Action</label>
+                            <p>What are you being asked to do?</p>
+                            <textarea id="decode-practice-action" name="decode-practice-action" placeholder="Write what you've identified..."></textarea>
+                        </div>
+                        <div class="decode-practice-field">
+                            <label for="decode-practice-quantity">2. Quantity</label>
+                            <p>How many things must you provide?</p>
+                            <textarea id="decode-practice-quantity" name="decode-practice-quantity" placeholder="Write what you've identified..."></textarea>
+                        </div>
+                        <div class="decode-practice-field">
+                            <label for="decode-practice-context">3. Context</label>
+                            <p>What must your answer refer to?</p>
+                            <textarea id="decode-practice-context" name="decode-practice-context" placeholder="Write what you've identified..."></textarea>
+                        </div>
+                        <div class="decode-practice-field">
+                            <label for="decode-practice-detail">4. Detail</label>
+                            <p>What information must you include?</p>
+                            <textarea id="decode-practice-detail" name="decode-practice-detail" placeholder="Write what you've identified..."></textarea>
+                        </div>
+                    </div>
+                    <details class="decode-model-disclosure">
+                        <summary>Compare with model answers</summary>
+                        <div class="decode-model-content">
+                            <section id="decode-hidden-breakdown" aria-labelledby="decode-hidden-breakdown-title">
+                                <h4 id="decode-hidden-breakdown-title">Model Answer &ndash; DECODE Breakdown</h4>
+                                <div class="decode-model-breakdown">
+                                    <article>
+                                        <h5><span class="decode-number" aria-hidden="true">1</span>ACTION &ndash; Describe, Give, Describe</h5>
+                                        <p>The answer performs three actions: it describes the principle, gives an example and describes how the example reduces errors.</p>
+                                    </article>
+                                    <article>
+                                        <h5><span class="decode-number" aria-hidden="true">2</span>QUANTITY &ndash; ONE example</h5>
+                                        <p>&ldquo;For example, an online appointment booking system could grey out dates that are unavailable...&rdquo;</p>
+                                        <p>Only one interface example is provided, as requested.</p>
+                                    </article>
+                                    <article>
+                                        <h5><span class="decode-number" aria-hidden="true">3</span>CONTEXT &ndash; Error prevention in an interface</h5>
+                                        <p>&ldquo;...grey out dates that are unavailable, preventing users from selecting them.&rdquo;</p>
+                                        <p>The example demonstrates how Nielsen's heuristic is applied in a human-computer interface.</p>
+                                    </article>
+                                    <article>
+                                        <h5><span class="decode-number" aria-hidden="true">4</span>DETAIL &ndash; Explain how errors are reduced</h5>
+                                        <p>&ldquo;This reduces user errors because people can only select available appointments, avoiding incorrect bookings and saving time correcting mistakes.&rdquo;</p>
+                                        <p>The answer explains the effect of the feature rather than simply naming it.</p>
+                                    </article>
+                                </div>
+                            </section>
+                            <section class="decode-written-model" aria-labelledby="decode-written-model-title">
+                                <h4 id="decode-written-model-title">Write the model answer</h4>
+                                <div class="decode-answer">
+                                    <p>Nielsen's Error prevention heuristic means designing an interface to stop users from making mistakes before they happen.</p>
+                                    <p>For example, an online appointment booking system could grey out dates that are unavailable, preventing users from selecting them.</p>
+                                    <p>This reduces user errors because people can only select available appointments, avoiding incorrect bookings and saving time correcting mistakes.</p>
+                                </div>
+                            </section>
+                        </div>
+                    </details>
                 </article>
                 <aside class="decode-remember" aria-label="Remember">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 18h6m-5 3h4M8 14a6 6 0 1 1 8 0c-1 1-1 2-1 4H9c0-2 0-3-1-4Z"></path></svg>

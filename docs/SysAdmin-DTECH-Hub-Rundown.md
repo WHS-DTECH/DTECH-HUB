@@ -68,12 +68,14 @@ The slideshow and PDF pictures open their original Google Slides/Drive resources
 in a new tab. Decode opens `assessment-decode.html` in the same tab, using the
 same pastel blue palette. Its Action, Quantity, Context and Detail prompts
 appear in four columns on desktop, two on tablets and one on small screens.
-Its model-answer walkthrough has three numbered steps: decode the highlighted
-Nielsen error-prevention question, read the appointment-booking model answer,
-and check it against Action/Quantity/Context/Detail. The question and breakdown
-sit side by side on desktop and stack on tablets and small screens; the final
-checks use two columns on larger screens and one on mobile. The reminder
-distinguishes DECODE from 5Ws & H (idea development) and SEED (organisation).
+Its worked example decodes the highlighted Nielsen error-prevention question,
+then checks the answer against Action/Quantity/Context/Detail. A "Your Turn"
+practice activity provides four response fields. The model stays hidden until
+students choose to compare; it first shows the four-part DECODE breakdown, then
+the complete appointment-booking answer. The question and breakdown sit side by
+side on desktop and stack on tablets and small screens; the practice fields use
+two columns on larger screens and one on mobile. The reminder distinguishes
+DECODE from 5Ws & H (idea development) and SEED (organisation).
 Think opens `assessment-think.html` in the same tab, using the card's lavender
 palette. Its introduction explains idea development with 5Ws & H; the six
 prompts appear in What/Who/Where/When/Why/How order in three columns on desktop,

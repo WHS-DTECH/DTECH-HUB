@@ -139,21 +139,48 @@ assert.deepEqual([...breakdown.matchAll(/<dt>[\s\S]*?<\/span>([^<]+)<\/dt>\s*<dd
 assert.match(decodeHtml, /<strong class="decode-remember-title">Remember<\/strong> DECODE helps you work out what to include in your answer before you start writing\./,
   "Worked example retains the planning reminder");
 assert.deepEqual([...decodeHtml.matchAll(/<h3 class="decode-step-heading"[^>]*><span[^>]*>\d<\/span>([^<]+)<\/h3>/g)]
-  .map((match) => match[1]), ["DECODE the question", "Write the model answer", "Check the answer against DECODE"],
-  "Model answer follows the three supplied steps");
-const modelAnswer = decodeHtml.match(/<div class="decode-answer">([\s\S]*?)<\/div>/)[1];
+  .map((match) => match[1]), ["DECODE the question", "Check the answer against DECODE", "Your Turn &ndash; DECODE"],
+  "Worked example is followed by the DECODE self-check and student practice in order");
+assert.ok(decodeHtml.indexOf('<h3 class="decode-step-heading" id="decode-step-one"') <
+  decodeHtml.indexOf('<h3 class="decode-step-heading" id="decode-step-two"'),
+  "DECODE self-check follows the worked question breakdown");
+const practiceFields = [...decodeHtml.matchAll(/<label for="decode-practice-(action|quantity|context|detail)">([^<]+)<\/label>/g)]
+  .map((match) => [match[1], match[2]]);
+assert.deepEqual(practiceFields, [
+  ["action", "1. Action"],
+  ["quantity", "2. Quantity"],
+  ["context", "3. Context"],
+  ["detail", "4. Detail"]
+], "Your Turn provides four labelled answer fields in DECODE order");
+const hiddenModel = decodeHtml.match(/<details class="decode-model-disclosure">([\s\S]*?)<\/details>/)[1];
+assert.match(hiddenModel, /^\s*<summary>Compare with model answers<\/summary>/,
+  "Practice model is hidden behind the requested disclosure control");
+assert.ok(hiddenModel.indexOf('id="decode-hidden-breakdown"') < hiddenModel.indexOf('class="decode-written-model"'),
+  "Hidden model presents the DECODE breakdown before the written answer");
+const modelBreakdown = hiddenModel.match(/<div class="decode-model-breakdown">([\s\S]*?)<\/div>\s*<\/section>/)[1];
+assert.deepEqual([...modelBreakdown.matchAll(/<h5>[\s\S]*?<\/span>([^<]+)<\/h5>/g)].map((match) => match[1]), [
+  "ACTION &ndash; Describe, Give, Describe",
+  "QUANTITY &ndash; ONE example",
+  "CONTEXT &ndash; Error prevention in an interface",
+  "DETAIL &ndash; Explain how errors are reduced"
+], "Hidden DECODE model breaks the question into the four supplied requirements");
+const modelAnswer = hiddenModel.match(/<div class="decode-answer">([\s\S]*?)<\/div>/)[1];
 assert.deepEqual([...modelAnswer.matchAll(/<p>([^<]+)<\/p>/g)].map((match) => match[1]), [
   "Nielsen's Error prevention heuristic means designing an interface to stop users from making mistakes before they happen.",
   "For example, an online appointment booking system could grey out dates that are unavailable, preventing users from selecting them.",
   "This reduces user errors because people can only select available appointments, avoiding incorrect bookings and saving time correcting mistakes."
-], "Complete model answer preserves all three supplied paragraphs");
+], "Hidden written model answer preserves all three supplied paragraphs after its breakdown");
 const answerChecks = decodeHtml.match(/<ul class="decode-checklist"[^>]*>([\s\S]*?)<\/ul>/)[1];
 assert.deepEqual([...answerChecks.matchAll(/<h4>([^<]+)<\/h4><p>([^<]+)<\/p>/g)].map((match) => [match[1], match[2]]), [
   ["Action", "Describes the principle and explains how it reduces errors."],
   ["Quantity", "Provides exactly ONE example."],
   ["Context", "Uses error prevention in an appointment booking interface."],
   ["Detail", "Explains what the principle means, how it is applied and why it helps users."]
-], "Model answer is checked against all four requirements");
+], "DECODE self-check provides the four supplied criteria before the hidden model");
+assert.match(decodeHtml, /\.decode-practice-fields \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+assert.match(decodeHtml, /\.decode-model-disclosure summary:[\s\S]*?focus-visible/);
+assert.match(decodeHtml, /@media \(max-width: 620px\) \{[\s\S]*?\.decode-practice-fields \{ grid-template-columns: minmax\(0, 1fr\);/,
+  "Practice fields stack on small screens");
 assert.match(decodeHtml, /DECODE is <em>not<\/em> a paragraph-writing formula\.[\s\S]*?<strong>5Ws &amp; H<\/strong> to develop your ideas and <strong>SEED<\/strong> to organise longer written responses\./,
   "Reminder distinguishes decoding from idea development and paragraph organisation");
 const thinkLink = stages[1][2].match(/<a href="([^"]+)">/);
