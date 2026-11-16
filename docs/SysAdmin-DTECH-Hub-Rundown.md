@@ -90,7 +90,10 @@ or Expand), peach (Example or Evidence), and mint (Discuss or Depth) colours.
 The CrowdCare worked example is followed by a model with prominent letter badges
 and full labels, then one continuous colour-coded paragraph with a matching key
 and screen-reader labels. All three concept pages link back to the AS 92006
-guide. Check remains instructional, not a link.
+guide. Check opens `assessment-check.html` in the same tab, using the card's
+mint palette. The page has a linked DECODE/THINK/WRITE/CHECK process ribbon, the
+AS 92006 Part C question and a checklist of its requirements, followed by the
+Google Maps practice scenario and its reflection question.
 
 ## 2) How Google Sign-In Is Set Up
 - Frontend uses Google Identity Services OAuth token flow.

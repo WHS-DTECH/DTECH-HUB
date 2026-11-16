@@ -240,6 +240,50 @@ assert.deepEqual(highlights.map((match) => match[3]), seedModelText,
   "Colour coding preserves the complete continuous model paragraph");
 assert.match(writeHtml, /href="assessment-standard-card.html\?standard=92006"/,
   "Write page returns to the Level 1 standard");
+const checkLink = stages[3][2].match(/<a href="([^"]+)">/);
+assert.ok(checkLink, "Entire Check card links to its concept page");
+const checkHtml = fs.readFileSync(path.join(root, checkLink[1]), "utf8");
+assert.match(checkHtml, /<h1 id="check-title">CHECK &ndash; Answer the Question\?<\/h1>/,
+  "Check page has the requested heading");
+assert.deepEqual([...checkHtml.matchAll(/<li><a class="(decode|think|write)" href="([^"]+)"><strong>([^<]+)<\/strong><small>([^<]+)<\/small><\/a><\/li>/g)]
+  .map((match) => [match[1], match[2], match[3], match[4]]), [
+  ["decode", "assessment-decode.html", "DECODE", "Requirements"],
+  ["think", "assessment-think.html", "THINK", "Ideas"],
+  ["write", "assessment-write.html", "WRITE", "Response"]
+], "Check page links back through the first three steps in the supplied answer-process order");
+assert.match(checkHtml, /<span class="check" aria-current="step"><strong>CHECK<\/strong><small>Evidence<\/small><\/span>/,
+  "Answer-process ribbon marks Check as the current step");
+assert.match(checkHtml, /Bring everything together! Use <strong>DECODE, THINK and WRITE<\/strong> to develop an examination answer, then <strong>CHECK<\/strong> that you have answered every part of the question with accurate technical explanations, relevant examples and clear reasoning\./,
+  "Check page preserves its supplied introduction");
+const checkQuestion = checkHtml.match(/<figure class="check-question">([\s\S]*?)<\/figure>/)[1];
+assert.match(checkQuestion, /Example question &ndash; AS 92006, Part C/);
+assert.match(checkQuestion, /Name ONE sufficiently complex interface that is commonly used or easily recognisable and that you studied before this assessment\. State the purpose of the interface\./);
+assert.match(checkQuestion, /Explain how effectively TWO different usability principles have been applied in the interface\./);
+assert.deepEqual([...checkQuestion.matchAll(/<li>([^<]+)<\/li>/g)].map((match) => match[1]), [
+  "Identify a specific interface feature.",
+  "Explain how the feature applies the principle.",
+  "Explain how it affects the interface's ability to achieve its purpose."
+], "AS 92006 Part C retains each of its three per-principle requirements");
+assert.deepEqual([...checkHtml.matchAll(/<li><svg[\s\S]*?<\/svg><p>([^<]+)<\/p><\/li>/g)].map((match) => match[1]), [
+  "Named one sufficiently complex, familiar interface and stated its purpose.",
+  "Explained how effectively two different usability principles are applied.",
+  "For each principle, identified a specific feature and explained how it applies.",
+  "Explained how each feature affects the interface's ability to achieve its purpose."
+], "Part C self-check covers the task's required outcomes");
+const checkScenario = checkHtml.match(/<div class="check-scenario">([\s\S]*?)<\/div>/)[1];
+const scenarioParagraphs = [...checkScenario.matchAll(/<p(?: class="check-consider")?>([\s\S]*?)<\/p>/g)]
+  .map((match) => match[1].replace(/<[^>]+>/g, "").trim());
+assert.deepEqual(scenarioParagraphs, [
+  "A student is travelling from Hokitika to Greymouth for a sports event. They use Google Maps to find the venue, plan their journey and navigate to their destination.",
+  "After entering the destination, Google Maps displays possible routes, estimated travel times and distances. The student selects a route and starts navigation.",
+  "During the journey, Google Maps displays their current location, upcoming turns and estimated arrival time. The student can follow their progress on the map as they travel.",
+  "Partway through the journey, the student decides to take a different route. Google Maps allows them to select an alternative route or stop navigation if their plans change.",
+  "Consider: How do these features help the student complete their journey? How effectively does Google Maps support the needs of its users?"
+], "Check page preserves the complete supplied Google Maps scenario and reflection");
+assert.match(checkHtml, /@media \(max-width: 700px\)[\s\S]*?\.check-journey \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}[\s\S]*?\.check-list \{ grid-template-columns: minmax\(0, 1fr\); \}/,
+  "Process navigation and checklist adapt to smaller screens");
+assert.match(checkHtml, /href="assessment-standard-card.html\?standard=92006"/,
+  "Check page returns to the Level 1 standard");
 const resourceLinks = [...resourceMarkup.matchAll(/<a class="student-standard-study-link[^"]*" href="([^"]+)"([^>]+)>\s*<img src="([^"]+)"/g)];
 assert.deepEqual(resourceLinks.map((match) => match[1]), [
   "https://docs.google.com/presentation/d/1NC3TENDS_0XBDVMfFxgxdVAS2_sPn1ESp8RRP_xKYxY/edit?usp=sharing",
