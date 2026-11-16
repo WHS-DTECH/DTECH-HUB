@@ -92,8 +92,9 @@ and full labels, then one continuous colour-coded paragraph with a matching key
 and screen-reader labels. All three concept pages link back to the AS 92006
 guide. Check opens `assessment-check.html` in the same tab, using the card's
 mint palette. The page has a linked DECODE/THINK/WRITE/CHECK process ribbon, the
-AS 92006 Part C question and a checklist of its requirements, followed by the
-Google Maps practice scenario and its reflection question.
+AS 92006 Part C question, the Google Maps practice scenario, and a responsive
+three-column workspace for the student's written answer, a seven-item
+interactive self-check, and a model answer revealed on demand.
 
 ## 2) How Google Sign-In Is Set Up
 - Frontend uses Google Identity Services OAuth token flow.

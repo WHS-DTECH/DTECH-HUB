@@ -264,12 +264,31 @@ assert.deepEqual([...checkQuestion.matchAll(/<li>([^<]+)<\/li>/g)].map((match) =
   "Explain how the feature applies the principle.",
   "Explain how it affects the interface's ability to achieve its purpose."
 ], "AS 92006 Part C retains each of its three per-principle requirements");
-assert.deepEqual([...checkHtml.matchAll(/<li><svg[\s\S]*?<\/svg><p>([^<]+)<\/p><\/li>/g)].map((match) => match[1]), [
-  "Named one sufficiently complex, familiar interface and stated its purpose.",
-  "Explained how effectively two different usability principles are applied.",
-  "For each principle, identified a specific feature and explained how it applies.",
-  "Explained how each feature affects the interface's ability to achieve its purpose."
-], "Part C self-check covers the task's required outcomes");
+assert.match(checkHtml, /<section class="check-work-grid" aria-label="Write and check your answer">/,
+  "Answer-writing, self-check and model answer share the three-column work area");
+assert.match(checkHtml, /<textarea class="check-answer-input" id="student-answer" name="student-answer" placeholder="Write your response here\.\.\."><\/textarea>/,
+  "Students have a dedicated written-answer area");
+assert.deepEqual([...checkHtml.matchAll(/<li><label><input type="checkbox"><span>([^<]+)<\/span><\/label><\/li>/g)].map((match) => match[1]), [
+  "I named ONE interface and stated its purpose.",
+  "I identified TWO different usability principles.",
+  "I identified a specific feature for EACH principle.",
+  "I explained HOW each feature applies its principle.",
+  "I explained WHY each feature helps the interface achieve its purpose.",
+  "I examined HOW EFFECTIVELY both principles are applied.",
+  "My technical explanations are accurate and supported by relevant examples."
+], "Student self-check contains all seven supplied criteria");
+assert.match(checkHtml, /<details class="check-model">\s*<summary>Reveal model answer<\/summary>/,
+  "Model answer is hidden in a native disclosure until requested");
+assert.match(checkHtml, /Usability Principle 1 &ndash; Visibility of system status/);
+assert.match(checkHtml, /Usability Principle 2 &ndash; User control and freedom/);
+assert.equal([...checkHtml.matchAll(/<p class="seed-statement">/g)].length, 2);
+assert.equal([...checkHtml.matchAll(/<p class="seed-explain">/g)].length, 2);
+assert.equal([...checkHtml.matchAll(/<p class="seed-evidence">/g)].length, 2);
+assert.equal([...checkHtml.matchAll(/<p class="seed-discuss">/g)].length, 2);
+assert.match(checkHtml, /<button class="check-reset" id="check-reset" type="button">Reset checklist<\/button>/,
+  "Student self-check can be reset");
+assert.match(checkHtml, /checkedCount\} of \$\{selfCheckBoxes\.length\} checked/,
+  "Student self-check reports the number of criteria checked");
 const checkScenario = checkHtml.match(/<div class="check-scenario">([\s\S]*?)<\/div>/)[1];
 const scenarioParagraphs = [...checkScenario.matchAll(/<p(?: class="check-consider")?>([\s\S]*?)<\/p>/g)]
   .map((match) => match[1].replace(/<[^>]+>/g, "").trim());
@@ -280,8 +299,10 @@ assert.deepEqual(scenarioParagraphs, [
   "Partway through the journey, the student decides to take a different route. Google Maps allows them to select an alternative route or stop navigation if their plans change.",
   "Consider: How do these features help the student complete their journey? How effectively does Google Maps support the needs of its users?"
 ], "Check page preserves the complete supplied Google Maps scenario and reflection");
-assert.match(checkHtml, /@media \(max-width: 700px\)[\s\S]*?\.check-journey \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}[\s\S]*?\.check-list \{ grid-template-columns: minmax\(0, 1fr\); \}/,
-  "Process navigation and checklist adapt to smaller screens");
+assert.match(checkHtml, /\.check-work-grid \{ display: grid; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/,
+  "Student answer, self-check and model answer display in three desktop columns");
+assert.match(checkHtml, /@media \(max-width: 900px\)[\s\S]*?\.check-work-grid \{ grid-template-columns: minmax\(0, 1fr\); \}/,
+  "Three-column work area stacks on smaller screens");
 assert.match(checkHtml, /href="assessment-standard-card.html\?standard=92006"/,
   "Check page returns to the Level 1 standard");
 const resourceLinks = [...resourceMarkup.matchAll(/<a class="student-standard-study-link[^"]*" href="([^"]+)"([^>]+)>\s*<img src="([^"]+)"/g)];

@@ -71,20 +71,45 @@
         .check-consider { margin-top: 20px !important; padding: 16px; border-radius: 9px; background: #e8f7ef; }
         .check-consider strong { color: #24734b; }
 
-        .check-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
-        .check-list li { display: flex; align-items: start; gap: 12px; min-width: 0; padding: 16px; border: 1px solid #d5e9dd; border-radius: 10px; background: #f7fcf9; }
-        .check-list svg { width: 22px; height: 22px; flex-shrink: 0; color: #24734b; }
-        .check-list p { margin: 0; line-height: 1.6; }
+        .check-work-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 24px; align-items: start; }
+        .check-work-panel { min-width: 0; padding: 20px; border: 1px solid #bbdccb; border-radius: 12px; background: #fff; }
+        .check-work-panel h2 { margin: 0 0 12px; color: #24734b; font-size: 1.15rem; }
+        .check-work-panel > p { margin: 0 0 14px; line-height: 1.6; }
+        .check-answer-label { display: block; margin-bottom: 8px; font-weight: 700; }
+        .check-answer-input { display: block; width: 100%; min-height: 420px; padding: 12px; border: 1px solid #aacbb8; border-radius: 8px; color: #334155; font: inherit; line-height: 1.6; resize: vertical; }
+        .check-answer-input:focus-visible, .check-reset:focus-visible, .check-model summary:focus-visible { outline: 3px solid #24734b; outline-offset: 3px; }
+        .check-self-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+        .check-self-list label { display: flex; align-items: start; gap: 10px; padding: 10px; border: 1px solid #d5e9dd; border-radius: 8px; background: #f7fcf9; line-height: 1.5; cursor: pointer; }
+        .check-self-list input { flex: 0 0 auto; width: 18px; height: 18px; margin: 2px 0 0; accent-color: #24734b; }
+        .check-self-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; }
+        .check-progress { margin: 0; color: #526457; font-size: 0.9rem; }
+        .check-reset { padding: 8px 12px; border: 1px solid #8caf9a; border-radius: 8px; background: #fff; color: #24734b; font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+        .check-model { border: 1px solid #bbdccb; border-radius: 9px; background: #f7fcf9; }
+        .check-model summary { padding: 12px; border-radius: 9px; color: #24734b; font-weight: 700; cursor: pointer; }
+        .check-model[open] summary { border-bottom: 1px solid #d5e9dd; border-radius: 9px 9px 0 0; background: #e8f7ef; }
+        .check-model-content { display: grid; gap: 12px; padding: 12px; }
+        .check-model-content > p { margin: 0; line-height: 1.6; }
+        .check-model-principle { display: grid; gap: 8px; padding: 12px; border: 1px solid #d5e9dd; border-radius: 8px; background: #fff; line-height: 1.6; }
+        .check-model-principle h3 { margin: 0 0 2px; color: #24734b; font-size: 1rem; }
+        .check-model-principle p { margin: 0; padding: 10px; border: 1px solid transparent; border-radius: 7px; }
+        .check-model-principle p.seed-statement { border-color: #b5cfea; background: #eaf4ff; color: #1d5e9f; }
+        .check-model-principle p.seed-explain { border-color: #ddcfee; background: #f2ecff; color: #7346a6; }
+        .check-model-principle p.seed-evidence { border-color: #edceb8; background: #fff0e5; color: #a64c16; }
+        .check-model-principle p.seed-discuss { border-color: #bbdccb; background: #e8f7ef; color: #24734b; }
         .check-back { display: inline-block; margin-top: 24px; color: #24734b; font-weight: 700; }
         .check-back:focus-visible { outline: 3px solid #24734b; outline-offset: 3px; }
 
+        @media (max-width: 900px) {
+            .check-work-grid { grid-template-columns: minmax(0, 1fr); }
+            .check-answer-input { min-height: 280px; }
+        }
+
         @media (max-width: 700px) {
             .check-journey { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .check-list { grid-template-columns: minmax(0, 1fr); }
         }
 
         @media (max-width: 620px) {
-            .check-intro, .check-panel { padding: 18px; }
+            .check-intro, .check-panel, .check-work-panel { padding: 18px; }
             .check-question, .check-scenario { padding: 16px; }
         }
     </style>
@@ -125,15 +150,6 @@
                         <li>Explain how it affects the interface's ability to achieve its purpose.</li>
                     </ul>
                 </figure>
-                <section class="check-panel" aria-labelledby="checklist-title">
-                    <h3 id="checklist-title">Before you finish, check that you have:</h3>
-                    <ul class="check-list" role="list">
-                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg><p>Named one sufficiently complex, familiar interface and stated its purpose.</p></li>
-                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg><p>Explained how effectively two different usability principles are applied.</p></li>
-                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg><p>For each principle, identified a specific feature and explained how it applies.</p></li>
-                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg><p>Explained how each feature affects the interface's ability to achieve its purpose.</p></li>
-                    </ul>
-                </section>
             </section>
             <section class="check-panel" aria-labelledby="check-scenario-title">
                 <h2 id="check-scenario-title">Practice: Google Maps</h2>
@@ -146,10 +162,73 @@
                     <p class="check-consider"><strong>Consider:</strong> How do these features help the student complete their journey? How effectively does Google Maps support the needs of its users?</p>
                 </div>
             </section>
+            <section class="check-work-grid" aria-label="Write and check your answer">
+                <article class="check-work-panel" aria-labelledby="student-answer-title">
+                    <h2 id="student-answer-title">Your written answer</h2>
+                    <p>Write your response to the AS 92006 question using the Google Maps practice context.</p>
+                    <label class="check-answer-label" for="student-answer">Student answer</label>
+                    <textarea class="check-answer-input" id="student-answer" name="student-answer" placeholder="Write your response here..."></textarea>
+                </article>
+                <article class="check-work-panel" aria-labelledby="student-self-check-title">
+                    <h2 id="student-self-check-title">Student self-check</h2>
+                    <p>Tick each statement only if you can identify where you demonstrated it in your answer.</p>
+                    <ul class="check-self-list" role="list">
+                        <li><label><input type="checkbox"><span>I named ONE interface and stated its purpose.</span></label></li>
+                        <li><label><input type="checkbox"><span>I identified TWO different usability principles.</span></label></li>
+                        <li><label><input type="checkbox"><span>I identified a specific feature for EACH principle.</span></label></li>
+                        <li><label><input type="checkbox"><span>I explained HOW each feature applies its principle.</span></label></li>
+                        <li><label><input type="checkbox"><span>I explained WHY each feature helps the interface achieve its purpose.</span></label></li>
+                        <li><label><input type="checkbox"><span>I examined HOW EFFECTIVELY both principles are applied.</span></label></li>
+                        <li><label><input type="checkbox"><span>My technical explanations are accurate and supported by relevant examples.</span></label></li>
+                    </ul>
+                    <div class="check-self-footer">
+                        <p class="check-progress" id="check-progress" role="status" aria-live="polite">0 of 7 checked</p>
+                        <button class="check-reset" id="check-reset" type="button">Reset checklist</button>
+                    </div>
+                </article>
+                <article class="check-work-panel" aria-labelledby="model-answer-title">
+                    <h2 id="model-answer-title">Model answer</h2>
+                    <p>Compare your answer with the example. Notice how the 5Ws &amp; H develop ideas and SEED builds each technical explanation.</p>
+                    <details class="check-model">
+                        <summary>Reveal model answer</summary>
+                        <div class="check-model-content">
+                            <p><strong>Interface:</strong> Google Maps</p>
+                            <p><strong>Purpose:</strong> To help users find locations, plan routes and navigate to destinations.</p>
+                            <section class="check-model-principle">
+                                <h3>Usability Principle 1 &ndash; Visibility of system status</h3>
+                                <p class="seed-statement"><strong>Statement:</strong> Google Maps effectively applies visibility of system status to help the student navigate to the sports venue.</p>
+                                <p class="seed-explain"><strong>Explain or Expand:</strong> This principle means keeping users informed about what the system is doing and their progress towards completing a task.</p>
+                                <p class="seed-evidence"><strong>Example or Evidence:</strong> During navigation, Google Maps displays the student's current location, upcoming turns and estimated arrival time.</p>
+                                <p class="seed-discuss"><strong>Discuss or Depth:</strong> These features help the student recognise whether they are following the correct route and when they need to turn. However, inaccurate GPS information could temporarily reduce the reliability of this feedback.</p>
+                            </section>
+                            <section class="check-model-principle">
+                                <h3>Usability Principle 2 &ndash; User control and freedom</h3>
+                                <p class="seed-statement"><strong>Statement:</strong> Google Maps also effectively applies user control and freedom by allowing the student to change or stop navigation.</p>
+                                <p class="seed-explain"><strong>Explain or Expand:</strong> This principle means users should be able to change their decisions or leave a process without being trapped in an unwanted action.</p>
+                                <p class="seed-evidence"><strong>Example or Evidence:</strong> For example, the student can select an alternative route to Greymouth or stop navigation if their plans change.</p>
+                                <p class="seed-discuss"><strong>Discuss or Depth:</strong> This is effective because the student can adjust their journey without having to follow an unsuitable route. It supports Google Maps' purpose of helping users reach their destinations while allowing them to make their own travel decisions.</p>
+                            </section>
+                        </div>
+                    </details>
+                </article>
+            </section>
             <a class="check-back" href="assessment-standard-card.html?standard=92006">Back to Level 1 Exam Preparation</a>
         </main>
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="script.js"></script>
+    <script>
+        const selfCheckBoxes = [...document.querySelectorAll(".check-self-list input[type='checkbox']")];
+        const checkProgress = document.getElementById("check-progress");
+        const updateCheckProgress = () => {
+            const checkedCount = selfCheckBoxes.filter((checkbox) => checkbox.checked).length;
+            checkProgress.textContent = `${checkedCount} of ${selfCheckBoxes.length} checked`;
+        };
+        selfCheckBoxes.forEach((checkbox) => checkbox.addEventListener("change", updateCheckProgress));
+        document.getElementById("check-reset").addEventListener("click", () => {
+            selfCheckBoxes.forEach((checkbox) => { checkbox.checked = false; });
+            updateCheckProgress();
+        });
+    </script>
 </body>
 </html>
