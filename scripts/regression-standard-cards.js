@@ -92,15 +92,17 @@ assert.equal((resourceMarkup.match(/class="student-standard-study-column(?: |")/
 assert.ok(html.indexOf('id="ssg-criteria"') < html.indexOf('id="ssg-external-resources"'),
   "New study area appears below the existing criteria");
 const stageMarkup = resourceMarkup.match(/<ol class="student-standard-study-stages"[^>]*>([\s\S]*?)<\/ol>/)[1];
-const stages = [...stageMarkup.matchAll(/<li><span>(Stage \d)<\/span><img src="([^"]+)" alt="([^"]+)"><\/li>/g)];
-assert.deepEqual(stages.map((stage) => [stage[1], stage[2], stage[3]]), [
-  ["Stage 1", "images/92006-stage-decode.png", "Decode: Read the question."],
-  ["Stage 2", "images/92006-stage-think.png", "Think: 5Ws &amp; H."],
-  ["Stage 3", "images/92006-stage-write.png", "Write: SEED."],
-  ["Stage 4", "images/92006-stage-check.png", "Check: Answer the question?"]
+const stages = [...stageMarkup.matchAll(/<li><img src="([^"]+)" alt="([^"]+)"><\/li>/g)];
+assert.deepEqual(stages.map((stage) => [stage[1], stage[2]]), [
+  ["images/92006-stage-decode.png", "Decode: Read the question."],
+  ["images/92006-stage-think.png", "Think: 5Ws &amp; H."],
+  ["images/92006-stage-write.png", "Write: SEED."],
+  ["images/92006-stage-check.png", "Check: Answer the question?"]
 ], "Right column presents the four supplied stages in order, with accessible descriptions");
+assert.doesNotMatch(resourceMarkup.replace(/<[^>]+>/g, ""), /Stage/i,
+  "Stage wording is not displayed in the answering column");
 for (const stage of stages) {
-  const image = fs.readFileSync(path.join(root, stage[2]));
+  const image = fs.readFileSync(path.join(root, stage[1]));
   assert.equal(image.subarray(1, 4).toString(), "PNG", "Stage image is available as a PNG");
 }
 const resourceLinks = [...resourceMarkup.matchAll(/<a class="student-standard-study-link[^"]*" href="([^"]+)"([^>]+)>\s*<img src="([^"]+)"/g)];

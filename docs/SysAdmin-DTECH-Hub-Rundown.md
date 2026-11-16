@@ -59,7 +59,7 @@ three-column resource area below the grade criteria: the Usability slideshow on
 the left, Tutorial and Cram Cards PDFs in the middle, and four answering stages
 on the right. The supplied stage images appear vertically in order: Decode
 (Read the question), Think (5Ws & H), Write (SEED), and Check (Answer the question?).
-The stages have numbered labels and accessible image descriptions. The layout
+The images are centred without Stage labels and have accessible descriptions. The layout
 stacks on small screens and is not shown for other standards.
 The slideshow cover and supplied PDF-link pictures are local snapshots in
 `images/92006-*.png`; refresh the cover if the slideshow's front slide changes.
