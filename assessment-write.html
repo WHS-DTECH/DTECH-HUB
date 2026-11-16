@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WRITE &ndash; Structure Your Answer | Computer Lab</title>
+    <meta name="description" content="Use SEED to organise a clear examination answer with a statement, explanation, evidence and deeper reasoning.">
+    <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
+    <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
+    <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .assessment-write-page {
+            max-width: 1100px;
+            margin: 24px auto 40px;
+            padding: 0 16px;
+            color: #334155;
+        }
+
+        .write-intro { padding: 24px; border: 1px solid #edceb8; border-radius: 12px; background: #fff0e5; }
+        .write-heading { display: flex; align-items: center; gap: 14px; color: #a64c16; }
+        .write-heading svg { width: 36px; height: 36px; flex-shrink: 0; }
+        .write-heading h1 { margin: 0; font-size: 2rem; }
+        .write-intro p { margin: 12px 0 0; line-height: 1.7; }
+
+        .write-section { margin-top: 24px; padding: 24px; border: 1px solid #edceb8; border-radius: 12px; background: #fff; }
+        .write-section h2 { margin: 0 0 20px; color: #a64c16; font-size: 1.2rem; }
+        .write-section > p { line-height: 1.7; }
+        .seed-statement { --seed-bg: #eaf4ff; --seed-ink: #1d5e9f; --seed-border: #b5cfea; }
+        .seed-explain { --seed-bg: #f2ecff; --seed-ink: #7346a6; --seed-border: #ddcfee; }
+        .seed-evidence { --seed-bg: #fff0e5; --seed-ink: #a64c16; --seed-border: #edceb8; }
+        .seed-discuss { --seed-bg: #e8f7ef; --seed-ink: #24734b; --seed-border: #bbdccb; }
+
+        .seed-parts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+        .seed-part { min-width: 0; padding: 20px; border: 1px solid var(--seed-border); border-left: 4px solid var(--seed-ink); border-radius: 10px; background: var(--seed-bg); }
+        .seed-part h3 { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; color: var(--seed-ink); font-size: 1.05rem; }
+        .seed-part p { margin: 0; line-height: 1.7; }
+        .seed-part p + p { margin-top: 10px; }
+        .seed-letter { display: inline-grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; background: var(--seed-ink); color: #fff; font-size: 1.15rem; font-weight: 700; }
+        .seed-prompt { font-weight: 700; }
+        .seed-example-list { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+
+        .write-question { margin: 0 0 20px; padding: 22px; border-left: 4px solid #a64c16; border-radius: 10px; background: #fff0e5; }
+        .write-question figcaption { margin-bottom: 12px; color: #a64c16; font-size: 0.8rem; font-weight: 700; }
+        .write-question blockquote { margin: 0; font-size: 1.1rem; line-height: 1.7; }
+
+        .seed-annotated { display: grid; gap: 16px; }
+        .seed-annotated .seed-letter { width: 46px; height: 46px; font-size: 1.5rem; }
+        .seed-annotated h3 { font-size: 1.15rem; }
+
+        .seed-key { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 20px; padding: 0; list-style: none; }
+        .seed-key li { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--seed-border); border-radius: 10px; background: var(--seed-bg); color: var(--seed-ink); font-size: 0.85rem; font-weight: 700; }
+        .seed-key .seed-letter { width: 26px; height: 26px; font-size: 0.95rem; }
+        .write-section .seed-completed { margin: 0; padding: 0 4px; font-size: 1.05rem; line-height: 2.2; }
+        .seed-completed > span { padding: 3px 4px; border-radius: 4px; background: var(--seed-bg); color: var(--seed-ink); -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+        .write-back { display: inline-block; margin-top: 24px; color: #a64c16; font-weight: 700; }
+        .write-back:focus-visible { outline: 3px solid #a64c16; outline-offset: 3px; }
+
+        @media (max-width: 620px) {
+            .seed-parts { grid-template-columns: minmax(0, 1fr); }
+            .write-intro, .write-section { padding: 18px; }
+            .seed-part { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero">
+            <nav class="topbar" aria-label="Primary">
+                <a class="brand" href="index.html">Computer Lab</a>
+            </nav>
+        </header>
+        <main class="assessment-write-page">
+            <section class="write-intro" aria-labelledby="write-title">
+                <div class="write-heading">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m15 4 5 5M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14l-1 7 6-2M4 14l5 5"></path></svg>
+                    <h1 id="write-title">WRITE &ndash; Structure Your Answer</h1>
+                </div>
+                <p>Use <strong>SEED</strong> to turn your technical knowledge and ideas into a clear, well-developed examination answer. SEED helps you organise your information, explain how and why things happen, provide relevant evidence and develop deeper reasoning.</p>
+            </section>
+            <section class="write-section" aria-labelledby="seed-parts-title">
+                <h2 id="seed-parts-title">Four parts of a SEED paragraph</h2>
+                <div class="seed-parts">
+                    <article class="seed-part seed-statement">
+                        <h3><span class="seed-letter" aria-hidden="true">S</span>Statement</h3>
+                        <p class="seed-prompt">What is your main point?</p>
+                        <p>Make a clear statement that directly answers the examination question.</p>
+                    </article>
+                    <article class="seed-part seed-explain">
+                        <h3><span class="seed-letter" aria-hidden="true">E</span>Explain or Expand</h3>
+                        <p class="seed-prompt">How or why does it happen?</p>
+                        <p>Develop your statement by explaining the technical concept, process or relationship.</p>
+                    </article>
+                    <article class="seed-part seed-evidence">
+                        <h3><span class="seed-letter" aria-hidden="true">E</span>Example or Evidence</h3>
+                        <p class="seed-prompt">What supports your explanation?</p>
+                        <p>Provide a specific example, technical detail or evidence from the question's context.</p>
+                    </article>
+                    <article class="seed-part seed-discuss">
+                        <h3><span class="seed-letter" aria-hidden="true">D</span>Discuss or Depth</h3>
+                        <p class="seed-prompt">Why does this matter?</p>
+                        <p>Explore consequences, limitations, different perspectives or justified conclusions.</p>
+                    </article>
+                </div>
+            </section>
+            <section class="write-section" aria-labelledby="write-example-title">
+                <h2 id="write-example-title">WRITE in action</h2>
+                <figure class="write-question">
+                    <figcaption>Example question &ndash; adapted from AS 91908 Big Data</figcaption>
+                    <blockquote>Explain how CrowdCare's use of social media posts could introduce bias into its predictions of emergency-service demand. Discuss one consequence for allocating emergency resources.</blockquote>
+                </figure>
+                <p>Let's use SEED to build a response. Each part adds something important to the answer.</p>
+                <ol class="seed-example-list" role="list">
+                    <li class="seed-part seed-statement">
+                        <h3><span class="seed-letter" aria-hidden="true">S</span>Statement</h3>
+                        <p>CrowdCare's predictions could be biased because social media activity does not necessarily represent the emergency-service needs of an entire community.</p>
+                    </li>
+                    <li class="seed-part seed-explain">
+                        <h3><span class="seed-letter" aria-hidden="true">E</span>Explain or Expand</h3>
+                        <p>People who use social media frequently generate more data, while people with limited internet access may be underrepresented. This means the system could mistake high levels of online activity for high demand for emergency services.</p>
+                    </li>
+                    <li class="seed-part seed-evidence">
+                        <h3><span class="seed-letter" aria-hidden="true">E</span>Example or Evidence</h3>
+                        <p>For example, CrowdCare may rank a suburb with many social media posts as high priority, while ranking a less-connected suburb as low priority, even if both have similar emergency-service needs.</p>
+                    </li>
+                    <li class="seed-part seed-discuss">
+                        <h3><span class="seed-letter" aria-hidden="true">D</span>Discuss or Depth</h3>
+                        <p>As a result, emergency resources could be directed towards areas with greater digital activity rather than greater need. This could disadvantage less-connected communities. CrowdCare should therefore use additional evidence, such as ambulance call-outs and hospital demand, while checking whether these sources also underrepresent particular communities.</p>
+                    </li>
+                </ol>
+            </section>
+            <section class="write-section" aria-labelledby="seed-annotated-title">
+                <h2 id="seed-annotated-title">Putting it all together &ndash; SEED Model Paragraph</h2>
+                <p>Follow the SEED labels to see what each part contributes.</p>
+                <div class="seed-annotated">
+                    <article class="seed-part seed-statement">
+                        <h3><span class="seed-letter" aria-hidden="true">S</span>Statement</h3>
+                        <p>CrowdCare's predictions could be biased because social media activity does not necessarily represent the emergency-service needs of an entire community.</p>
+                    </article>
+                    <article class="seed-part seed-explain">
+                        <h3><span class="seed-letter" aria-hidden="true">E</span>Explain or Expand</h3>
+                        <p>People who use social media frequently generate more data, while people with limited internet access may be underrepresented. This means the system could mistake high levels of online activity for high demand for emergency services.</p>
+                    </article>
+                    <article class="seed-part seed-evidence">
+                        <h3><span class="seed-letter" aria-hidden="true">E</span>Example or Evidence</h3>
+                        <p>For example, CrowdCare may rank a suburb with many social media posts as high priority, while ranking a less-connected suburb as low priority, even if both have similar emergency-service needs.</p>
+                    </article>
+                    <article class="seed-part seed-discuss">
+                        <h3><span class="seed-letter" aria-hidden="true">D</span>Discuss or Depth</h3>
+                        <p>As a result, emergency resources could be directed towards areas with greater digital activity rather than greater need. This could disadvantage less-connected communities. CrowdCare should therefore use additional evidence, such as ambulance call-outs and hospital demand, while checking whether these sources also underrepresent particular communities.</p>
+                    </article>
+                </div>
+            </section>
+            <section class="write-section" aria-labelledby="seed-completed-title">
+                <h2 id="seed-completed-title">Putting it all together &ndash; Model paragraph</h2>
+                <ul class="seed-key" role="list" aria-label="SEED colour key">
+                    <li class="seed-statement"><span class="seed-letter" aria-hidden="true">S</span>Statement</li>
+                    <li class="seed-explain"><span class="seed-letter" aria-hidden="true">E</span>Explain or Expand</li>
+                    <li class="seed-evidence"><span class="seed-letter" aria-hidden="true">E</span>Example or Evidence</li>
+                    <li class="seed-discuss"><span class="seed-letter" aria-hidden="true">D</span>Discuss or Depth</li>
+                </ul>
+                <p class="seed-completed">
+                    <span class="seed-statement"><span class="visually-hidden">Statement: </span>CrowdCare's predictions could be biased because social media activity does not necessarily represent the emergency-service needs of an entire community.</span>
+                    <span class="seed-explain"><span class="visually-hidden">Explain or Expand: </span>People who use social media frequently generate more data, while people with limited internet access may be underrepresented. This means the system could mistake high levels of online activity for high demand for emergency services.</span>
+                    <span class="seed-evidence"><span class="visually-hidden">Example or Evidence: </span>For example, CrowdCare may rank a suburb with many social media posts as high priority, while ranking a less-connected suburb as low priority, even if both have similar emergency-service needs.</span>
+                    <span class="seed-discuss"><span class="visually-hidden">Discuss or Depth: </span>As a result, emergency resources could be directed towards areas with greater digital activity rather than greater need. This could disadvantage less-connected communities. CrowdCare should therefore use additional evidence, such as ambulance call-outs and hospital demand, while checking whether these sources also underrepresent particular communities.</span>
+                </p>
+            </section>
+            <a class="write-back" href="assessment-standard-card.html?standard=92006">Back to Level 1 Exam Preparation</a>
+        </main>
+    </div>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="script.js"></script>
+</body>
+</html>

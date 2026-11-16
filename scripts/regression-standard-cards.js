@@ -202,6 +202,44 @@ assert.deepEqual([...thinkReminder.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((match) 
   "Use WHAT, WHO, WHERE and WHEN to gather relevant facts. Use WHY and HOW to develop your technical explanation.",
   "Choose the information that directly answers the examination question. More information does not necessarily mean a better answer."
 ], "Closing reminder preserves the supplied guidance on selecting relevant ideas");
+const writeLink = stages[2][2].match(/<a href="([^"]+)">/);
+assert.ok(writeLink, "Entire Write card links to its SEED page");
+const writeHtml = fs.readFileSync(path.join(root, writeLink[1]), "utf8");
+const writeSections = [...writeHtml.matchAll(/<section[^>]* aria-labelledby="([^"]+)">([\s\S]*?)<\/section>/g)];
+assert.deepEqual(writeSections.map((section) => section[1]), [
+  "write-title", "seed-parts-title", "write-example-title", "seed-annotated-title", "seed-completed-title"
+], "Write page follows the five supplied sections");
+const seedParts = [
+  ["seed-statement", "S", "Statement"],
+  ["seed-explain", "E", "Explain or Expand"],
+  ["seed-evidence", "E", "Example or Evidence"],
+  ["seed-discuss", "D", "Discuss or Depth"]
+];
+for (const section of writeSections.slice(1, 4)) {
+  assert.deepEqual([...section[2].matchAll(/class="seed-part ([^"]+)">\s*<h3><span[^>]*>([SED])<\/span>([^<]+)<\/h3>/g)]
+    .map((match) => [match[1], match[2], match[3]]), seedParts,
+  "SEED parts retain their letters, full labels and colour classes across definitions and examples");
+}
+const seedModelText = [
+  "CrowdCare's predictions could be biased because social media activity does not necessarily represent the emergency-service needs of an entire community.",
+  "People who use social media frequently generate more data, while people with limited internet access may be underrepresented. This means the system could mistake high levels of online activity for high demand for emergency services.",
+  "For example, CrowdCare may rank a suburb with many social media posts as high priority, while ranking a less-connected suburb as low priority, even if both have similar emergency-service needs.",
+  "As a result, emergency resources could be directed towards areas with greater digital activity rather than greater need. This could disadvantage less-connected communities. CrowdCare should therefore use additional evidence, such as ambulance call-outs and hospital demand, while checking whether these sources also underrepresent particular communities."
+];
+for (const section of writeSections.slice(2, 4)) {
+  const paragraphs = [...section[2].matchAll(/<h3>[\s\S]*?<\/h3>\s*<p>([^<]+)<\/p>/g)].map((match) => match[1]);
+  assert.deepEqual(paragraphs, seedModelText, "Worked and labelled models preserve every supplied sentence");
+}
+const completedSeed = writeSections[4][2].match(/<p class="seed-completed">([\s\S]*?)<\/p>/)[1];
+const highlights = [...completedSeed.matchAll(/<span class="(seed-[^"]+)"><span class="visually-hidden">([^<]+)<\/span>([^<]+)<\/span>/g)];
+assert.deepEqual(highlights.map((match) => match[1]), seedParts.map((part) => part[0]),
+  "Completed paragraph uses matching SEED colour classes in order");
+assert.deepEqual(highlights.map((match) => match[2]), seedParts.map((part) => `${part[2]}: `),
+  "Completed paragraph identifies each part for screen readers, not only by colour");
+assert.deepEqual(highlights.map((match) => match[3]), seedModelText,
+  "Colour coding preserves the complete continuous model paragraph");
+assert.match(writeHtml, /href="assessment-standard-card.html\?standard=92006"/,
+  "Write page returns to the Level 1 standard");
 const resourceLinks = [...resourceMarkup.matchAll(/<a class="student-standard-study-link[^"]*" href="([^"]+)"([^>]+)>\s*<img src="([^"]+)"/g)];
 assert.deepEqual(resourceLinks.map((match) => match[1]), [
   "https://docs.google.com/presentation/d/1NC3TENDS_0XBDVMfFxgxdVAS2_sPn1ESp8RRP_xKYxY/edit?usp=sharing",

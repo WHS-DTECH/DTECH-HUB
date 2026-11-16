@@ -84,8 +84,13 @@ ideas help answer the examination question. A closing reminder emphasises
 selecting relevant facts and explanations rather than including every idea.
 The MFA WHEN example applies to signing into a protected school account,
 especially when a password may have been compromised, not only unfamiliar devices.
-Both concept pages link back to
-the AS 92006 guide. Write and Check remain instructional, not links.
+Write opens `assessment-write.html` in the same tab, using the card's peach
+palette. Its four SEED parts use consistent blue (Statement), lavender (Explain
+or Expand), peach (Example or Evidence), and mint (Discuss or Depth) colours.
+The CrowdCare worked example is followed by a model with prominent letter badges
+and full labels, then one continuous colour-coded paragraph with a matching key
+and screen-reader labels. All three concept pages link back to the AS 92006
+guide. Check remains instructional, not a link.
 
 ## 2) How Google Sign-In Is Set Up
 - Frontend uses Google Identity Services OAuth token flow.
