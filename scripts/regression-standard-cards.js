@@ -108,6 +108,22 @@ for (const stage of stages) {
     "Decorative icons do not duplicate the readable instructions for screen readers");
 }
 assert.doesNotMatch(stageMarkup, /<img/, "Answering cards no longer use black-background pictures");
+const decodeLink = stages[0][2].match(/<a href="([^"]+)">/);
+assert.ok(decodeLink, "Entire Decode card links to its concept page");
+const decodeHtml = fs.readFileSync(path.join(root, decodeLink[1]), "utf8");
+const concepts = [...decodeHtml.matchAll(/<li>\s*<h3><span[^>]*>\d<\/span>([^<]+)<\/h3>\s*<p>([^<]+)<\/p>/g)];
+assert.deepEqual(concepts.map((concept) => [concept[1], concept[2]]), [
+  ["Action", "What am I being asked to do?"],
+  ["Quantity", "How many things are required?"],
+  ["Context", "What must my answer refer to?"],
+  ["Detail", "What specific information must I include?"]
+], "Dedicated Decode page preserves all four supplied prompts in order");
+assert.match(decodeHtml, /href="assessment-standard-card.html\?standard=92006"/,
+  "Decode page returns to the Level 1 standard");
+assert.match(decodeHtml, /\.decode-grid \{[\s\S]*?grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/,
+  "Four Decode concepts appear across desktop screens");
+assert.match(decodeHtml, /@media \(max-width: 620px\) \{\s*\.decode-grid \{ grid-template-columns: 1fr;/,
+  "Decode concepts stack on small screens");
 const resourceLinks = [...resourceMarkup.matchAll(/<a class="student-standard-study-link[^"]*" href="([^"]+)"([^>]+)>\s*<img src="([^"]+)"/g)];
 assert.deepEqual(resourceLinks.map((match) => match[1]), [
   "https://docs.google.com/presentation/d/1NC3TENDS_0XBDVMfFxgxdVAS2_sPn1ESp8RRP_xKYxY/edit?usp=sharing",

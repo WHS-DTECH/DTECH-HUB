@@ -65,7 +65,11 @@ stacks on small screens and is not shown for other standards.
 The slideshow cover and supplied PDF-link pictures are local snapshots in
 `images/92006-*.png`; refresh the cover if the slideshow's front slide changes.
 The slideshow and PDF pictures open their original Google Slides/Drive resources
-in a new tab; the answering cards are instructional, not links.
+in a new tab. Decode opens `assessment-decode.html` in the same tab, using the
+same pastel blue palette. Its Action, Quantity, Context and Detail prompts
+appear in four columns on desktop, two on tablets and one on small screens.
+The page links back to the AS 92006 guide. The other answering cards remain
+instructional, not links.
 
 ## 2) How Google Sign-In Is Set Up
 - Frontend uses Google Identity Services OAuth token flow.

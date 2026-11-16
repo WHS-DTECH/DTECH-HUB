@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decode the Question | Computer Lab</title>
+    <meta name="description" content="Decode assessment questions by identifying the action, quantity, context and detail.">
+    <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
+    <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
+    <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .assessment-decode-page {
+            max-width: 1100px;
+            margin: 24px auto 40px;
+            padding: 0 16px;
+            color: #334155;
+        }
+
+        .decode-intro {
+            padding: 24px;
+            border: 1px solid #c9d9ec;
+            border-radius: 12px;
+            background: #eaf4ff;
+        }
+
+        .decode-heading {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            color: #1d5e9f;
+        }
+
+        .decode-heading svg { width: 36px; height: 36px; flex-shrink: 0; }
+        .decode-heading h1 { margin: 0; font-size: 2rem; }
+        .decode-intro p { margin: 12px 0 0; line-height: 1.5; }
+
+        .decode-concepts {
+            margin-top: 24px;
+            padding: 24px;
+            border: 1px solid #c9d9ec;
+            border-radius: 12px;
+            background: #fff;
+        }
+
+        .decode-concepts h2 { margin: 0 0 20px; color: #1d5e9f; font-size: 1.2rem; }
+
+        .decode-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .decode-grid li {
+            min-width: 0;
+            padding: 18px;
+            border: 1px solid #c9d9ec;
+            border-radius: 10px;
+            background: #eaf4ff;
+        }
+
+        .decode-grid h3 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 14px;
+            color: #1d5e9f;
+            font-size: 1rem;
+        }
+
+        .decode-number {
+            display: inline-grid;
+            place-items: center;
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            background: #1d5e9f;
+            color: #fff;
+            font-size: 0.85rem;
+        }
+
+        .decode-grid p { margin: 0; line-height: 1.5; }
+        .decode-back { display: inline-block; margin-top: 24px; color: #1d5e9f; font-weight: 700; }
+        .decode-back:focus-visible { outline: 3px solid #1d5e9f; outline-offset: 3px; }
+
+        @media (max-width: 920px) {
+            .decode-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 620px) {
+            .decode-grid { grid-template-columns: 1fr; }
+            .decode-intro, .decode-concepts { padding: 18px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero">
+            <nav class="topbar" aria-label="Primary">
+                <a class="brand" href="index.html">Computer Lab</a>
+            </nav>
+        </header>
+        <main class="assessment-decode-page">
+            <section class="decode-intro" aria-labelledby="decode-title">
+                <div class="decode-heading">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="6"></circle><path d="m15 15 6 6"></path></svg>
+                    <h1 id="decode-title">Decode</h1>
+                </div>
+                <p>Read it. Break it down. Know what to answer.</p>
+            </section>
+            <section class="decode-concepts" aria-labelledby="decode-concepts-title">
+                <h2 id="decode-concepts-title">Four things to look for in every question</h2>
+                <ol class="decode-grid" role="list">
+                    <li>
+                        <h3><span class="decode-number" aria-hidden="true">1</span>Action</h3>
+                        <p>What am I being asked to do?</p>
+                    </li>
+                    <li>
+                        <h3><span class="decode-number" aria-hidden="true">2</span>Quantity</h3>
+                        <p>How many things are required?</p>
+                    </li>
+                    <li>
+                        <h3><span class="decode-number" aria-hidden="true">3</span>Context</h3>
+                        <p>What must my answer refer to?</p>
+                    </li>
+                    <li>
+                        <h3><span class="decode-number" aria-hidden="true">4</span>Detail</h3>
+                        <p>What specific information must I include?</p>
+                    </li>
+                </ol>
+            </section>
+            <a class="decode-back" href="assessment-standard-card.html?standard=92006">Back to Level 1 Exam Preparation</a>
+        </main>
+    </div>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="script.js"></script>
+</body>
+</html>
