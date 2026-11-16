@@ -87,11 +87,60 @@
         }
 
         .decode-grid p { margin: 0; line-height: 1.5; }
+
+        .decode-example-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+            align-items: start;
+            gap: 24px;
+        }
+
+        .decode-question {
+            margin: 0;
+            padding: 22px;
+            border-left: 4px solid #1d5e9f;
+            border-radius: 10px;
+            background: #eaf4ff;
+        }
+
+        .decode-question figcaption,
+        .decode-breakdown h3 {
+            margin: 0 0 16px;
+            color: #1d5e9f;
+            font-size: 1.05rem;
+            font-weight: 700;
+        }
+
+        .decode-question blockquote { margin: 0; font-size: 1.1rem; line-height: 1.8; }
+        .decode-question strong { color: #174b80; }
+        .decode-question mark { padding: 2px 4px; border-radius: 4px; background: #cfe4fc; color: #174b80; font-weight: 700; }
+        .decode-question-key { margin: 20px 0 0; padding-top: 16px; border-top: 1px solid #c9d9ec; font-size: 0.85rem; line-height: 1.8; }
+
+        .decode-breakdown dl { display: grid; gap: 12px; margin: 0; }
+        .decode-breakdown dl > div { padding: 14px 16px; border: 1px solid #dce8f5; border-radius: 10px; background: #f7fbff; }
+        .decode-breakdown dt { display: flex; align-items: center; gap: 10px; color: #1d5e9f; font-weight: 700; }
+        .decode-breakdown dd { margin: 8px 0 0; font-size: 0.95rem; line-height: 1.6; }
+
+        .decode-remember {
+            display: flex;
+            align-items: start;
+            gap: 14px;
+            margin-top: 24px;
+            padding: 18px;
+            border: 1px solid #c9d9ec;
+            border-radius: 10px;
+            background: #eaf4ff;
+        }
+
+        .decode-remember svg { flex-shrink: 0; width: 26px; height: 26px; color: #1d5e9f; }
+        .decode-remember p { margin: 0; line-height: 1.6; }
+        .decode-remember strong { display: block; margin-bottom: 4px; color: #1d5e9f; }
         .decode-back { display: inline-block; margin-top: 24px; color: #1d5e9f; font-weight: 700; }
         .decode-back:focus-visible { outline: 3px solid #1d5e9f; outline-offset: 3px; }
 
         @media (max-width: 920px) {
             .decode-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .decode-example-grid { grid-template-columns: minmax(0, 1fr); }
         }
 
         @media (max-width: 620px) {
@@ -135,6 +184,41 @@
                         <p>What specific information must I include?</p>
                     </li>
                 </ol>
+            </section>
+            <section class="decode-concepts" aria-labelledby="decode-example-title">
+                <h2 id="decode-example-title">DECODE in action</h2>
+                <div class="decode-example-grid">
+                    <figure class="decode-question">
+                        <figcaption>Example question</figcaption>
+                        <blockquote>&ldquo;<strong>Describe</strong> Nielsen's Error prevention heuristic. <strong>Give</strong> <mark>ONE specific example</mark> of how it could be applied in an interface and <strong>describe</strong> how it reduces the chance of user error.&rdquo;</blockquote>
+                        <p class="decode-question-key"><strong>Bold words</strong> show the actions.<br><mark>Highlighted words</mark> show the quantity.</p>
+                    </figure>
+                    <div class="decode-breakdown">
+                        <h3>Break it down</h3>
+                        <dl>
+                            <div>
+                                <dt><span class="decode-number" aria-hidden="true">1</span>Action</dt>
+                                <dd>Describe, Give, Describe.</dd>
+                            </div>
+                            <div>
+                                <dt><span class="decode-number" aria-hidden="true">2</span>Quantity</dt>
+                                <dd>ONE specific example.</dd>
+                            </div>
+                            <div>
+                                <dt><span class="decode-number" aria-hidden="true">3</span>Context</dt>
+                                <dd>Error prevention in a human-computer interface.</dd>
+                            </div>
+                            <div>
+                                <dt><span class="decode-number" aria-hidden="true">4</span>Detail</dt>
+                                <dd>Explain what error prevention means, provide an interface example, and describe how it reduces mistakes.</dd>
+                            </div>
+                        </dl>
+                    </div>
+                </div>
+                <aside class="decode-remember" aria-label="Remember">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 18h6m-5 3h4M8 14a6 6 0 1 1 8 0c-1 1-1 2-1 4H9c0-2 0-3-1-4Z"></path></svg>
+                    <p><strong>Remember</strong> DECODE helps you work out what to include in your answer before you start writing.</p>
+                </aside>
             </section>
             <a class="decode-back" href="assessment-standard-card.html?standard=92006">Back to Level 1 Exam Preparation</a>
         </main>

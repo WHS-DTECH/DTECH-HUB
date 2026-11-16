@@ -124,6 +124,20 @@ assert.match(decodeHtml, /\.decode-grid \{[\s\S]*?grid-template-columns: repeat\
   "Four Decode concepts appear across desktop screens");
 assert.match(decodeHtml, /@media \(max-width: 620px\) \{\s*\.decode-grid \{ grid-template-columns: 1fr;/,
   "Decode concepts stack on small screens");
+const exampleQuestion = decodeHtml.match(/<blockquote>([\s\S]*?)<\/blockquote>/)[1];
+assert.deepEqual([...exampleQuestion.matchAll(/<strong>([^<]+)<\/strong>/g)].map((match) => match[1]),
+  ["Describe", "Give", "describe"], "Worked question identifies each action word");
+assert.match(exampleQuestion, /<mark>ONE specific example<\/mark>/, "Worked question highlights the quantity");
+const breakdown = decodeHtml.match(/<dl>([\s\S]*?)<\/dl>/)[1];
+assert.deepEqual([...breakdown.matchAll(/<dt>[\s\S]*?<\/span>([^<]+)<\/dt>\s*<dd>([^<]+)<\/dd>/g)]
+  .map((match) => [match[1], match[2]]), [
+  ["Action", "Describe, Give, Describe."],
+  ["Quantity", "ONE specific example."],
+  ["Context", "Error prevention in a human-computer interface."],
+  ["Detail", "Explain what error prevention means, provide an interface example, and describe how it reduces mistakes."]
+], "Worked example includes all four supplied explanations as readable text");
+assert.match(decodeHtml, /<strong>Remember<\/strong> DECODE helps you work out what to include in your answer before you start writing\./,
+  "Worked example retains the planning reminder");
 const resourceLinks = [...resourceMarkup.matchAll(/<a class="student-standard-study-link[^"]*" href="([^"]+)"([^>]+)>\s*<img src="([^"]+)"/g)];
 assert.deepEqual(resourceLinks.map((match) => match[1]), [
   "https://docs.google.com/presentation/d/1NC3TENDS_0XBDVMfFxgxdVAS2_sPn1ESp8RRP_xKYxY/edit?usp=sharing",

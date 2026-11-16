@@ -68,6 +68,9 @@ The slideshow and PDF pictures open their original Google Slides/Drive resources
 in a new tab. Decode opens `assessment-decode.html` in the same tab, using the
 same pastel blue palette. Its Action, Quantity, Context and Detail prompts
 appear in four columns on desktop, two on tablets and one on small screens.
+Its worked example pairs a highlighted Nielsen error-prevention question with
+an Action/Quantity/Context/Detail breakdown and a planning reminder. These
+panels sit side by side on desktop and stack on tablets and small screens.
 The page links back to the AS 92006 guide. The other answering cards remain
 instructional, not links.
 
