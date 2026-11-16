@@ -92,19 +92,22 @@ assert.equal((resourceMarkup.match(/class="student-standard-study-column(?: |")/
 assert.ok(html.indexOf('id="ssg-criteria"') < html.indexOf('id="ssg-external-resources"'),
   "New study area appears below the existing criteria");
 const stageMarkup = resourceMarkup.match(/<ol class="student-standard-study-stages"[^>]*>([\s\S]*?)<\/ol>/)[1];
-const stages = [...stageMarkup.matchAll(/<li><img src="([^"]+)" alt="([^"]+)"><\/li>/g)];
-assert.deepEqual(stages.map((stage) => [stage[1], stage[2]]), [
-  ["images/92006-stage-decode.png", "Decode: Read the question."],
-  ["images/92006-stage-think.png", "Think: 5Ws &amp; H."],
-  ["images/92006-stage-write.png", "Write: SEED."],
-  ["images/92006-stage-check.png", "Check: Answer the question?"]
-], "Right column presents the four supplied stages in order, with accessible descriptions");
+const stages = [...stageMarkup.matchAll(/<li class="([^"]+)">([\s\S]*?)<\/li>/g)];
+assert.deepEqual(stages.map((stage) => [
+  stage[1], stage[2].match(/<h4>(.*?)<\/h4>/)[1], stage[2].match(/<p>(.*?)<\/p>/)[1]
+]), [
+  ["decode", "Decode", "Read the question."],
+  ["think", "Think", "5Ws &amp; H."],
+  ["write", "Write", "SEED."],
+  ["check", "Check", "Answer the question?"]
+], "Pastel cards preserve the four instructions in order as readable text");
 assert.doesNotMatch(resourceMarkup.replace(/<[^>]+>/g, ""), /Stage/i,
   "Stage wording is not displayed in the answering column");
 for (const stage of stages) {
-  const image = fs.readFileSync(path.join(root, stage[1]));
-  assert.equal(image.subarray(1, 4).toString(), "PNG", "Stage image is available as a PNG");
+  assert.match(stage[2], /<svg [^>]*aria-hidden="true"/,
+    "Decorative icons do not duplicate the readable instructions for screen readers");
 }
+assert.doesNotMatch(stageMarkup, /<img/, "Answering cards no longer use black-background pictures");
 const resourceLinks = [...resourceMarkup.matchAll(/<a class="student-standard-study-link[^"]*" href="([^"]+)"([^>]+)>\s*<img src="([^"]+)"/g)];
 assert.deepEqual(resourceLinks.map((match) => match[1]), [
   "https://docs.google.com/presentation/d/1NC3TENDS_0XBDVMfFxgxdVAS2_sPn1ESp8RRP_xKYxY/edit?usp=sharing",

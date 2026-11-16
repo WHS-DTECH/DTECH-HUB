@@ -57,14 +57,15 @@ DTECH Hub is a web application used in DTECH classes for project/activity access
 The AS 92006 Student View in `assessment-standard-card.html` includes a
 three-column resource area below the grade criteria: the Usability slideshow on
 the left, Tutorial and Cram Cards PDFs in the middle, and four answering stages
-on the right. The supplied stage images appear vertically in order: Decode
+on the right. Pastel cards appear vertically in order: Decode
 (Read the question), Think (5Ws & H), Write (SEED), and Check (Answer the question?).
-The images are centred without Stage labels and have accessible descriptions. The layout
+The blue, lavender, peach and mint cards use decorative inline icons and readable
+HTML instructions without Stage labels. The layout
 stacks on small screens and is not shown for other standards.
 The slideshow cover and supplied PDF-link pictures are local snapshots in
 `images/92006-*.png`; refresh the cover if the slideshow's front slide changes.
 The slideshow and PDF pictures open their original Google Slides/Drive resources
-in a new tab; the stage images are instructional, not links.
+in a new tab; the answering cards are instructional, not links.
 
 ## 2) How Google Sign-In Is Set Up
 - Frontend uses Google Identity Services OAuth token flow.
