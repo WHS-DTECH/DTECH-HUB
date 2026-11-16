@@ -104,7 +104,7 @@
         }
 
         .decode-question figcaption,
-        .decode-breakdown h3 {
+        .decode-breakdown h4 {
             margin: 0 0 16px;
             color: #1d5e9f;
             font-size: 1.05rem;
@@ -121,6 +121,36 @@
         .decode-breakdown dt { display: flex; align-items: center; gap: 10px; color: #1d5e9f; font-weight: 700; }
         .decode-breakdown dd { margin: 8px 0 0; font-size: 0.95rem; line-height: 1.6; }
 
+        .decode-model-step + .decode-model-step { margin-top: 32px; padding-top: 28px; border-top: 1px solid #dce8f5; }
+        .decode-step-heading { display: flex; align-items: center; gap: 12px; margin: 0 0 20px; color: #1d5e9f; font-size: 1.15rem; }
+        .decode-step-heading .decode-number { width: 36px; height: 36px; border-radius: 50%; font-size: 1rem; }
+
+        .decode-answer {
+            padding: 24px;
+            border: 1px solid #c9d9ec;
+            border-left: 4px solid #1d5e9f;
+            border-radius: 10px;
+            background: #f7fbff;
+        }
+
+        .decode-answer p { max-width: 75ch; margin: 0; font-size: 1.05rem; line-height: 1.8; }
+        .decode-answer p + p { margin-top: 18px; }
+
+        .decode-checklist {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .decode-checklist li { display: flex; align-items: start; gap: 12px; padding: 18px; border: 1px solid #c9d9ec; border-radius: 10px; background: #f7fbff; }
+        .decode-check-icon { display: inline-grid; place-items: center; flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: #e8f7ef; color: #24734b; }
+        .decode-check-icon svg { width: 18px; height: 18px; }
+        .decode-checklist h4 { margin: 0 0 6px; color: #1d5e9f; font-size: 1rem; }
+        .decode-checklist p { margin: 0; line-height: 1.6; }
+
         .decode-remember {
             display: flex;
             align-items: start;
@@ -134,7 +164,9 @@
 
         .decode-remember svg { flex-shrink: 0; width: 26px; height: 26px; color: #1d5e9f; }
         .decode-remember p { margin: 0; line-height: 1.6; }
-        .decode-remember strong { display: block; margin-bottom: 4px; color: #1d5e9f; }
+        .decode-remember p + p { margin-top: 12px; }
+        .decode-remember strong { color: #1d5e9f; }
+        .decode-remember-title { display: block; margin-bottom: 4px; }
         .decode-back { display: inline-block; margin-top: 24px; color: #1d5e9f; font-weight: 700; }
         .decode-back:focus-visible { outline: 3px solid #1d5e9f; outline-offset: 3px; }
 
@@ -145,7 +177,9 @@
 
         @media (max-width: 620px) {
             .decode-grid { grid-template-columns: 1fr; }
+            .decode-checklist { grid-template-columns: minmax(0, 1fr); }
             .decode-intro, .decode-concepts { padding: 18px; }
+            .decode-answer { padding: 18px; }
         }
     </style>
 </head>
@@ -186,38 +220,73 @@
                 </ol>
             </section>
             <section class="decode-concepts" aria-labelledby="decode-example-title">
-                <h2 id="decode-example-title">DECODE in action</h2>
-                <div class="decode-example-grid">
-                    <figure class="decode-question">
-                        <figcaption>Example question</figcaption>
-                        <blockquote>&ldquo;<strong>Describe</strong> Nielsen's Error prevention heuristic. <strong>Give</strong> <mark>ONE specific example</mark> of how it could be applied in an interface and <strong>describe</strong> how it reduces the chance of user error.&rdquo;</blockquote>
-                        <p class="decode-question-key"><strong>Bold words</strong> show the actions.<br><mark>Highlighted words</mark> show the quantity.</p>
-                    </figure>
-                    <div class="decode-breakdown">
-                        <h3>Break it down</h3>
-                        <dl>
-                            <div>
-                                <dt><span class="decode-number" aria-hidden="true">1</span>Action</dt>
-                                <dd>Describe, Give, Describe.</dd>
-                            </div>
-                            <div>
-                                <dt><span class="decode-number" aria-hidden="true">2</span>Quantity</dt>
-                                <dd>ONE specific example.</dd>
-                            </div>
-                            <div>
-                                <dt><span class="decode-number" aria-hidden="true">3</span>Context</dt>
-                                <dd>Error prevention in a human-computer interface.</dd>
-                            </div>
-                            <div>
-                                <dt><span class="decode-number" aria-hidden="true">4</span>Detail</dt>
-                                <dd>Explain what error prevention means, provide an interface example, and describe how it reduces mistakes.</dd>
-                            </div>
-                        </dl>
+                <h2 id="decode-example-title">DECODE &ndash; Model Answer</h2>
+                <article class="decode-model-step" aria-labelledby="decode-step-one">
+                    <h3 class="decode-step-heading" id="decode-step-one"><span class="decode-number" aria-hidden="true">1</span>DECODE the question</h3>
+                    <div class="decode-example-grid">
+                        <figure class="decode-question">
+                            <figcaption>Example question</figcaption>
+                            <blockquote>&ldquo;<strong>Describe</strong> Nielsen's Error prevention heuristic. <strong>Give</strong> <mark>ONE specific example</mark> of how it could be applied in an interface and <strong>describe</strong> how it reduces the chance of user error.&rdquo;</blockquote>
+                            <p class="decode-question-key"><strong>Bold words</strong> show the actions.<br><mark>Highlighted words</mark> show the quantity.</p>
+                        </figure>
+                        <div class="decode-breakdown">
+                            <h4>Break it down</h4>
+                            <dl>
+                                <div>
+                                    <dt><span class="decode-number" aria-hidden="true">1</span>Action</dt>
+                                    <dd>Describe, Give, Describe.</dd>
+                                </div>
+                                <div>
+                                    <dt><span class="decode-number" aria-hidden="true">2</span>Quantity</dt>
+                                    <dd>ONE specific example.</dd>
+                                </div>
+                                <div>
+                                    <dt><span class="decode-number" aria-hidden="true">3</span>Context</dt>
+                                    <dd>Nielsen's Error prevention heuristic in a human-computer interface.</dd>
+                                </div>
+                                <div>
+                                    <dt><span class="decode-number" aria-hidden="true">4</span>Detail</dt>
+                                    <dd>Explain the principle, provide an example and describe how it reduces user mistakes.</dd>
+                                </div>
+                            </dl>
+                        </div>
                     </div>
-                </div>
+                </article>
+                <article class="decode-model-step" aria-labelledby="decode-step-two">
+                    <h3 class="decode-step-heading" id="decode-step-two"><span class="decode-number" aria-hidden="true">2</span>Write the model answer</h3>
+                    <div class="decode-answer">
+                        <p>Nielsen's Error prevention heuristic means designing an interface to stop users from making mistakes before they happen.</p>
+                        <p>For example, an online appointment booking system could grey out dates that are unavailable, preventing users from selecting them.</p>
+                        <p>This reduces user errors because people can only select available appointments, avoiding incorrect bookings and saving time correcting mistakes.</p>
+                    </div>
+                </article>
+                <article class="decode-model-step" aria-labelledby="decode-step-three">
+                    <h3 class="decode-step-heading" id="decode-step-three"><span class="decode-number" aria-hidden="true">3</span>Check the answer against DECODE</h3>
+                    <ul class="decode-checklist" role="list">
+                        <li>
+                            <span class="decode-check-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"></path></svg></span>
+                            <div><h4>Action</h4><p>Describes the principle and explains how it reduces errors.</p></div>
+                        </li>
+                        <li>
+                            <span class="decode-check-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"></path></svg></span>
+                            <div><h4>Quantity</h4><p>Provides exactly ONE example.</p></div>
+                        </li>
+                        <li>
+                            <span class="decode-check-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"></path></svg></span>
+                            <div><h4>Context</h4><p>Uses error prevention in an appointment booking interface.</p></div>
+                        </li>
+                        <li>
+                            <span class="decode-check-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"></path></svg></span>
+                            <div><h4>Detail</h4><p>Explains what the principle means, how it is applied and why it helps users.</p></div>
+                        </li>
+                    </ul>
+                </article>
                 <aside class="decode-remember" aria-label="Remember">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 18h6m-5 3h4M8 14a6 6 0 1 1 8 0c-1 1-1 2-1 4H9c0-2 0-3-1-4Z"></path></svg>
-                    <p><strong>Remember</strong> DECODE helps you work out what to include in your answer before you start writing.</p>
+                    <div>
+                        <p><strong class="decode-remember-title">Remember</strong> DECODE helps you work out what to include in your answer before you start writing.</p>
+                        <p>DECODE is <em>not</em> a paragraph-writing formula. It helps you identify everything your answer needs to include. You can then use <strong>5Ws &amp; H</strong> to develop your ideas and <strong>SEED</strong> to organise longer written responses.</p>
+                    </div>
                 </aside>
             </section>
             <a class="decode-back" href="assessment-standard-card.html?standard=92006">Back to Level 1 Exam Preparation</a>

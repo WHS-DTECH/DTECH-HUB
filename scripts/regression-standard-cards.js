@@ -133,11 +133,29 @@ assert.deepEqual([...breakdown.matchAll(/<dt>[\s\S]*?<\/span>([^<]+)<\/dt>\s*<dd
   .map((match) => [match[1], match[2]]), [
   ["Action", "Describe, Give, Describe."],
   ["Quantity", "ONE specific example."],
-  ["Context", "Error prevention in a human-computer interface."],
-  ["Detail", "Explain what error prevention means, provide an interface example, and describe how it reduces mistakes."]
+  ["Context", "Nielsen's Error prevention heuristic in a human-computer interface."],
+  ["Detail", "Explain the principle, provide an example and describe how it reduces user mistakes."]
 ], "Worked example includes all four supplied explanations as readable text");
-assert.match(decodeHtml, /<strong>Remember<\/strong> DECODE helps you work out what to include in your answer before you start writing\./,
+assert.match(decodeHtml, /<strong class="decode-remember-title">Remember<\/strong> DECODE helps you work out what to include in your answer before you start writing\./,
   "Worked example retains the planning reminder");
+assert.deepEqual([...decodeHtml.matchAll(/<h3 class="decode-step-heading"[^>]*><span[^>]*>\d<\/span>([^<]+)<\/h3>/g)]
+  .map((match) => match[1]), ["DECODE the question", "Write the model answer", "Check the answer against DECODE"],
+  "Model answer follows the three supplied steps");
+const modelAnswer = decodeHtml.match(/<div class="decode-answer">([\s\S]*?)<\/div>/)[1];
+assert.deepEqual([...modelAnswer.matchAll(/<p>([^<]+)<\/p>/g)].map((match) => match[1]), [
+  "Nielsen's Error prevention heuristic means designing an interface to stop users from making mistakes before they happen.",
+  "For example, an online appointment booking system could grey out dates that are unavailable, preventing users from selecting them.",
+  "This reduces user errors because people can only select available appointments, avoiding incorrect bookings and saving time correcting mistakes."
+], "Complete model answer preserves all three supplied paragraphs");
+const answerChecks = decodeHtml.match(/<ul class="decode-checklist"[^>]*>([\s\S]*?)<\/ul>/)[1];
+assert.deepEqual([...answerChecks.matchAll(/<h4>([^<]+)<\/h4><p>([^<]+)<\/p>/g)].map((match) => [match[1], match[2]]), [
+  ["Action", "Describes the principle and explains how it reduces errors."],
+  ["Quantity", "Provides exactly ONE example."],
+  ["Context", "Uses error prevention in an appointment booking interface."],
+  ["Detail", "Explains what the principle means, how it is applied and why it helps users."]
+], "Model answer is checked against all four requirements");
+assert.match(decodeHtml, /DECODE is <em>not<\/em> a paragraph-writing formula\.[\s\S]*?<strong>5Ws &amp; H<\/strong> to develop your ideas and <strong>SEED<\/strong> to organise longer written responses\./,
+  "Reminder distinguishes decoding from idea development and paragraph organisation");
 const resourceLinks = [...resourceMarkup.matchAll(/<a class="student-standard-study-link[^"]*" href="([^"]+)"([^>]+)>\s*<img src="([^"]+)"/g)];
 assert.deepEqual(resourceLinks.map((match) => match[1]), [
   "https://docs.google.com/presentation/d/1NC3TENDS_0XBDVMfFxgxdVAS2_sPn1ESp8RRP_xKYxY/edit?usp=sharing",
