@@ -147,11 +147,14 @@ test("student UI labels completed and excused weeks without confusing school per
     const progress = weeklyTypingProgress(startDate, [], attendance(["A", "A"]), "2026-12-12");
     const context = vm.createContext({
         state: { snapshot: { weeklyProgress: progress } },
+        window: { TypingWeekLabels: require("../practical-skills/typing-week-labels") },
+        weeks: () => Array.from({ length: 7 }, (_, index) => addDays(startDate, index * 7)),
         escapeHtml: value => String(value).replace(/</g, "&lt;"),
         dateLabel: value => value, timeLabel: value => value
     });
     vm.runInContext(source.slice(start, end), context);
-    assert.match(context.weeklyRulesNotice(), /Weeks 5-7: 0 completed &middot; 3 excused/);
+    assert.match(context.weeklyRulesNotice(), /Term Weeks 7-9: 0 completed &middot; 3 excused/);
+    assert.match(context.weeklyRulesNotice(), /Term Weeks 3-6 have no new requirement/);
     assert.match(context.weekAttendance("2026-11-23"), /Week excused/);
     assert.match(context.weekAttendance("2026-11-23"), /school P1/);
     assert.match(context.weekAttendance("2026-11-23"), /No catch-up needed/);

@@ -7,6 +7,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const { DEFAULT_START_DATE, WEEK_COUNT, PERIOD_COUNT, withTypingKitCard, isMonday, addDays, parseTypingResult, certificateUnlockDate, typingCertificateEligible, registerTypingKit } = require("../practical-skills/typing-kit-store");
+const typingWeekLabels = require("../practical-skills/typing-week-labels");
 
 const resultUrl = "https://www.typingtest.com/result.php?acc=97&nwpm=35&gwpm=36&ncpm=175&gcpm=180&dur=60&time=60&chksum=16988&unit=wpm&kh=998&td=null&err=1&hits=180&textfile=mediumText.txt&mobile=0&TIPS=RSHIFT#goog_game_inter";
 const student = "student@school.nz";
@@ -121,6 +122,16 @@ test("seven Monday weeks, fourteen periods, and safe result-link extraction", ()
         resultUrl.replace("hits=180", "hits=180&hits=100")
     ]) assert.throws(() => parseTypingResult(bad), Error, bad);
     assert.equal(parseTypingResult(resultUrl.replace("acc=97", "acc=0").replace("nwpm=35", "nwpm=0")).netWpm, 0, "A zero score remains a valid result");
+});
+
+test("term week labels follow dates, with an explicit log-week fallback outside the known calendar", () => {
+    assert.equal(typingWeekLabels.label("2026-10-12", 1), "Term Week 1");
+    assert.equal(typingWeekLabels.label("2026-11-23", 5), "Term Week 7");
+    assert.equal(typingWeekLabels.label("2026-12-07", 7), "Term Week 9");
+    assert.equal(typingWeekLabels.label("2026-12-14", 1), "Log Week 1");
+    assert.equal(typingWeekLabels.label("2026-10-13", 1), "Log Week 1");
+    assert.equal(typingWeekLabels.range("2026-11-23", 5, "2026-12-07", 7), "Term Weeks 7-9");
+    assert.equal(typingWeekLabels.range("2026-12-07", 1, "2026-12-28", 4), "Log Weeks 1-4");
 });
 
 test("teacher weekly reads and book signatures are independent of typing and certificates", async t => {
@@ -350,7 +361,7 @@ function frontend({ search = "", snapshot, deferred, fetchSource, failFirstPost 
     const context = vm.createContext({
         document: { hidden: false, getElementById: get, querySelector: () => node(),
             addEventListener(name, callback) { events[name] = callback; } },
-        window: { location: { search }, addEventListener(name, callback) { events[name] = callback; } },
+        window: { TypingWeekLabels: typingWeekLabels, location: { search }, addEventListener(name, callback) { events[name] = callback; } },
         localStorage: { getItem: () => auth }, sessionStorage: { getItem: () => null },
         crypto: { randomUUID }, URLSearchParams, Intl, Date, AbortSignal,
         fetch: async (url, options) => {
@@ -518,6 +529,8 @@ test("dashboard renders exactly seven dated weeks and fourteen daily record link
     assert.equal((html.match(/Open daily record/g) || []).length, 14);
     assert.match(html, /26 Oct 2026/);
     assert.match(html, /13 Dec 2026/);
+    assert.deepEqual([...html.matchAll(/<h3>(Term Week \d+)<\/h3>/g)].map(match => match[1]),
+        ["Term Week 3", "Term Week 4", "Term Week 5", "Term Week 6", "Term Week 7", "Term Week 8", "Term Week 9"]);
     assert.match(html, /0 \/ 14 period records started/);
     assert.equal(ui.get("typing-identity-verification").hidden, true);
     assert.match(html, /week=2026-12-07&amp;period=2|week=2026-12-07&period=2/);
@@ -598,7 +611,7 @@ test("latest scorecard shows saved gross speed, accuracy and net speed with an e
         assert.ok(html.includes(`class="typing-score-value">${saved.netWpm}</span>`));
         assert.ok(html.includes(`Net speed: <b>${saved.netWpm} WPM</b>`));
         assert.ok(html.includes(`Accuracy: <b>${saved.accuracy}%</b>`));
-        assert.match(html, /Week 1.*Period 1<\/b>.*Week of 26 Oct 2026/);
+        assert.match(html, /Term Week 3.*Period 1<\/b>.*Week of 26 Oct 2026/);
         assert.match(html, /Then show your teacher/);
         assert.match(html, /ask them to sign your exercise book/);
         assert.match(html, /200<\/td>/, "Earlier attempts remain in the history");
@@ -797,7 +810,7 @@ test("Not Live teacher preview and certificate failures never issue a certificat
 test("dashboard explains the end-of-Week-7 certificate and shows an issued certificate only on the dashboard", async () => {
     const pending = frontend({ snapshot: { startDate: DEFAULT_START_DATE, canManage: false, attempts: [], certificateUnlockDate: "2026-12-11", certificate: null } });
     await settle();
-    assert.match(pending.get("typing-content").innerHTML, /unlocks at the end of Week 7 \(Friday 11 Dec 2026\) once its requirements are met/);
+    assert.match(pending.get("typing-content").innerHTML, /unlocks at the end of Term Week 9 \(Friday 11 Dec 2026\) once its requirements are met/);
     assert.equal(pending.get("worksheet-certificate").hidden, true);
     const certificate = { studentName: "Student Name", detailText: "Seven-week typing practice log | 11 December 2026", issuer: "Westland High School | DTECH-HUB" };
     const issued = frontend({ snapshot: { startDate: DEFAULT_START_DATE, canManage: false, attempts: [], certificateUnlockDate: "2026-12-11", certificate, certificateEmailed: true } });

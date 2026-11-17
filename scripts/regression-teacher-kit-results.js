@@ -123,7 +123,7 @@ test("typing weekly table follows filters and persists independent per-week book
         { name: "Ben", email: "ben@school.nz", timetableClass: "JVE", course: "JuniorDTECH" }];
     const context = vm.createContext({
         document: { getElementById: el, querySelector: el, createElement: element },
-        window: { addEventListener() {}, location: { search: "" } }, URLSearchParams,
+        window: { TypingWeekLabels: require("../practical-skills/typing-week-labels"), addEventListener() {}, location: { search: "" } }, URLSearchParams,
         localStorage: { getItem: () => JSON.stringify({ profile: { email: "teacher@school.nz" } }) },
         Option: function(text, value) { return { textContent: text, value }; },
         fetch: async (url, options) => {
@@ -176,8 +176,8 @@ test("typing weekly table follows filters and persists independent per-week book
     const selectWeek = value => { el("typing-week-filter").value = value; el("typing-week-filter").events.change(); };
     const weekOptions = () => el("typing-week-filter").options.map(option => option.textContent);
     assert.deepEqual(weekOptions().slice(0, 2), ["current", "all"], "Current and All weeks options are unchanged");
-    assert.equal(weekOptions()[2], "Week 1 (26 Oct 2026 - 1 Nov 2026)");
-    assert.equal(weekOptions()[8], "Week 7 (7 Dec 2026 - 13 Dec 2026)");
+    assert.equal(weekOptions()[2], "Term Week 3 (26 Oct 2026 - 1 Nov 2026)");
+    assert.equal(weekOptions()[8], "Term Week 9 (7 Dec 2026 - 13 Dec 2026)");
     assert.equal(el("typing-week-filter").value, "current", "Populating dates preserves the current selection");
     selectWeek("1");
     assert.ok(rows()[0].children[1].children.some(child => /35 WPM - 97%/.test(child.textContent)),
@@ -191,7 +191,7 @@ test("typing weekly table follows filters and persists independent per-week book
     selectWeek("current");
     releaseAttendance();
     await settle();
-    assert.deepEqual(header(), ["Student", "Week 3 (2026-11-09) - Results", "Week 3 - Period 1 signed", "Week 3 - Period 2 signed"],
+    assert.deepEqual(header(), ["Student", "Term Week 5 (2026-11-09) - Results", "Term Week 5 - Period 1 signed", "Term Week 5 - Period 2 signed"],
         "Current NZ Monday defaults to the current Typing Kit week");
     assert.equal(rows()[0].children.length, 4);
     assert.ok(rows()[0].children[1].children.some(child => /13 Nov 2026 - School P2: Not yet held/.test(child.textContent)),
@@ -214,7 +214,7 @@ test("typing weekly table follows filters and persists independent per-week book
     assert.ok(rows()[0].children[1].children.some(child => /38 WPM - 98%/.test(child.textContent)), "Both periods show their saved scores");
     assert.equal(rows()[0].children[13].children[0].textContent, "Excused - absent");
     selectWeek("1");
-    assert.deepEqual(header(), ["Student", "Week 1 (2026-10-26) - Results", "Week 1 - Period 1 signed", "Week 1 - Period 2 signed"]);
+    assert.deepEqual(header(), ["Student", "Term Week 3 (2026-10-26) - Results", "Term Week 3 - Period 1 signed", "Term Week 3 - Period 2 signed"]);
     assert.equal(tick(1).checked, false);
     tick(1).checked = true;
     await tick(1).events.change();
@@ -247,7 +247,7 @@ test("typing weekly table follows filters and persists independent per-week book
     assert.match(el("typing-review-status").textContent, /no current week/i, "Before the calendar, never guess a current week");
     assert.equal(el("class-typing-table-host").children.length, 0);
     selectWeek("7");
-    assert.match(header()[1], /Week 7/, "Past or future weeks can still be selected");
+    assert.match(header()[1], /Term Week 9/, "Past or future weeks can still be selected");
     today = "2026-12-14";
     selectWeek("current");
     await el("class-progress-refresh").events.click();
@@ -256,7 +256,7 @@ test("typing weekly table follows filters and persists independent per-week book
     today = "2026-12-13";
     await el("class-progress-refresh").events.click();
     await settle();
-    assert.match(header()[1], /Week 7/, "Sunday is still in the final week");
+    assert.match(header()[1], /Term Week 9/, "Sunday is still in the final week");
     today = "";
     await el("class-progress-refresh").events.click();
     await settle();
@@ -289,13 +289,13 @@ test("typing weekly table follows filters and persists independent per-week book
     await el("class-progress-refresh").events.click();
     await settle();
     assert.equal(el("typing-week-filter").value, "3", "Calendar refresh keeps the chosen week");
-    assert.equal(weekOptions()[2], "Week 1 (28 Dec 2026 - 3 Jan 2027)", "Calendar changes update dates across years");
+    assert.equal(weekOptions()[2], "Log Week 1 (28 Dec 2026 - 3 Jan 2027)", "Calendar changes update dates across years without guessing term weeks");
     failRead = true;
     await el("class-progress-refresh").events.click();
     await settle();
     assert.match(el("typing-review-status").textContent, /could not be read/);
     assert.equal(el("class-typing-table-host").children.length, 0, "Failed reads do not invent empty results or unsigned ticks");
-    assert.equal(weekOptions()[2], "Week 1", "Failed reads clear stale calendar dates");
+    assert.equal(weekOptions()[2], "Log Week 1", "Failed reads clear stale calendar dates");
     el("class-kit-filter").value = "kit-login";
     el("class-kit-filter").events.change();
     assert.equal(el("class-typing-results").hidden, true);

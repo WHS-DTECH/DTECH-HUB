@@ -258,8 +258,8 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
             const unlock = new Intl.DateTimeFormat("en-NZ", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
                 .format(new Date(`${certificateUnlockDate(startDate)}T00:00:00Z`));
             res.status(409).json({ error: progress.active
-                ? `Your Typing Kit certificate unlocks at the end of Week 7 (${unlock}). From Week 5, save one test per attended week; confirmed fully absent weeks are excused. Unconfirmed attendance needs your teacher's help.`
-                : `Your Typing Kit certificate unlocks at the end of Week 7 (${unlock}) once you have saved a result.` });
+                ? `Your Typing Kit certificate unlocks at the end of the final log week (${unlock}). During the final three log weeks, save one test per attended week; confirmed fully absent weeks are excused. Unconfirmed attendance needs your teacher's help.`
+                : `Your Typing Kit certificate unlocks at the end of the final log week (${unlock}) once you have saved a result.` });
         }
         return certificate;
     }
@@ -335,7 +335,7 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
             if (!(await canManagePracticalSchedule(email))) return res.status(403).json({ error: "Only teaching staff can change the Typing Kit start date." });
             const startDate = req.body?.startDate;
             if (!isMonday(startDate) || startDate < "2000-01-01" || startDate > "2100-12-31") {
-                return res.status(400).json({ error: "Choose a valid Monday for the start of Week 1 (2000-2100)." });
+                return res.status(400).json({ error: "Choose a valid Monday for the start of the seven-week log (2000-2100)." });
             }
             await ensureSchema();
             await pool.query(`UPDATE typing_kit_settings SET start_date = $1, updated_by_email = $2, updated_at = NOW() WHERE id = 'default'`, [startDate, email]);

@@ -64,17 +64,20 @@
     function certificateNotice() {
         if (state.snapshot.certificate) return '<p class="typing-certificate-note"><strong>Certificate issued.</strong> Your Typing Kit certificate is below.</p>';
         const unlock = state.snapshot.certificateUnlockDate;
-        return unlock ? `<p class="typing-certificate-note">Your Typing Kit certificate unlocks at the end of Week 7 (Friday ${dateLabel(unlock)}) once its requirements are met. It is not issued after each session.</p>` : "";
+        return unlock ? `<p class="typing-certificate-note">Your Typing Kit certificate unlocks at the end of ${window.TypingWeekLabels.label(weeks()[6], 7)} (Friday ${dateLabel(unlock)}) once its requirements are met. It is not issued after each session.</p>` : "";
     }
     function weeklyRulesNotice() {
         const progress = state.snapshot.weeklyProgress;
         if (!progress) return "";
-        const rule = "From Typing Kit Week 5, save at least one one-minute test each week you attend DTECH. Away for every scheduled DTECH class that week? The week is excused, with no catch-up required. Weeks 1-4 have no new requirement.";
+        const starts = weeks();
+        const required = window.TypingWeekLabels.range(starts[4], 5, starts[6], 7);
+        const optional = window.TypingWeekLabels.range(starts[0], 1, starts[3], 4);
+        const rule = `During ${required}, save at least one one-minute test each week you attend DTECH. Away for every scheduled DTECH class that week? The week is excused, with no catch-up required. ${optional} have no new requirement.`;
         if (progress.sourceStatus === "loading") return `<p class="typing-attendance-note">${rule}</p>
             <p role="status">Checking Teacher Planner attendance and certificate status... Your typing log is ready to use.</p>`;
         if (!progress.active) return `<p class="typing-attendance-note">${rule} The attendance connection is being set up; the new certificate rule is not active yet.</p>`;
         return `<p class="typing-attendance-note">${rule}</p>
-            <p><strong>Weeks 5-7: ${progress.completedWeeks} completed &middot; ${progress.excusedWeeks} excused</strong></p>
+            <p><strong>${required}: ${progress.completedWeeks} completed &middot; ${progress.excusedWeeks} excused</strong></p>
             <p class="typing-note">Teacher Planner attendance (not the official KAMAR register). ${progress.fetchedAt ? `Checked ${escapeHtml(timeLabel(progress.fetchedAt))}.` : ""} Blank attendance is not treated as absent.</p>
             ${progress.error ? `<p class="typing-attendance-warning" role="status">${escapeHtml(progress.error)}</p>` : ""}`;
     }
@@ -85,7 +88,8 @@
         if (!week) return "";
         if (progress.sourceStatus === "loading") return '<p class="typing-attendance-note" role="status">Checking attendance... You can open your daily record and save results now.</p>';
         if (progress.sourceStatus === "unavailable") return `<p class="typing-attendance-warning" role="status">${escapeHtml(progress.error)}</p>`;
-        const labels = { legacy: "Weeks 1-4: no new weekly requirement", future: "Upcoming week",
+        const starts = weeks();
+        const labels = { legacy: `${window.TypingWeekLabels.range(starts[0], 1, starts[3], 4)}: no new weekly requirement`, future: "Upcoming week",
             completed: "Weekly typing requirement met", excused: "Week excused - away for all DTECH classes. No catch-up needed.",
             required: "One typing test needed this week", pending: "Attendance needs confirmation - not counted as absent" };
         return `<div class="typing-attendance-note" data-week-status="${escapeHtml(week.status)}">
@@ -134,25 +138,25 @@
                 <p class="typing-note">This is your electronic log, not an electronic sign-off. Scores are student-submitted. Submission dates do not verify when a test was taken.</p>
             </section>
             ${state.snapshot.canManage ? `<details class="typing-settings"><summary>Teacher calendar settings</summary>
-                <h2>Week 1 start date</h2>
+                <h2>Seven-week log start date</h2>
                 <p>This shared calendar applies to all students using the Typing Kit. Changing it does not delete results: records outside the new dates remain under Earlier / other dated records.</p>
                 <form id="typing-settings-form">
-                    <label for="typing-start-date">Monday starting Week 1</label>
+                    <label for="typing-start-date">Monday starting the first log week</label>
                     <input id="typing-start-date" type="date" min="2000-01-03" max="2100-12-31" step="7" value="${state.snapshot.startDate}" required>
                     <button class="worksheet-btn worksheet-btn-primary" type="submit">Save start date</button>
                 </form>
             </details>` : ""}
             <section aria-labelledby="typing-weeks-heading"><h2 id="typing-weeks-heading">Your seven-week log</h2>
                 ${starts.map((start, index) => `<article class="typing-week">
-                    <div class="typing-week-heading"><h3>Week ${index + 1}</h3><p>${dateLabel(start)} &ndash; ${dateLabel(addDays(start, 6))}</p></div>
+                    <div class="typing-week-heading"><h3>${window.TypingWeekLabels.label(start, index + 1)}</h3><p>${dateLabel(start)} &ndash; ${dateLabel(addDays(start, 6))}</p></div>
                     <div id="typing-attendance-${start}">${weekAttendance(start)}</div>
                     <div class="typing-periods">${[1, 2].map((period) => {
                         const rows = periodAttempts(start, period);
                         const latest = rows[rows.length - 1];
-                        return `<section class="typing-period ${latest ? "has-results" : ""}" aria-label="Week ${index + 1}, Period ${period}">
+                        return `<section class="typing-period ${latest ? "has-results" : ""}" aria-label="${window.TypingWeekLabels.label(start, index + 1)}, Period ${period}">
                             <h4>Period ${period}</h4><p>${latest ? `Latest: <strong>${score(latest)}</strong>` : "No result saved yet"}</p>
                             <p>${rows.length} saved attempt${rows.length === 1 ? "" : "s"}</p>
-                            <a class="worksheet-btn worksheet-btn-primary" href="${dailyLink(start, period)}" aria-label="Open Week ${index + 1} Period ${period} daily record">Open daily record</a>
+                            <a class="worksheet-btn worksheet-btn-primary" href="${dailyLink(start, period)}" aria-label="Open ${window.TypingWeekLabels.label(start, index + 1)} Period ${period} daily record">Open daily record</a>
                         </section>`;
                     }).join("")}</div>
                 </article>`).join("")}
@@ -181,7 +185,7 @@
     function renderDaily(weekStart, period) {
         const rows = periodAttempts(weekStart, period);
         const index = weeks().indexOf(weekStart);
-        const title = index >= 0 ? `Week ${index + 1} \u00b7 Period ${period}` : `Archived period ${period}`;
+        const title = index >= 0 ? `${window.TypingWeekLabels.label(weekStart, index + 1)} \u00b7 Period ${period}` : `Archived period ${period}`;
         const latest = rows[rows.length - 1];
         document.title = `${title} | Typing Kit`;
         content.innerHTML = `<a href="./typing-kit.html">&larr; Back to Typing Kit Dashboard</a>

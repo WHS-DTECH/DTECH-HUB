@@ -52,7 +52,7 @@
         for (const option of typingWeekFilter.options) {
             const week = weeks?.find(item => String(item.week) === option.value);
             if (!/^[1-7]$/.test(option.value)) continue;
-            option.textContent = `Week ${option.value}`;
+            option.textContent = week ? window.TypingWeekLabels.label(week.weekStart, week.week) : `Log Week ${option.value}`;
             if (!week || !/^\d{4}-\d{2}-\d{2}$/.test(week.weekStart)) continue;
             const start = new Date(`${week.weekStart}T00:00:00Z`);
             if (Number.isNaN(start.getTime()) || start.toISOString().slice(0, 10) !== week.weekStart) continue;
@@ -436,9 +436,10 @@
             const header = node("tr", undefined, node("thead", undefined, table));
             node("th", "Student", header);
             selectedWeeks.forEach(week => {
-                node("th", `Week ${week.week} (${week.weekStart}) - Results`, header);
-                node("th", `Week ${week.week} - Period 1 signed`, header);
-                node("th", `Week ${week.week} - Period 2 signed`, header);
+                const label = window.TypingWeekLabels.label(week.weekStart, week.week);
+                node("th", `${label} (${week.weekStart}) - Results`, header);
+                node("th", `${label} - Period 1 signed`, header);
+                node("th", `${label} - Period 2 signed`, header);
             });
             const body = node("tbody", undefined, table);
             for (const student of students) {
@@ -457,7 +458,7 @@
                 }
                 for (const week of review.weeklyProgress.weeks.filter(item => selectedWeeks.some(selected => selected.weekStart === item.weekStart))) {
                     const cell = node("td", undefined, row);
-                    const labels = { legacy: "Weeks 1-4: optional", future: "Upcoming", completed: "Completed",
+                    const labels = { legacy: "Optional practice week", future: "Upcoming", completed: "Completed",
                         excused: "Excused - absent", required: "Needs a test", pending: "Attendance unconfirmed" };
                     node("strong", labels[week.status], cell);
                     if (review.weeklyProgress.sourceStatus === "available") {
@@ -487,7 +488,7 @@
                         checkbox.type = "checkbox";
                         checkbox.checked = review.signatures.some(entry => entry.weekStart === week.weekStart && entry.period === period && entry.signed);
                         checkbox.disabled = pendingSignatures.size > 0;
-                        checkbox.setAttribute("aria-label", `Book signed for ${student.name} - Week ${week.week} Period ${period}`);
+                        checkbox.setAttribute("aria-label", `Book signed for ${student.name} - ${window.TypingWeekLabels.label(week.weekStart, week.week)} Period ${period}`);
                         node("span", checkbox.checked ? " Signed" : " No", label);
                         checkbox.addEventListener("change", () => saveBookSignature(student, review, week.weekStart, period, checkbox.checked));
                     }
