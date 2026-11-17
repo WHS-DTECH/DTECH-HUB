@@ -89,7 +89,7 @@
                         <p class="activity-block-status" role="status"></p>`;
                 } catch (error) { body = `<p class="activity-block-status">${e(error.message)}</p>`; }
             }
-            return `<section class="activity-content-block" data-content-block="${e(b.id)}">${b.title ? `<h2>${e(b.title)}</h2>` : `<h2>${e(B.types[b.kind])}</h2>`}${b.required ? '<p class="typing-note">Required in automatic-tick activities</p>' : ""}${body}</section>`;
+            return `<section class="activity-content-block${b.kind === "question" && b.questionType === "checklist" && b.showProgress === true ? " activity-content-block--progress" : ""}" data-content-block="${e(b.id)}">${b.title ? `<h2>${e(b.title)}</h2>` : `<h2>${e(B.types[b.kind])}</h2>`}${b.required ? '<p class="typing-note">Required in automatic-tick activities</p>' : ""}${body}</section>`;
         }).join("");
     }
     function bind(host, blocks, options) {

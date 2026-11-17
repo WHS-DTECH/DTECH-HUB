@@ -35,10 +35,17 @@
 .activity-block-onedrive-alert strong:first-child { font-size: 1.1rem; color: #9a2d00; }
 .activity-block-onedrive-alert[hidden] { display: none; }
 .activity-block-completion { padding: 12px 16px; background: #edf5ef; border-left: 4px solid #246b51; border-radius: 8px; }
-.activity-block-columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 18px; align-items: start; }
+.activity-block-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
 .activity-block-columns > * { min-width: 0; }
-.activity-checklist-progress { display: grid; gap: 6px; margin: 14px 0; font-weight: 700; }
-.activity-checklist-progress progress { width: 100%; height: 14px; accent-color: #246b51; }
+.activity-content-block--progress { padding: 24px; border: 2px solid #6abf87; background: linear-gradient(145deg, #f0fff2, #e5f7ff); box-shadow: 0 6px 20px rgba(31, 100, 67, .12); color: #173858; }
+.activity-content-block--progress h2 { color: #145c3d; }
+.activity-content-block--progress label { display: flex; align-items: flex-start; gap: 12px; margin: 10px 0; padding: 12px; border: 1px solid #b5dfc2; border-radius: 10px; background: #fff; cursor: pointer; }
+.activity-content-block--progress input[type=checkbox] { flex: 0 0 26px; width: 26px; height: 26px; margin: 0; accent-color: #16834b; }
+.activity-checklist-progress { display: grid; gap: 8px; margin: 20px 0; font-weight: 700; color: #145c3d; }
+.activity-checklist-progress progress { appearance: none; display: block; width: 100%; height: 22px; border: 0; border-radius: 20px; background: #c1e6ce; accent-color: #16834b; }
+.activity-checklist-progress progress::-webkit-progress-bar { background: #c1e6ce; border-radius: 20px; }
+.activity-checklist-progress progress::-webkit-progress-value { background: #16834b; border-radius: 20px; }
+.activity-checklist-progress progress::-moz-progress-bar { background: #16834b; border-radius: 20px; }
 .activity-content-block a:focus-visible, .activity-content-block button:focus-visible, .activity-content-block input:focus-visible, .activity-content-block textarea:focus-visible { outline: 3px solid #ad6200; outline-offset: 2px; }
 @media(max-width: 760px) { .activity-block-columns { grid-template-columns: 1fr; gap: 0; } }
 @media(max-width: 560px) { .block-palette { grid-template-columns: 1fr; } .activity-content-block { padding: 14px; } }

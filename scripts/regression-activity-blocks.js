@@ -102,9 +102,11 @@ test("optional checklist progress restores saved answers and updates without com
     const view = context.window.ActivityBlockView;
     const render = (answers) => view.markup(activity.blocks, answers, false);
     assert.match(render({}), /0 of 3 completed/);
+    assert.match(render({}), /class="activity-content-block activity-content-block--progress"/);
     assert.match(render({ progress: ["Open", "Save", "obsolete"] }), /2 of 3 completed/);
     assert.match(render({ progress: ["Open", "Save"] }), /<progress data-progress value="2" max="3"/);
     assert.doesNotMatch(view.markup([{ ...checklist, showProgress: false }], {}, false), /data-progress-count/);
+    assert.doesNotMatch(view.markup([{ ...checklist, showProgress: false }], {}, false), /activity-content-block--progress/);
 
     const inputs = checklist.options.map((_, i) => ({ dataset: { option: String(i) }, checked: i === 0 }));
     const count = {}, progress = {};
@@ -328,6 +330,24 @@ test("block API persists answers, verifies receipts, reverses incomplete ticks a
     f.content.activities[0].assessmentId = "existing";
     result = await f.request("/check", { answers: { question: "Work" } });
     assert.equal(result.body.completedActivities[0], undefined, "Specialised marking must not be overridden");
+});
+
+test("manual progress checklist persists across visits without affecting completion", async (t) => {
+    const f = await fixture(t);
+    const checklist = block("question", { id: "progress", questionType: "checklist",
+        options: ["Open", "Build", "Save"], required: false, showProgress: true });
+    f.content.activities[0] = { completionMode: "manual", blocks: [checklist] };
+    let result = await f.request("/check", { answers: { progress: ["Open", "Build"] } });
+    assert.equal(result.body.completedActivities[0], undefined);
+    let answers = B.savedAnswers(f.content.activities[0], 0, f.rows.get(`${f.emails.student}:kit-test`).responses);
+    assert.deepEqual(answers.progress, ["Open", "Build"]);
+    result = await f.request("/check", { answers: { progress: ["Open", "Build", "Save"] } });
+    assert.equal(result.body.completedActivities[0], undefined);
+    f.rows.get(`${f.emails.student}:kit-test`).completed_activities = { 0: "manual" };
+    result = await f.request("/check", { answers: { progress: ["Build"] } });
+    assert.equal(result.body.completedActivities[0], "manual");
+    answers = B.savedAnswers(f.content.activities[0], 0, f.rows.get(`${f.emails.student}:kit-test`).responses);
+    assert.deepEqual(answers.progress, ["Build"]);
 });
 
 test("document API verifies identity, reuses copies concurrently and isolates students", async (t) => {
