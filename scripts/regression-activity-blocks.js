@@ -172,13 +172,13 @@ test("Blueprint Mission compares buildings by view with an empty third building 
     const html = render([intro, ...photos, link]);
     assert.match(html, /data-content-block="blueprint-reference-pictures"[\s\S]*<table class="blueprint-reference-table"[\s\S]*<\/table>[\s\S]*data-content-block="blueprint-slideshow-link"/);
     assert.match(html, /<tr><td><\/td><th scope="col">Eiffel Tower<\/th><th scope="col">Notre-Dame Cathedral<\/th><td><\/td><\/tr>/);
-    const rows = [...html.matchAll(/<th scope="row">(\w+)<\/th>([\s\S]*?)<\/tr>/g)];
+    const rows = [...html.matchAll(/<th scope="row">([^<]+)<\/th>([\s\S]*?)<\/tr>/g)];
     assert.deepEqual(rows.map(([, label, cells]) => [
         label, ...Array.from(cells.matchAll(/data-content-block="blueprint-photo-([^"]+)"/g), (m) => m[1])
     ]), [
         ["Outside", "outside", "notre-dame-outside"],
         ["Inside", "inside", "notre-dame-inside"],
-        ["Details", "details", "notre-dame-plan"]
+        ["Details / Plans", "details", "notre-dame-plan"]
     ]);
     assert.ok(rows.every(([, , cells]) => /<td><\/td>\s*$/.test(cells)));
     assert.match(rows[2][2], /Viollet-le-Duc[\s\S]*href="https:\/\/example.org\/plan"/);

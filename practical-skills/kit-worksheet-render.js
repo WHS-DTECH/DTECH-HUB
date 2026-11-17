@@ -752,7 +752,7 @@
         const rows = [
             ["Outside", "blueprint-photo-outside", "blueprint-photo-notre-dame-outside"],
             ["Inside", "blueprint-photo-inside", "blueprint-photo-notre-dame-inside"],
-            ["Details", "blueprint-photo-details", "blueprint-photo-notre-dame-plan"]
+            ["Details / Plans", "blueprint-photo-details", "blueprint-photo-notre-dame-plan"]
         ];
         const ids = new Set(rows.flatMap(([, ...imageIds]) => imageIds));
         const start = blocks.findIndex((block) => ids.has(block.id));
