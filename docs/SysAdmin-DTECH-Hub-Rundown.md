@@ -216,6 +216,7 @@ Strict cutover checklist (go/no-go):
 - `GET /api/admin/kit-results/:kitId?emails=...` uses parameterised SELECT queries only. It does not call student progress/completion/email handlers, initialise schemas or open/modify Drive files. Access failures are explicit and responses use `private, no-store`.
 - A kit with worksheet titles but no activity definitions permits manual completion ticks; the report warns about this rather than presenting certificates as verified work.
 - Admin users can also open **Licence > Teacher Review** in Teacher View. The menu uses the same admin permission as Upload Kits; the report endpoint still enforces admin access.
+- The Blueprint Mission displays its six existing reference-image blocks in a comparison table: Eiffel Tower, Notre-Dame Cathedral, and an empty building column. Keep those six blocks together in the activity editor to retain the table. The Notre-Dame floor plan appears under Details.
 - Future completion-certificate subjects include the student's certificate name, e.g. `[DTECH HUB] Minecraft Builder Kit - Certificate of Completion - Alex Student`, including teacher catch-up copies. Existing sent mail is unchanged; legacy and named subjects are both recognised when checking prior teacher deliveries.
 
 ### My Class description tracker (October 2026)

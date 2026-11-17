@@ -748,6 +748,40 @@
         </section>`;
     }
 
+    function renderBlueprintReferences(blocks, renderBlocks) {
+        const rows = [
+            ["Outside", "blueprint-photo-outside", "blueprint-photo-notre-dame-outside"],
+            ["Inside", "blueprint-photo-inside", "blueprint-photo-notre-dame-inside"],
+            ["Details", "blueprint-photo-details", "blueprint-photo-notre-dame-plan"]
+        ];
+        const ids = new Set(rows.flatMap(([, ...imageIds]) => imageIds));
+        const start = blocks.findIndex((block) => ids.has(block.id));
+        const images = blocks.slice(start, start + ids.size);
+        const byId = new Map(images.map((block) => [block.id, block]));
+        if (start < 0 || byId.size !== ids.size || !images.every((block) =>
+            ids.has(block.id) && block.kind === "image" && window.ActivityBlocks?.safeUrl(block.url))) {
+            return renderBlocks(blocks);
+        }
+
+        return `${renderBlocks(blocks.slice(0, start))}
+            <div class="blueprint-reference-scroll" role="region" aria-label="Building reference images" tabindex="0">
+                <table class="blueprint-reference-table">
+                    <caption>Building reference images</caption>
+                    <thead>
+                        <tr><td></td><th scope="col">Eiffel Tower</th><th scope="col">Notre-Dame Cathedral</th><td></td></tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(([label, ...imageIds]) => `<tr>
+                            <th scope="row">${label}</th>
+                            ${imageIds.map((id) => `<td data-content-block="${id}">${renderWorksheetImage(byId.get(id))}</td>`).join("")}
+                            <td></td>
+                        </tr>`).join("")}
+                    </tbody>
+                </table>
+            </div>
+            ${renderBlocks(blocks.slice(start + ids.size))}`;
+    }
+
     function renderWorksheet(host, content, options = {}) {
         if (!host) return;
 
@@ -812,7 +846,7 @@
                     <div class="activity-block-columns">
                         <div class="activity-content-blocks">${blockMarkup(blocks.filter((block) => block.column !== "full" && block.column !== "right"))}</div>
                         <div class="activity-content-blocks">${blockMarkup(blocks.filter((block) => block.column === "right"))}</div>
-                    </div>` : `<div class="activity-content-blocks">${blockMarkup(blocks)}</div>`}
+                    </div>` : `<div class="activity-content-blocks">${renderBlueprintReferences(blocks, blockMarkup)}</div>`}
             ` : ""}
             ${imageInformationLayout ? `<div class="worksheet-image-information-layout">` : ""}
             ${images.length ? `

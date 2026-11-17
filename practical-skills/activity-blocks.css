@@ -37,6 +37,15 @@
 .activity-block-completion { padding: 12px 16px; background: #edf5ef; border-left: 4px solid #246b51; border-radius: 8px; }
 .activity-block-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
 .activity-block-columns > * { min-width: 0; }
+.blueprint-reference-scroll { margin: 18px 0; overflow-x: auto; border: 1px solid #cad9df; border-radius: 14px; background: #fff; }
+.blueprint-reference-scroll:focus-visible { outline: 3px solid #ad6200; outline-offset: 2px; }
+.blueprint-reference-table { width: 100%; min-width: 560px; table-layout: fixed; border-collapse: collapse; }
+.blueprint-reference-table caption { padding: 14px; text-align: left; font-weight: 700; font-size: 1.3rem; }
+.blueprint-reference-table th, .blueprint-reference-table td { padding: 10px; border: 1px solid #cad9df; vertical-align: top; overflow-wrap: anywhere; }
+.blueprint-reference-table thead td:first-child { width: 70px; }
+.blueprint-reference-table thead th, .blueprint-reference-table tbody th { background: #edf5ef; }
+.blueprint-reference-table tbody th { text-align: left; }
+.blueprint-reference-table .worksheet-image { margin-inline: auto; }
 .activity-content-block--progress { padding: 24px; border: 2px solid #6abf87; background: linear-gradient(145deg, #f0fff2, #e5f7ff); box-shadow: 0 6px 20px rgba(31, 100, 67, .12); color: #173858; }
 .activity-content-block--progress h2 { color: #145c3d; }
 .activity-content-block--progress label { display: flex; align-items: flex-start; gap: 12px; margin: 10px 0; padding: 12px; border: 1px solid #b5dfc2; border-radius: 10px; background: #fff; cursor: pointer; }

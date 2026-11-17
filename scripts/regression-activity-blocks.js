@@ -153,6 +153,40 @@ test("two-column activity layout is opt-in and keeps the full-width reminder abo
     assert.match(css, /@media\(max-width:\s*760px\)\s*\{\s*\.activity-block-columns\s*\{\s*grid-template-columns:\s*1fr/);
 });
 
+test("Blueprint Mission compares buildings by view with an empty third building column", () => {
+    const context = vm.createContext({ window: { ActivityBlocks: B }, structuredClone, URL });
+    for (const script of ["activity-block-view.js", "kit-worksheet-render.js"]) {
+        vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", script), "utf8"), context);
+    }
+    const photos = ["outside", "details", "inside", "notre-dame-outside", "notre-dame-plan", "notre-dame-inside"].map((name) =>
+        block("image", { id: `blueprint-photo-${name}`, url: `https://example.org/${name}.jpg`, alt: name }));
+    photos[4].attribution = "Viollet-le-Duc";
+    photos[4].sourceUrl = "https://example.org/plan";
+    const host = { style: { setProperty() {} }, querySelectorAll: () => [] };
+    const intro = block("text", { id: "blueprint-reference-pictures" });
+    const link = block("studentlink", { id: "blueprint-slideshow-link", required: true });
+    const render = (blocks) => {
+        context.window.KitWorksheetRender.renderWorksheet(host, { blocks }, { readOnly: true });
+        return host.innerHTML;
+    };
+    const html = render([intro, ...photos, link]);
+    assert.match(html, /data-content-block="blueprint-reference-pictures"[\s\S]*<table class="blueprint-reference-table"[\s\S]*<\/table>[\s\S]*data-content-block="blueprint-slideshow-link"/);
+    assert.match(html, /<tr><td><\/td><th scope="col">Eiffel Tower<\/th><th scope="col">Notre-Dame Cathedral<\/th><td><\/td><\/tr>/);
+    const rows = [...html.matchAll(/<th scope="row">(\w+)<\/th>([\s\S]*?)<\/tr>/g)];
+    assert.deepEqual(rows.map(([, label, cells]) => [
+        label, ...Array.from(cells.matchAll(/data-content-block="blueprint-photo-([^"]+)"/g), (m) => m[1])
+    ]), [
+        ["Outside", "outside", "notre-dame-outside"],
+        ["Inside", "inside", "notre-dame-inside"],
+        ["Details", "details", "notre-dame-plan"]
+    ]);
+    assert.ok(rows.every(([, , cells]) => /<td><\/td>\s*$/.test(cells)));
+    assert.match(rows[2][2], /Viollet-le-Duc[\s\S]*href="https:\/\/example.org\/plan"/);
+    const partial = render([intro, ...photos.slice(0, -1), link]);
+    assert.doesNotMatch(partial, /blueprint-reference-table/);
+    assert.match(partial, /data-content-block="blueprint-photo-notre-dame-plan"/);
+});
+
 test("legacy migration retains response keys, repeated block IDs and original content order", () => {
     const legacy = { questions: [{ id: "answer", prompt: "What?", type: "short-answer" }], images: [{ url: "https://example.org/a", alt: "A" }] };
     assert.equal(B.initialBlocks(legacy, 0, {})[1].responseKey, "answer");
