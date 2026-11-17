@@ -92,6 +92,65 @@ test("question choices and checklists are presence checks, not answer-key markin
     assert.equal(B.grade({ blocks: [{ ...choice, required: false }] }, {}).passed, false);
 });
 
+test("optional checklist progress restores saved answers and updates without completing the activity", () => {
+    const checklist = block("question", { id: "progress", title: "Progress Checklist", text: "Track your progress",
+        questionType: "checklist", options: ["Open", "Build", "Save"], showProgress: true, required: false });
+    const activity = { completionMode: "manual", blocks: [checklist] };
+    B.validate(activity);
+    const context = vm.createContext({ window: { ActivityBlocks: B }, structuredClone });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "activity-block-view.js"), "utf8"), context);
+    const view = context.window.ActivityBlockView;
+    const render = (answers) => view.markup(activity.blocks, answers, false);
+    assert.match(render({}), /0 of 3 completed/);
+    assert.match(render({ progress: ["Open", "Save", "obsolete"] }), /2 of 3 completed/);
+    assert.match(render({ progress: ["Open", "Save"] }), /<progress data-progress value="2" max="3"/);
+    assert.doesNotMatch(view.markup([{ ...checklist, showProgress: false }], {}, false), /data-progress-count/);
+
+    const inputs = checklist.options.map((_, i) => ({ dataset: { option: String(i) }, checked: i === 0 }));
+    const count = {}, progress = {};
+    let inputHandler, saved;
+    const section = {
+        dataset: { contentBlock: "progress" },
+        addEventListener: (event, handler) => { if (event === "input") inputHandler = handler; },
+        querySelector: (selector) => selector === "[data-progress-count]" ? count : progress,
+        querySelectorAll: () => inputs.filter((input) => input.checked)
+    };
+    view.bind({ querySelectorAll: () => [section] }, activity.blocks,
+        { answers: { progress: ["Open"] }, onChange: (answers) => { saved = answers; } });
+    inputs[1].checked = true;
+    inputHandler({ target: inputs[1] });
+    assert.equal(count.textContent, "2 of 3 completed");
+    assert.equal(progress.value, 2);
+    assert.deepEqual(saved.progress, ["Open", "Build"]);
+    assert.equal(activity.completionMode, "manual");
+    assert.equal(B.grade(activity, saved).passed, false);
+    inputs[0].checked = false;
+    inputHandler({ target: inputs[0] });
+    assert.equal(count.textContent, "1 of 3 completed");
+    assert.deepEqual(saved.progress, ["Build"]);
+});
+
+test("two-column activity layout is opt-in and keeps the full-width reminder above both columns", () => {
+    const context = vm.createContext({ window: { ActivityBlocks: B }, structuredClone });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "activity-block-view.js"), "utf8"), context);
+    context.window.ActivityBlockView.bind = () => {};
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet-render.js"), "utf8"), context);
+    const blocks = [
+        block("text", { id: "reminder", column: "full" }),
+        block("text", { id: "instructions" }),
+        block("question", { id: "checklist", column: "right", questionType: "checklist", options: ["One"], showProgress: true })
+    ];
+    const host = { style: { setProperty() {} } };
+    context.window.KitWorksheetRender.renderWorksheet(host, { blocks, blockLayout: "two-column", completionMode: "manual" }, { readOnly: true });
+    assert.match(host.innerHTML, /Completion: when you have finished the activity, choose Mark Activity Complete below/);
+    assert.match(host.innerHTML, /data-content-block="reminder"[\s\S]*activity-block-columns[\s\S]*data-content-block="instructions"[\s\S]*data-content-block="checklist"/);
+    assert.match(host.innerHTML, /data-option="0"[^>]*disabled/);
+    context.window.KitWorksheetRender.renderWorksheet(host, { blocks }, { readOnly: true });
+    assert.doesNotMatch(host.innerHTML, /activity-block-columns/);
+    const css = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "activity-blocks.css"), "utf8");
+    assert.match(css, /@media\(max-width:\s*760px\)\s*\{\s*\.activity-block-columns\s*\{\s*grid-template-columns:\s*1fr/);
+});
+
 test("legacy migration retains response keys, repeated block IDs and original content order", () => {
     const legacy = { questions: [{ id: "answer", prompt: "What?", type: "short-answer" }], images: [{ url: "https://example.org/a", alt: "A" }] };
     assert.equal(B.initialBlocks(legacy, 0, {})[1].responseKey, "answer");

@@ -763,6 +763,7 @@
                 images,
                 taskBrief: activity?.taskBrief,
                 blocks: activity?.blocks,
+                blockLayout: activity?.blockLayout,
                 completionMode: activity?.completionMode,
                 uniqueDocumentLinks: activity?.uniqueDocumentLinks,
                 noGoogleLinks: activity?.noGoogleLinks,

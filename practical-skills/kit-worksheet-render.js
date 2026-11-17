@@ -762,6 +762,8 @@
         (blocks || []).forEach((block) => {
             if (block.responseKey && blockAnswers[block.id] === undefined) blockAnswers[block.id] = responses[block.responseKey];
         });
+        const blockMarkup = (items) => window.ActivityBlockView.markup(items, blockAnswers, readOnly || options.blocksReadOnly,
+            { renderImage: (image) => renderWorksheetImage(image), unityEditor: content.unityEditor, noGoogleLinks: content.noGoogleLinks === true });
         const imageInformationLayout = Boolean(content?.information && images.length);
         const juniorLoginSites = [7, 8].includes(options.huntProfile?.year);
         const siteLevel = options.huntProfile?.courseIds?.includes("STAFF") ? "staff" : juniorLoginSites ? "junior"
@@ -805,7 +807,12 @@
                             ? "Auto-Completed: submit the required HTTPS sharing link to your document or PDF. Use a different file for every activity. Duplicate files do not earn ticks. Links are checked, not file contents or sharing permissions."
                             : "Automatic tick: complete all required interactive blocks. Written answers are checked for presence, not correctness. A document copy confirms creation only."
                         : "Completion: when you have finished the activity, choose Mark Activity Complete below."}</p>
-                <div class="activity-content-blocks">${window.ActivityBlockView.markup(blocks, blockAnswers, readOnly || options.blocksReadOnly, { renderImage: (image) => renderWorksheetImage(image), unityEditor: content.unityEditor, noGoogleLinks: content.noGoogleLinks === true })}</div>
+                ${content.blockLayout === "two-column" ? `
+                    <div class="activity-content-blocks">${blockMarkup(blocks.filter((block) => block.column === "full"))}</div>
+                    <div class="activity-block-columns">
+                        <div class="activity-content-blocks">${blockMarkup(blocks.filter((block) => block.column !== "full" && block.column !== "right"))}</div>
+                        <div class="activity-content-blocks">${blockMarkup(blocks.filter((block) => block.column === "right"))}</div>
+                    </div>` : `<div class="activity-content-blocks">${blockMarkup(blocks)}</div>`}
             ` : ""}
             ${imageInformationLayout ? `<div class="worksheet-image-information-layout">` : ""}
             ${images.length ? `

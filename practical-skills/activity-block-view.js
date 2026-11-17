@@ -58,6 +58,10 @@
                 <p class="activity-block-status" data-school-licence-status role="status"></p>`;
             if (b.kind === "question") {
                 body = `<p class="activity-block-text">${e(b.text)}</p>`;
+                if (b.questionType === "checklist" && b.showProgress === true) {
+                    const count = (b.options || []).filter((option) => Array.isArray(value) && value.includes(option)).length;
+                    body += `<div class="activity-checklist-progress"><span data-progress-count aria-live="polite">${count} of ${(b.options || []).length} completed</span><progress data-progress value="${count}" max="${(b.options || []).length}" aria-label="${e(b.title || "Checklist")} progress"></progress></div>`;
+                }
                 if (b.questionType === "short-answer" || !b.questionType) body += `<label>Your answer<textarea data-answer ${disabled}>${e(value || "")}</textarea></label>`;
                 else body += (b.options || []).map((option, i) => `<label><input type="${b.questionType === "checklist" ? "checkbox" : "radio"}" name="block-${e(b.id)}" data-option="${i}" ${b.questionType === "checklist" ? (Array.isArray(value) && value.includes(option) ? "checked" : "") : value === option ? "checked" : ""} ${disabled}> ${e(option)}</label>`).join("");
                 if (renderImage && Array.isArray(b.images)) body = b.images.map(renderImage).join("") + body;
@@ -176,6 +180,10 @@
                 else if (b.kind === "question") {
                     const value = b.questionType === "checklist" ? [...section.querySelectorAll("[data-option]:checked")].map((n) => b.options[Number(n.dataset.option)])
                         : b.questionType === "multiple-choice" ? b.options[Number(input.dataset.option)] : input.value;
+                    if (b.questionType === "checklist" && b.showProgress === true) {
+                        section.querySelector("[data-progress-count]").textContent = `${value.length} of ${b.options.length} completed`;
+                        section.querySelector("[data-progress]").value = value.length;
+                    }
                     changed(b, value);
                     if (b.responseKey) options.onLegacyChange?.(b.responseKey, value);
                 }
