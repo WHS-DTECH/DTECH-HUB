@@ -8,7 +8,7 @@
     <title>Computing History Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=2">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=3">
 </head>
 <body>
     <div class="page-shell">
@@ -57,7 +57,7 @@
                     <h2>Propose a new cloud</h2>
                     <p id="web-proposal-parent"></p>
                     <form id="web-proposal-form">
-                        <label>Cloud title<input name="title" required maxlength="120"></label>
+                        <label>Cloud title<textarea name="title" rows="1" required maxlength="120"></textarea></label>
                         <label>Historical description<textarea name="description" rows="4" required maxlength="2000"></textarea></label>
                         <label>Historical significance<textarea name="significance" rows="3" required maxlength="2000"></textarea></label>
                         <fieldset>
@@ -104,7 +104,7 @@
                     <form id="web-form" class="kw-panel" hidden>
                         <h2 id="web-editor-title">Edit cloud</h2>
                         <p id="web-metadata"></p>
-                        <label>Cloud title<input name="title" required maxlength="120"></label>
+                        <label>Cloud title<textarea name="title" rows="1" required maxlength="120"></textarea></label>
                         <label>Description<textarea name="description" rows="4" required maxlength="2000"></textarea></label>
                         <label>Historical significance<textarea name="significance" rows="3" required maxlength="2000"></textarea></label>
                         <fieldset>
@@ -140,6 +140,6 @@
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="/script.js?v=knowledge-web-2"></script>
-    <script src="/knowledge-web/web.js?v=3"></script>
+    <script src="/knowledge-web/web.js?v=4"></script>
 </body>
 </html>

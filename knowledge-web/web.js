@@ -24,6 +24,18 @@
         return el;
     }
 
+    function resizeTextareas(container) {
+        container.querySelectorAll("textarea").forEach((field) => {
+            if (!field.getClientRects().length) return;
+            field.style.height = "auto";
+            field.style.height = `${field.scrollHeight + field.offsetHeight - field.clientHeight}px`;
+        });
+    }
+
+    function mainField(target, name) {
+        return target.querySelector(`:scope > label > [name="${name}"]`);
+    }
+
     async function request(path, options = {}) {
         const response = await fetch(`/api/knowledge-web/${path}`, {
             ...options, headers: withHubAuthHeaders({ "Content-Type": "application/json" }, undefined, true),
@@ -139,7 +151,8 @@
         row.append(element("legend", kind === "source" ? "Source" : "Dated event"));
         for (const [key, title, limit] of fields) {
             const label = element("label", title);
-            const input = element("input");
+            const input = element(key === "date" || key === "publicationDate" ? "input" : "textarea");
+            if (input.tagName === "TEXTAREA") input.rows = 1;
             input.name = key;
             input.maxLength = limit;
             input.required = key !== "publicationDate";
@@ -153,9 +166,10 @@
             else state.dirty = true;
         }));
         host.append(row);
+        resizeTextareas(row);
         if (focus) {
             state.dirty = true;
-            row.querySelector("input").focus();
+            row.querySelector("input, textarea").focus();
         }
     }
 
@@ -170,7 +184,7 @@
         node("metadata").textContent = cloud
             ? `${cloud.publishedAt ? "Published" : "Unpublished draft"} · ${cloud.contributor} · Added ${formatDate(cloud.createdAt)} · Updated ${formatDate(cloud.updatedAt)}`
             : "This cloud will not appear on the shared web until published.";
-        for (const key of ["title", "description", "significance"]) form.elements.namedItem(key).value = cloud?.[key] || "";
+        for (const key of ["title", "description", "significance"]) mainField(form, key).value = cloud?.[key] || "";
         form.elements.namedItem("x").value = cloud?.position.x ?? 30;
         form.elements.namedItem("y").value = cloud?.position.y ?? 30;
         node("sources").replaceChildren();
@@ -179,7 +193,8 @@
         cloud?.events.forEach((event) => addRow("event", event));
         node("save").textContent = cloud?.publishedAt ? "Save changes" : "Save draft";
         node("publish").hidden = Boolean(cloud?.publishedAt);
-        if (focus) form.elements.namedItem("title").focus();
+        resizeTextareas(form);
+        if (focus) mainField(form, "title").focus();
     }
 
     function renderManagement() {
@@ -192,9 +207,9 @@
     }
 
     function setFormValues(target, values) {
-        for (const [key, value] of Object.entries(values)) {
-            const field = target.elements.namedItem(key);
-            if (field) field.value = value ?? "";
+        for (const key of ["title", "description", "significance", "connection"]) {
+            const field = mainField(target, key);
+            if (field) field.value = values[key] ?? "";
         }
     }
 
@@ -212,7 +227,7 @@
         state.duplicatesAcknowledgedTitle = "";
         proposalForm.reset();
         setFormValues(proposalForm, proposal || {});
-        proposalForm.elements.namedItem("connection").value = proposal?.connection || "";
+        mainField(proposalForm, "connection").value = proposal?.connection || "";
         node("proposal-parent").textContent = `Your original cloud: ${originalCloud.title}`;
         node("proposal-parent-title").textContent = originalCloud.title;
         node("proposal-sources").replaceChildren();
@@ -227,7 +242,8 @@
         node("submit-proposal").hidden = ["Submitted", "Approved", "Declined"].includes(proposal?.status);
         node("save-proposal").hidden = ["Submitted", "Approved", "Declined"].includes(proposal?.status);
         node("proposal").hidden = false;
-        node("proposal-form").querySelector("input[name=title]").focus();
+        resizeTextareas(proposalForm);
+        mainField(proposalForm, "title").focus();
         node("proposal").scrollIntoView({ block: "start", behavior: "smooth" });
     }
 
@@ -350,13 +366,13 @@
 
     function entries(id) {
         return [...node(id).children].map((row) => ({
-            ...Object.fromEntries([...row.querySelectorAll("input")].map((input) => [input.name, input.value])),
+            ...Object.fromEntries([...row.querySelectorAll("input, textarea")].map((input) => [input.name, input.value])),
             ...(row.dataset.id ? { id: row.dataset.id } : {})
         }));
     }
 
     async function saveProposal(intent, duplicatesAcknowledged = false) {
-        const value = (key) => proposalForm.elements.namedItem(key).value;
+        const value = (key) => mainField(proposalForm, key).value;
         const title = value("title").trim();
         if (intent === "submit" && !proposalForm.reportValidity()) return;
         const editing = state.editingProposal;
@@ -454,7 +470,7 @@
         if (publish && !window.confirm("Publish this cloud and its sources to the shared Knowledge Web?")) return;
         const editing = state.editing;
         const revision = state.revision;
-        const value = (key) => form.elements.namedItem(key).value;
+        const value = (key) => (mainField(form, key) || form.elements.namedItem(key)).value;
         const body = {
             title: value("title"), description: value("description"), significance: value("significance"),
             position: { x: Number(value("x")), y: Number(value("y")) }, events: entries("events"), sources: entries("sources"),
@@ -556,7 +572,10 @@
     node("zoom-in").addEventListener("click", () => zoom(state.zoom + .25));
     node("reset").addEventListener("click", () => { zoom(1); node("viewport").scrollTo(0, 0); });
     node("retry").addEventListener("click", () => { void load(true); });
-    proposalForm.addEventListener("input", () => { state.proposalDirty = true; });
+    proposalForm.addEventListener("input", (event) => {
+        state.proposalDirty = true;
+        if (event.target.matches("textarea")) resizeTextareas(event.target.parentElement);
+    });
     node("add-proposal-source").addEventListener("click", () => addRow("source", {}, true, "proposal-sources"));
     node("add-connection-source").addEventListener("click", () => addRow("source", {}, true, "connection-sources"));
     node("add-proposal-event").addEventListener("click", () => addRow("event", {}, true, "proposal-events"));
@@ -570,7 +589,18 @@
         event.preventDefault();
         void saveProposal("submit");
     });
-    form.addEventListener("input", () => { state.dirty = true; });
+    form.addEventListener("input", (event) => {
+        state.dirty = true;
+        if (event.target.matches("textarea")) resizeTextareas(event.target.parentElement);
+    });
+    window.addEventListener("resize", () => {
+        resizeTextareas(form);
+        resizeTextareas(proposalForm);
+    });
+    document.fonts?.ready.then(() => {
+        resizeTextareas(form);
+        resizeTextareas(proposalForm);
+    });
     window.addEventListener("hub-auth-state-changed", () => { void load(); });
     window.addEventListener("beforeunload", (event) => {
         if (state.dirty || state.proposalDirty) { event.preventDefault(); event.returnValue = true; }

@@ -6,6 +6,7 @@
 .knowledge-web p, .knowledge-web li { overflow-wrap: anywhere; }
 .knowledge-web :is(input, textarea, button, fieldset) { border: 1px solid #7998a3; border-radius: .5rem; background: #fff; color: var(--kw-ink); font: inherit; padding: .5rem; }
 .knowledge-web :is(input, textarea) { width: 100%; }
+.knowledge-web textarea { overflow: hidden; overflow-wrap: anywhere; resize: none; }
 .knowledge-web button { cursor: pointer; }
 .knowledge-web button:hover, .knowledge-web button[aria-pressed="true"] { background: #dfedf3; border-color: var(--kw-accent); }
 .knowledge-web button:disabled { cursor: default; opacity: .7; }
@@ -16,7 +17,7 @@
 .kw-columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1rem; align-items: start; }
 #web-manage .kw-columns { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
 .kw-panel { min-width: 0; padding: 1rem; border: 1px solid #b6cdd5; border-radius: .8rem; background: #fff; }
-#web-results, #web-drafts { list-style: none; padding: 0; margin: .4rem 0; max-height: 12rem; overflow: auto; }
+#web-results, #web-drafts { list-style: none; padding: 0; margin: .4rem 0; }
 #web-results button, #web-drafts button { margin: .25rem; text-align: left; }
 .kw-viewport { height: min(52vh, 30rem); min-height: 16rem; overflow: auto; border: 1px solid #7998a3; border-radius: .65rem; background: #e8f4fa; }
 #web-board { position: relative; }
