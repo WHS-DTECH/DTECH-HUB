@@ -240,7 +240,7 @@
         return `/api/practical-skills/blocks/${encodeURIComponent(state.kitId)}/${index}`;
     }
 
-    async function checkBlockAnswers(index) {
+    async function checkBlockAnswers(index, confirmCompletion = false) {
         if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh and try again.");
         const email = state.email;
         const revision = state.blockRevision;
@@ -250,14 +250,15 @@
             if (getSignedInEmail() !== email) throw new Error("Your signed-in account changed. Reopen this activity.");
             const result = await loadJson(`${blockPath(index)}/check`, {
                 method: "POST", headers: withAuthHeaders({ "Content-Type": "application/json" }),
-                body: JSON.stringify({ answers: state.responses[`${index}-blocks`] || {} })
+                body: JSON.stringify({ answers: state.responses[`${index}-blocks`] || {}, confirmCompletion })
             });
             if (getSignedInEmail() !== email || revision !== state.blockRevision) return result;
             state.completedActivities = result.completedActivities;
             updateActivityCompleteBar();
             const auto = state.content.activities[index].completionMode === "auto" && !window.ActivityBlocks.specialised(state.content.activities[index]);
             showStatusMessage(auto
-                ? result.passed ? "Activity complete! Your answers and automatic tick are saved."
+                ? result.passed ? state.completedActivities[index] ? "Activity complete! Your answers and automatic tick are saved."
+                    : "Answers saved. Select Check & Save Activity to earn your completion tick again."
                     : result.results.find((r) => r.message)?.message || `Answers saved. Complete ${result.results.filter((r) => !r.passed).length} remaining required block(s) to earn your tick.`
                 : "Your activity answers are saved.");
             return result;
@@ -577,7 +578,7 @@
         queueProgressWrite(() => loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${activityIndex}/check`, {
             method: "POST",
             headers: withAuthHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ answers: { ...state.responses } })
+            body: JSON.stringify({ answers: { ...state.responses }, passive: true })
         })).then((grade) => {
             state.completedActivities = grade.completedActivities;
             updateActivityCompleteBar();
@@ -589,7 +590,7 @@
         }).catch(() => {});
     }
 
-    function scheduleSearchActivityAutoMark(activityIndex, assessmentId) {
+    function scheduleSearchActivityAutoMark(activityIndex, assessmentId, passive = false) {
         if (!state.email || !state.progressLoaded || state.completedActivities[activityIndex]) return;
         const baseQuestionIds = assessmentId === "search-keyword-challenge-v1"
             ? [
@@ -636,7 +637,7 @@
                 const grade = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${activityIndex}/check`, {
                     method: "POST",
                     headers: withAuthHeaders({ "Content-Type": "application/json" }),
-                    body: JSON.stringify({ answers })
+                    body: JSON.stringify({ answers, passive })
                 });
                 state.completedActivities = grade.completedActivities;
                 updateActivityCompleteBar();
@@ -926,7 +927,7 @@
             });
             if (activity?.documentCheck) renderDocumentCheck(host, activityIndex);
             if (["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1", "search-and-find-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
-                scheduleSearchActivityAutoMark(activityIndex, activity.questionAutoMarkAssessmentId);
+                scheduleSearchActivityAutoMark(activityIndex, activity.questionAutoMarkAssessmentId, true);
             }
             if (activity?.questionAutoMarkAssessmentId === "search-and-find-v1") {
                 showSavedSearchAndFindFeedback(activityIndex, questions);
@@ -991,7 +992,7 @@
                 if (activity?.completionMode === "auto" && !window.ActivityBlocks.specialised(activity)) {
                     const email = state.email;
                     const revision = state.blockRevision;
-                    const result = await checkBlockAnswers(index);
+                    const result = await checkBlockAnswers(index, true);
                     if (activity.unityTestProjectVersion && result.passed &&
                         email === getSignedInEmail() && revision === state.blockRevision) {
                         const remaining = state.content.worksheets.filter((worksheet, activityIndex) =>
@@ -1193,12 +1194,15 @@
             let siteGrade;
             const index = getCurrentActivityIndex();
             const savedSiteAnswers = state.responses[`${index}-login-sites-readiness-v1`];
-            if (currentActivity?.loginSites && !state.completedActivities[index] && savedSiteAnswers &&
+            if (!progressPayload.certificateRevoked && currentActivity?.loginSites && !state.completedActivities[index] && savedSiteAnswers &&
                 window.KitWorksheetRender.visibleLoginSites(currentActivity.loginSites, state.huntProfile).some((site) => site.readinessQuestion)) {
                 siteGrade = await checkLoginSiteCompletion(index, savedSiteAnswers);
             }
             renderPage();
             updateCompleteBar(progressPayload?.kit);
+            if (progressPayload.certificateRevoked) {
+                showStatusMessage("Your previous certificate was revoked. Your work is still saved. Complete each activity again to earn a new certificate.");
+            }
             if (state.kitId === "kit-google-search" && Object.keys(identityDraft).length) queueResponseSave();
             if (progressPayload?.certificateEmailed && state.certificate) {
                 certificateStatus(`Ka pai! A copy of your certificate has been emailed to ${state.email}.`);

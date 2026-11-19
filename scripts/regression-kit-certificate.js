@@ -27,6 +27,7 @@ async function main() {
     const queries = [];
     const context = vm.createContext({
         withKitCertificateEmailLock: async (_pool, _hasDatabase, _email, _kitId, callback) => callback(),
+        minecraftPrerequisite: { status: async () => null },
         ...certificateTools, ...assessment, ...loginSites,
         app: Object.fromEntries(["get", "post", "put"].map((method) => [method, (url, handler) => { handlers[`${method} ${url}`] = handler; }])),
         requireAdminAccess: () => {},
@@ -216,6 +217,24 @@ async function main() {
     assert.equal(sent.length, 3);
     await call("post", "/reset");
     assert.equal((await call("get", "")).body.certificate, null);
+    const revoked = context.memoryPracticalSkillsProgress.get(`${email}:kit-login`);
+    revoked.certificate_revoked_at = new Date().toISOString();
+    revoked.responses = { "0-blocks": { saved: "keep me" } };
+    content.activities[0] = { completionMode: "auto" };
+    context.ActivityBlocks = { specialised: () => false, savedAnswers: () => ({}), grade: () => ({ passed: true }) };
+    const reopened = await call("get", "");
+    assert.equal(reopened.body.certificateRevoked, true);
+    assert.deepEqual(Object.keys(reopened.body.completedActivities), [], "Saved passing answers do not restore a revoked tick");
+    assert.equal(reopened.body.responses["0-blocks"].saved, "keep me");
+    assert.equal((await call("get", "/certificate.pdf")).code, 409);
+    await context.setPracticalSkillsActivityCompletion(email, "kit-login", 0, true, { passive: true });
+    await call("put", "/activities/:activityIndex", { params: { kitId: "kit-login", activityIndex: "1" } });
+    assert.equal((await call("get", "")).body.certificate, null, "Checking only one activity cannot restore the other");
+    await context.setPracticalSkillsActivityCompletion(email, "kit-login", 0, true);
+    assert.ok((await call("get", "")).body.certificate, "Successful fresh checks can re-earn a certificate");
+    content.activities[0] = {};
+    delete context.memoryPracticalSkillsProgress.get(`${email}:kit-login`).certificate_revoked_at;
+    await call("post", "/reset");
     assert.equal(certificateTools.allActivitiesComplete({ worksheets: [] }, { completed_activities: {} }), false);
     context.smtpTransporter = null;
     assert.equal((await call("post", "/certificate/email")).code, 503);

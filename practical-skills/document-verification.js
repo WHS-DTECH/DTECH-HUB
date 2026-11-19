@@ -392,7 +392,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                 }
                 await save(email, item.kit, item.index, item.documentKey, item.policy, result.passed, "automatic",
                     { ...result, modifiedTime: after.modifiedTime });
-                const synced = await syncCompletion(email, item.kit, item.content);
+                const synced = await syncCompletion(email, item.kit, item.content, { recheckDocumentIndex: item.index });
                 if (synced.completed) void autoEmailKitCertificate(req, item.kit);
                 res.json({ verification: await get(email, item.kit, item.index, item.activity, current.row.responses),
                     completedActivities: synced.completed_activities });
@@ -444,7 +444,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                     await pool.query(`DELETE FROM practical_skills_submissions WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3`,
                         [email, item.kit, item.index]);
                 }
-                const synced = await syncCompletion(email, item.kit, item.content);
+                const synced = await syncCompletion(email, item.kit, item.content, { recheckDocumentIndex: item.index });
                 if (synced.completed && req.body.approved) void autoEmailKitCertificate(req, item.kit, undefined, email);
                 res.json({ verification: await get(email, item.kit, item.index, item.activity, item.row.responses),
                     completedActivities: synced.completed_activities, kitCompleted: Boolean(synced.completed) });

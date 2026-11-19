@@ -4674,6 +4674,7 @@ async function ensurePracticalSkillsProgressSchema() {
       await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed_activities JSONB NOT NULL DEFAULT '{}'::jsonb`);
       await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS certificate_emailed_at TIMESTAMPTZ`);
       await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS search_tick_recovery_version INTEGER NOT NULL DEFAULT 0`);
+      await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS certificate_revoked_at TIMESTAMPTZ`);
     })().catch((error) => { practicalSkillsProgressSchemaReady = null; throw error; });
   }
   await practicalSkillsProgressSchemaReady;
@@ -5752,7 +5753,7 @@ async function savePracticalSkillsKitResponses(studentEmail, kitId, responses) {
   return result.rows?.[0] || null;
 }
 
-async function setPracticalSkillsActivityCompletion(studentEmail, kitId, activityIndex, completed) {
+async function setPracticalSkillsActivityCompletion(studentEmail, kitId, activityIndex, completed, { passive = false } = {}) {
   const email = normalizeEmail(studentEmail);
   await ensurePracticalSkillsProgressRow(email, kitId);
   const key = String(activityIndex);
@@ -5761,6 +5762,7 @@ async function setPracticalSkillsActivityCompletion(studentEmail, kitId, activit
   if (!hasDatabase) {
     const progressKey = `${email}:${kitId}`;
     const existing = memoryPracticalSkillsProgress.get(progressKey);
+    if (passive && existing.certificate_revoked_at && !existing.completed) return existing;
     const completedActivities = { ...existing.completed_activities };
     if (completed) completedActivities[key] = completedAt;
     else delete completedActivities[key];
@@ -5773,19 +5775,19 @@ async function setPracticalSkillsActivityCompletion(studentEmail, kitId, activit
     ? await pool.query(
         `UPDATE practical_skills_progress
          SET completed_activities = jsonb_set(completed_activities, ARRAY[$1::text], to_jsonb($2::text)), updated_at = NOW()
-         WHERE student_email = $3 AND kit_id = $4 RETURNING *`,
-        [key, completedAt, email, kitId]
+         WHERE student_email = $3 AND kit_id = $4 AND (NOT $5::boolean OR certificate_revoked_at IS NULL OR completed) RETURNING *`,
+        [key, completedAt, email, kitId, passive]
       )
     : await pool.query(
         `UPDATE practical_skills_progress
          SET completed_activities = completed_activities - $1::text, updated_at = NOW()
-         WHERE student_email = $2 AND kit_id = $3 RETURNING *`,
-        [key, email, kitId]
+         WHERE student_email = $2 AND kit_id = $3 AND (NOT $4::boolean OR certificate_revoked_at IS NULL OR completed) RETURNING *`,
+        [key, email, kitId, passive]
       );
-  return result.rows?.[0] || null;
+  return result.rows?.[0] || (passive ? await ensurePracticalSkillsProgressRow(email, kitId) : null);
 }
 
-async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex, grade) {
+async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex, grade, { passive = false } = {}) {
   const email = normalizeEmail(studentEmail);
   await ensurePracticalSkillsProgressRow(email, kitId);
   const activityKey = String(activityIndex);
@@ -5811,7 +5813,7 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
       },
       completed_activities: {
         ...existing.completed_activities,
-        ...(grade.passed ? { [activityKey]: completedAt } : {})
+        ...(grade.passed && (!passive || !existing.certificate_revoked_at || existing.completed) ? { [activityKey]: completedAt } : {})
       },
       updated_at: completedAt
     };
@@ -5824,12 +5826,12 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
      SET responses = CASE WHEN $8::boolean OR $10::boolean THEN responses || $2::jsonb
            WHEN $9::boolean THEN jsonb_set(responses, ARRAY[$1::text], COALESCE(responses -> $1::text, '{}'::jsonb) || $2::jsonb)
            ELSE jsonb_set(responses, ARRAY[$1::text], $2::jsonb) END,
-         completed_activities = CASE WHEN $5::boolean
+         completed_activities = CASE WHEN $5::boolean AND (NOT $11::boolean OR certificate_revoked_at IS NULL OR completed)
            THEN jsonb_set(completed_activities, ARRAY[$3::text], to_jsonb($4::text))
            ELSE completed_activities END,
          updated_at = NOW()
      WHERE student_email = $6 AND kit_id = $7 RETURNING *`,
-    [responseKey, JSON.stringify(answers), activityKey, completedAt, grade.passed, email, kitId, Boolean(grade.identityLesson), mergeSiteAnswers, mergeQuestionAnswers]
+    [responseKey, JSON.stringify(answers), activityKey, completedAt, grade.passed, email, kitId, Boolean(grade.identityLesson), mergeSiteAnswers, mergeQuestionAnswers, passive]
   );
   if (!result.rows?.[0]) throw new Error("Activity progress could not be saved.");
   return result.rows[0];
@@ -6237,7 +6239,8 @@ app.use(async (req, _res, next) => {
     (["GET", "POST"].includes(req.method) && req.path === "/api/practical-skills/drawing-filing") ||
     (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/document-check$/.test(req.path)) ||
     (req.method === "POST" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/submit$/.test(req.path)) ||
-    (["GET", "PUT"].includes(req.method) && /^\/api\/admin\/kit-document-review\/kit-[a-z0-9-]+\/\d+$/.test(req.path))
+    (["GET", "PUT"].includes(req.method) && /^\/api\/admin\/kit-document-review\/kit-[a-z0-9-]+\/\d+$/.test(req.path)) ||
+    (req.method === "POST" && req.body?.revokeCertificate === true && /^\/api\/admin\/kit-results\/kit-[a-z0-9-]+\/reset\/?$/i.test(req.path))
   );
   let verification;
   try {
@@ -6394,7 +6397,7 @@ registerTypingKit(app, {
     },
     async send(studentEmail, certificate) {
       await sendKitCertificateEmail(normalizeEmail(studentEmail), "kit-typing", certificate);
-      await claimKitCertificateAutoEmail(studentEmail, "kit-typing").catch(() => false);
+      await claimKitCertificateAutoEmail(studentEmail, "kit-typing", true, certificate.completedAt).catch(() => false);
     },
     createPdf: (certificate) => createKitCertificatePdf(certificate),
     emailConfigured: () => Boolean(smtpTransporter && SMTP_FROM),
@@ -15476,7 +15479,7 @@ async function recoverSearchKitCompletion(studentEmail, kitId, content, row) {
   return saved;
 }
 
-async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = null) {
+async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = null, { recheckDocumentIndex = null } = {}) {
   const kitContent = content || await getStoredPracticalSkillsKitContent(kitId);
   const indexes = visibleActivityIndexes(kitContent);
   let row = await ensurePracticalSkillsProgressRow(studentEmail, kitId);
@@ -15484,6 +15487,8 @@ async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = n
   if (!(await kitPublication.available(kitId))) return row;
   if (kitId === "kit-google-search") row = await recoverSearchKitCompletion(studentEmail, kitId, kitContent, row);
   for (const index of indexes) {
+    const explicitDocumentCheck = index === String(recheckDocumentIndex);
+    if (row.certificate_revoked_at && !row.completed && !explicitDocumentCheck) continue;
     const activity = kitContent.activities?.[Number(index)];
     if (activity?.completionMode !== "auto" || ActivityBlocks.specialised(activity)) continue;
     const documents = {};
@@ -15494,7 +15499,9 @@ async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = n
       ? await documentVerification.get(normalizeEmail(studentEmail), kitId, index, activity, row.responses) : null;
     const grade = ActivityBlocks.grade(activity, ActivityBlocks.savedAnswers(activity, index, row.responses), documents,
       { content: kitContent, index, responses: row.responses, documentVerification: verification });
-    if (grade.passed !== Boolean(row.completed_activities?.[index])) row = await setPracticalSkillsActivityCompletion(studentEmail, kitId, Number(index), grade.passed);
+    if (grade.passed !== Boolean(row.completed_activities?.[index])) {
+      row = await setPracticalSkillsActivityCompletion(studentEmail, kitId, Number(index), grade.passed, { passive: !explicitDocumentCheck });
+    }
   }
   if (!indexes.length) return row;
   if (!hasDatabase) {
@@ -15632,10 +15639,11 @@ app.post("/api/practical-skills/progress/:kitId/complete", async (req, res) => {
   try {
     const content = await getStoredPracticalSkillsKitContent(kitId);
     const row = await syncPracticalSkillsKitCompletion(studentEmail, kitId, content);
-    if (visibleActivityIndexes(content).length && !allActivitiesComplete(content, row)) {
+    const hasActivities = visibleActivityIndexes(content).length > 0;
+    if ((hasActivities || row.certificate_revoked_at) && !allActivitiesComplete(content, row)) {
       return res.status(409).json({ error: "Complete all visible activities to earn this kit." });
     }
-    await setPracticalSkillsKitCompletion(studentEmail, kitId, true);
+    if (!hasActivities) await setPracticalSkillsKitCompletion(studentEmail, kitId, true);
     void autoEmailKitCertificate(req, kitId);
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
     res.json(await buildPracticalSkillsLicenceSnapshot(rows, await kitPublication.visibleKits(req)));
@@ -15692,6 +15700,7 @@ app.get("/api/practical-skills/progress/:kitId", async (req, res) => {
       badges: snapshot.badges,
       responses: row?.responses && typeof row.responses === "object" ? row.responses : {},
       completedActivities: row?.completed_activities || {},
+      certificateRevoked: Boolean(row?.certificate_revoked_at && !row.completed),
       certificate,
       certificateEmailed,
       courseCheckIn
@@ -15706,8 +15715,13 @@ const certificateEmailCooldowns = new Map();
 async function sendKitCertificateEmail(studentEmail, kitId, certificate) {
   return withKitCertificateEmailLock(pool, hasDatabase, studentEmail, kitId, async () => {
   if (!(await kitPublication.available(kitId))) throw Object.assign(new Error("This kit is Not Live. Certificates are paused."), { status: 409 });
-  const current = await pool.query("SELECT completed FROM practical_skills_progress WHERE student_email=$1 AND kit_id=$2", [studentEmail, kitId]);
-  if (!current.rows[0]?.completed) throw Object.assign(new Error("This kit completion has been reset. No certificate was sent."), { status: 409 });
+  const current = hasDatabase
+    ? (await pool.query("SELECT completed, completed_at FROM practical_skills_progress WHERE student_email=$1 AND kit_id=$2", [studentEmail, kitId])).rows[0]
+    : memoryPracticalSkillsProgress.get(`${normalizeEmail(studentEmail)}:${kitId}`);
+  if (!current?.completed || !current.completed_at) throw Object.assign(new Error("This kit completion has been reset. No certificate was sent."), { status: 409 });
+  if (new Date(current.completed_at).getTime() !== Date.parse(certificate.completedAt)) {
+    throw Object.assign(new Error("This certificate has been replaced. No old certificate was sent."), { status: 409 });
+  }
   const buffer = await createKitCertificatePdf(certificate);
   const safe = (value) => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
   let teacherRecipients = (await getPracticalSkillsCertificateTeacherRecipients())
@@ -15729,21 +15743,23 @@ async function sendKitCertificateEmail(studentEmail, kitId, certificate) {
 }
 
 // Claims the one automatic certificate email for a completed kit so concurrent requests cannot send it twice.
-async function claimKitCertificateAutoEmail(studentEmail, kitId, claim = true) {
+async function claimKitCertificateAutoEmail(studentEmail, kitId, claim, completedAt) {
   const email = normalizeEmail(studentEmail);
   if (!hasDatabase) {
     const row = memoryPracticalSkillsProgress.get(`${email}:${kitId}`);
-    if (!row) return false;
+    if (!row?.completed || row.completed_at !== completedAt) return false;
     if (!claim) { row.certificate_emailed_at = null; return true; }
-    if (!row.completed || row.certificate_emailed_at) return false;
+    if (row.certificate_emailed_at) return false;
     row.certificate_emailed_at = new Date().toISOString();
     return true;
   }
   await ensurePracticalSkillsProgressSchema();
   const result = claim
     ? await pool.query(`UPDATE practical_skills_progress SET certificate_emailed_at = NOW()
-        WHERE student_email = $1 AND kit_id = $2 AND completed = TRUE AND certificate_emailed_at IS NULL RETURNING kit_id`, [email, kitId])
-    : await pool.query(`UPDATE practical_skills_progress SET certificate_emailed_at = NULL WHERE student_email = $1 AND kit_id = $2 RETURNING kit_id`, [email, kitId]);
+        WHERE student_email = $1 AND kit_id = $2 AND date_trunc('milliseconds', completed_at) = $3::timestamptz
+          AND completed = TRUE AND certificate_emailed_at IS NULL RETURNING kit_id`, [email, kitId, completedAt])
+    : await pool.query(`UPDATE practical_skills_progress SET certificate_emailed_at = NULL
+        WHERE student_email = $1 AND kit_id = $2 AND date_trunc('milliseconds', completed_at) = $3::timestamptz RETURNING kit_id`, [email, kitId, completedAt]);
   return Boolean(result.rows?.[0]);
 }
 
@@ -15763,12 +15779,12 @@ async function autoEmailKitCertificate(req, kitId, certificate = undefined, stud
 
 // Throws on send failure after releasing the claim so a later visit can retry.
 async function emailKitCertificateOnce(studentEmail, kitId, certificate) {
-  if (!certificate || !await claimKitCertificateAutoEmail(studentEmail, kitId)) return false;
+  if (!certificate || !await claimKitCertificateAutoEmail(studentEmail, kitId, true, certificate.completedAt)) return false;
   try {
     await sendKitCertificateEmail(studentEmail, kitId, certificate);
     return true;
   } catch (error) {
-    await claimKitCertificateAutoEmail(studentEmail, kitId, false).catch(() => {});
+    await claimKitCertificateAutoEmail(studentEmail, kitId, false, certificate.completedAt).catch(() => {});
     throw error;
   }
 }
@@ -15779,11 +15795,13 @@ app.get("/api/practical-skills/progress/:kitId/certificate.pdf", async (req, res
   if (!studentEmail || !studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) return res.status(401).json({ error: "School sign-in required." });
   if (!getPracticalSkillsKitDefinition(kitId)) return res.status(404).json({ error: "Unknown kit." });
   try {
-    const certificate = await getPracticalSkillsCertificate(req, kitId);
-    if (!certificate) return res.status(409).json({ error: "Complete all visible activities before downloading your certificate." });
-    const buffer = await createKitCertificatePdf(certificate);
-    res.set("Cache-Control", "private, no-store");
-    res.type("application/pdf").attachment(`${kitId}-certificate.pdf`).send(buffer);
+    await withKitCertificateEmailLock(pool, hasDatabase, studentEmail, kitId, async () => {
+      const certificate = await getPracticalSkillsCertificate(req, kitId);
+      if (!certificate) return res.status(409).json({ error: "Complete all visible activities before downloading your certificate." });
+      const buffer = await createKitCertificatePdf(certificate);
+      res.set("Cache-Control", "private, no-store");
+      res.type("application/pdf").attachment(`${kitId}-certificate.pdf`).send(buffer);
+    });
   } catch (error) {
     console.error("[kit-certificate] Could not generate certificate:", error);
     res.status(500).json({ error: "Could not generate your certificate. Please try again." });
@@ -15809,7 +15827,7 @@ app.post("/api/practical-skills/progress/:kitId/certificate/email", async (req, 
       return res.status(409).json({ error: "Complete all visible activities before emailing your certificate." });
     }
     await sendKitCertificateEmail(studentEmail, kitId, certificate);
-    await claimKitCertificateAutoEmail(studentEmail, kitId).catch(() => false);
+    await claimKitCertificateAutoEmail(studentEmail, kitId, true, certificate.completedAt).catch(() => false);
     res.json({ sent: true, recipient: studentEmail });
   } catch (error) {
     certificateEmailCooldowns.delete(key);
@@ -16075,7 +16093,7 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
         : activity.assessmentId === LEARNING_SITES_ID
           ? gradeLearningSites(req.body.answers, await getLearningSitesStudentProfile(studentEmail))
           : gradePasswordProblems(req.body.answers);
-    const saved = await savePracticalSkillsAssessment(studentEmail, kitId, activityIndex, grade);
+    const saved = await savePracticalSkillsAssessment(studentEmail, kitId, activityIndex, grade, { passive: req.body.passive === true });
     await syncPracticalSkillsKitCompletion(studentEmail, kitId, content);
     void autoEmailKitCertificate(req, kitId);
     let courseFolder = null;

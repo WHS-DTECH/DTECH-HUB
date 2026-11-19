@@ -222,6 +222,22 @@
     color: #526772;
 }
 
+.certificate-revoke {
+    display: block;
+    margin: .4rem 0 0;
+    padding: .3rem .55rem;
+    border: 1px solid #981d32;
+    border-radius: .35rem;
+    background: #fff;
+    color: #981d32;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.certificate-revoke:hover:not(:disabled) {
+    background: #fff0f2;
+}
+
 @media (max-width: 600px) {
     .teacher-results-tabs [role="tab"] {
         flex: 1;

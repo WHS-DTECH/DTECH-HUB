@@ -121,6 +121,36 @@
     function kitStatus(progress) {
         return progress?.completed ? "completed" : progress?.started ? "in-progress" : "not-started";
     }
+    function addRevokeButton(parent, student, kit, completedAt, feedback, onRevoked) {
+        if (!completedAt || kit.id === "kit-typing") return;
+        const button = node("button", "Revoke certificate", parent, "button button-danger certificate-revoke");
+        button.type = "button";
+        const target = `${student.name || student.email} - ${kit.title}`;
+        button.setAttribute("aria-label", `Revoke certificate for ${target}`);
+        button.addEventListener("click", async () => {
+            if (!window.confirm(`Revoke the certificate for ${target} (${student.email})?\n\nThis clears all kit completion ticks. Saved work stays, but the student must complete the kit again. Emailed PDFs cannot be recalled.`)) return;
+            button.disabled = true;
+            feedback.classList.remove("is-error");
+            feedback.textContent = `Revoking certificate for ${target}...`;
+            try {
+                const response = await fetchDocumentReview(`/api/admin/kit-results/${encodeURIComponent(kit.id)}/reset`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ emails: [student.email], completedAt, revokeCertificate: true })
+                });
+                const result = await response.json();
+                if (!response.ok || !result.reset?.some((row) => row.student_email === student.email && row.completed === false)) {
+                    throw new Error(result.error || "Revocation was not confirmed. Refresh before trying again.");
+                }
+                onRevoked();
+                feedback.textContent = `${target}: ${result.message}`;
+            } catch (error) {
+                feedback.textContent = `${target}: ${error.message}`;
+                feedback.classList.add("is-error");
+                button.disabled = false;
+            }
+        });
+    }
     async function saveChocolate(student, kit, checked) {
         const data = classData;
         const key = `${student.email}:${kit.id}`;
@@ -533,6 +563,13 @@
                 const cell = node("td", undefined, row, progress?.completed ? "class-progress-complete" : "class-progress-incomplete");
                 cell.textContent = progress?.completed ? "Complete" : progress?.started ? "In progress" : "Not started";
                 if (progress?.completedAt) cell.title = `Completed ${date(progress.completedAt)}`;
+                if (focused && progress?.completed) {
+                    const data = classData;
+                    addRevokeButton(cell, student, kit, progress.completedAt, document.getElementById("class-certificate-status"), () => {
+                        student.kitProgress[kit.id] = { started: true, completed: false, completedAt: null };
+                        if (classData === data) renderClassProgress();
+                    });
+                }
                 const chocolateCell = node("td", undefined, row);
                 const label = node("label", undefined, chocolateCell);
                 const checkbox = node("input", undefined, label);
@@ -792,6 +829,13 @@
             node("summary", `${student.email} - ${progress ? (progress.completed ? "Recorded complete" : "Not recorded complete") : "No saved progress"}`, card);
             if (!progress) continue;
             node("p", `Started: ${date(progress.started_at)} | Completed: ${date(progress.completed_at)} | Certificate email recorded: ${date(progress.certificate_emailed_at)}`, card);
+            if (progress.completed) {
+                const kit = { id: data.kitId, title: data.content.identity?.name || data.content.bannerTitle || data.kitId };
+                addRevokeButton(card, student, kit, progress.completed_at, status, () => {
+                    Object.assign(progress, { completed: false, completed_at: null, certificate_emailed_at: null, completed_activities: {} });
+                    if (card.isConnected) render(data);
+                });
+            }
             for (const worksheet of worksheets) {
                 const index = data.content.worksheets.indexOf(worksheet);
                 const activity = data.content.activities?.[index];

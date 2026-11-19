@@ -531,7 +531,7 @@ test("class review keeps whānau and timetable homerooms separate and combines f
             kitProgress: { "kit-login": { completed: true, started: false }, "kit-search": { started: true } } },
         { name: "Ben", email: "ben@school.nz", homeroom: "8WPAPA", timetableClass: "JPI", course: "JuniorDTECH",
             chocolate: { "kit-search": true },
-            kitProgress: { "kit-login": { started: true }, "kit-search": { completed: true } } },
+            kitProgress: { "kit-login": { started: true }, "kit-search": { completed: true, completedAt: "2026-10-28T00:00:00.000Z" } } },
         { name: "Cara", email: "cara@school.nz", homeroom: "7WHAU", timetableClass: "JVE", course: "JuniorDTECH",
             kitProgress: { "kit-login": { started: false, completed: false } } },
         { name: "Dan", email: "dan@school.nz", homeroom: "JPI", timetableClass: "", course: "" }
@@ -539,15 +539,29 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "teacher-results.js"), "utf8");
     let kits = [{ id: "kit-login", title: "Login Kit" }, { id: "kit-search", title: "Search Kit" }];
     let failSave = false;
+    let confirmRevocation = false;
+    const revocations = [];
     const savedRequests = [];
     const context = vm.createContext({
         document: { getElementById: el, querySelector: el, createElement: element },
-        window: { addEventListener() {}, location: { search: "" } },
+        window: { addEventListener() {}, location: { search: "" }, confirm: (message) => {
+            assert.match(message, /Ben - Search Kit \(ben@school\.nz\)/);
+            assert.match(message, /Emailed PDFs cannot be recalled/);
+            return confirmRevocation;
+        } },
+        requestHubDriveAccessToken: async () => ({ access_token: "verified-test-token" }),
         URLSearchParams,
         localStorage: { getItem: () => JSON.stringify({ profile: { email: "admin@school.nz" } }) },
         Option: function (text, value) { return { textContent: text, value }; },
         fetch: async (url, options) => {
             if (url.includes("kit-submissions")) return { ok: true, json: async () => ({ kits: [] }) };
+            if (options?.method === "POST") {
+                revocations.push([url, JSON.parse(options.body), options.headers.Authorization]);
+                return { ok: true, json: async () => ({
+                    reset: [{ student_email: "ben@school.nz", completed: false }],
+                    message: "Certificate revoked and completion ticks cleared."
+                }) };
+            }
             if (options?.method === "PUT") {
                 savedRequests.push(JSON.parse(options.body));
                 return { ok: !failSave, json: async () => failSave
@@ -682,6 +696,17 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     assert.equal(rows()[0].children[2].children[0].children[0].checked, true, "Focused failed save restores confirmed Chocolate");
     assert.deepEqual(savedRequests.at(-1), { email: "ben@school.nz", chocolate: false }, "Focused checkbox targets the selected kit/student");
     failSave = false;
+    const revoke = rows()[0].children[1].children.find((child) => child.textContent === "Revoke certificate");
+    await revoke.events.click();
+    assert.deepEqual(revocations, [], "Cancel does not change results");
+    confirmRevocation = true;
+    await revoke.events.click();
+    assert.deepEqual(revocations, [["/api/admin/kit-results/kit-search/reset", {
+        emails: ["ben@school.nz"], completedAt: "2026-10-28T00:00:00.000Z", revokeCertificate: true
+    }, "Bearer verified-test-token"]]);
+    assert.match(el("class-progress-status").textContent, /No students match/);
+    assert.match(el("class-certificate-status").textContent, /Ben - Search Kit: Certificate revoked/);
+    assert.equal(students[1].chocolate["kit-search"], true);
     const beforeFiltering = JSON.stringify(students);
     kits = kits.filter((kit) => kit.id !== "kit-search");
     await el("class-progress-refresh").events.click();

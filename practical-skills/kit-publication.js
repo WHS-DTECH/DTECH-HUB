@@ -162,29 +162,47 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
         app.post("/api/admin/kit-results/:kitId/reset", requireAdminAccess, async (req, res) => {
             res.set("Cache-Control", "private, no-store");
             const emails = Array.isArray(req.body?.emails) ? [...new Set(req.body.emails)] : [];
+            const revoke = req.body?.revokeCertificate === true;
+            const expected = req.body?.completedAt;
             if (!emails.length || emails.length > 20 || emails.some((email) => typeof email !== "string" ||
                 !/^[^\s@]+@[^\s@]+$/.test(email) || email.split("@")[1] !== schoolDomain)) {
                 return res.status(400).json({ error: "Choose 1-20 valid school emails." });
             }
+            const reviewer = revoke ? getVerifiedEmail(req) : getRequestUserEmail(req);
+            if (revoke && !reviewer) return res.status(401).json({ error: "Verify your school Google sign-in to revoke a certificate." });
+            if (revoke && (emails.length !== 1 || typeof expected !== "string" || !Number.isFinite(Date.parse(expected)))) {
+                return res.status(400).json({ error: "Select one completed student record and refresh its completion date." });
+            }
+            if (revoke && req.params.kitId === "kit-typing") {
+                return res.status(409).json({ error: "Typing Kit completion is based on the separate weekly practice log." });
+            }
             let client;
             try {
+                if (revoke && !(await canManage(reviewer))) return res.status(403).json({ error: "Teacher access is required to revoke a certificate." });
                 if (!(await catalog()).some((kit) => kit.id === req.params.kitId)) return res.status(404).json({ error: "Unknown kit." });
                 await pool.query("ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS search_tick_recovery_version INTEGER NOT NULL DEFAULT 0");
+                if (revoke) await pool.query("ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS certificate_revoked_at TIMESTAMPTZ");
                 client = await pool.connect();
                 await client.query("BEGIN");
                 for (const email of [...emails].sort()) await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`kit-certificate:${email}:${req.params.kitId}`]);
                 const previous = await client.query("SELECT * FROM practical_skills_progress WHERE kit_id=$1 AND student_email=ANY($2::text[]) FOR UPDATE", [req.params.kitId, emails]);
+                if (revoke && (!previous.rows[0]?.completed || !previous.rows[0].completed_at ||
+                    new Date(previous.rows[0].completed_at).getTime() !== Date.parse(expected))) {
+                    await client.query("ROLLBACK");
+                    return res.status(409).json({ error: "This completion record changed. Refresh Teacher Review before revoking." });
+                }
                 for (const row of previous.rows) await client.query(`INSERT INTO practical_skills_kit_resets
                     (kit_id, student_email, reset_by_email, previous_progress) VALUES ($1,$2,$3,$4::jsonb)`,
-                [req.params.kitId, row.student_email, getRequestUserEmail(req), JSON.stringify(row)]);
+                [req.params.kitId, row.student_email, reviewer, JSON.stringify(revoke ? { ...row, reset_action: "certificate_revocation" } : row)]);
                 const result = await client.query(`UPDATE practical_skills_progress SET completed=FALSE, completed_at=NULL,
                     completed_activities='{}'::jsonb, certificate_emailed_at=NULL, started_at=NOW(), updated_at=NOW(),
-                    search_tick_recovery_version=CASE WHEN kit_id='kit-google-search' THEN 1 ELSE search_tick_recovery_version END
+                    search_tick_recovery_version=CASE WHEN kit_id='kit-google-search' THEN 1 ELSE search_tick_recovery_version END${revoke ? ", certificate_revoked_at=NOW()" : ""}
                     WHERE kit_id=$1 AND student_email=ANY($2::text[]) RETURNING student_email, completed, completed_activities, certificate_emailed_at`,
                 [req.params.kitId, emails]);
                 await client.query("COMMIT");
                 res.json({ reset: result.rows, missing: emails.filter((email) => !result.rows.some((row) => row.student_email === email)),
-                    message: "Completion and in-app certificate eligibility reset. Answers, Drive files and email history retained. Emailed PDFs cannot be recalled." });
+                    message: revoke ? "Certificate revoked and completion ticks cleared. Saved work was kept. Emailed PDFs cannot be recalled."
+                        : "Completion and in-app certificate eligibility reset. Answers, Drive files and email history retained. Emailed PDFs cannot be recalled." });
             } catch (error) {
                 if (client) {
                     try { await client.query("ROLLBACK"); }

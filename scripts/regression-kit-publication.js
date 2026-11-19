@@ -64,7 +64,7 @@ async function fixture(t) {
         { kit_id: "kit-deleted", content: { deletedAt: "2026-10-20", worksheets: [{}] } }
     ];
     const flags = new Map();
-    const rows = ["a", "b", "unrelated"].map((name) => ({ student_email: `${name}@school.nz`, completed: true,
+    const rows = ["a", "b", "unrelated"].map((name) => ({ student_email: `${name}@school.nz`, completed: true, completed_at: "2026-10-20T00:00:00.000Z",
         completed_activities: { "0": "2026-10-20" }, certificate_emailed_at: "2026-10-20", responses: { answer: "Keep me" } }));
     const queries = [], audits = [];
     let failUpdate = false;
@@ -86,7 +86,10 @@ async function fixture(t) {
         if (sql.startsWith("UPDATE practical_skills_progress")) {
             if (failUpdate) throw new Error("Update failed");
             const selected = rows.filter((row) => params[1].includes(row.student_email));
-            for (const row of selected) { row.completed = false; row.completed_activities = {}; row.certificate_emailed_at = null; }
+            for (const row of selected) {
+                Object.assign(row, { completed: false, completed_at: null, completed_activities: {}, certificate_emailed_at: null });
+                if (sql.includes("certificate_revoked_at=NOW()")) row.certificate_revoked_at = "2026-10-21";
+            }
             return { rows: selected };
         }
         throw new Error(`Unexpected query: ${sql}`);
@@ -94,7 +97,7 @@ async function fixture(t) {
     const pool = { query, connect: async () => ({ query, release() { queries.push({ sql: "RELEASE" }); } }) };
     const deps = { pool, builtIns: [{ id: "kit-minecraft" }], getDefaultContent: () => ({}), schoolDomain: "school.nz",
         getRequestUserEmail: (req) => req.headers?.["x-admin"] === "yes" ? "teacher@school.nz" : "student@school.nz",
-        getVerifiedEmail: (req) => req.headers?.["x-admin"] === "yes" ? "teacher@school.nz" : req.headers?.["x-verified-email"] || "",
+        getVerifiedEmail: (req) => req.headers?.["x-verified-email"] ?? (req.headers?.["x-admin"] === "yes" ? "teacher@school.nz" : ""),
         getStudentCourse: async (email) => ({ junior: "JuniorDTECH", middle: "MiddleDTECH", senior: "SeniorDTECH" })[email.split("@")[0]] || "",
         canManage: async (email) => email === "teacher@school.nz" };
     const service = createKitPublication(deps);
@@ -342,14 +345,36 @@ test("actual Express middleware loads custom kits on cold direct student and adm
     }
 });
 
-test("a queued certificate send rechecks publication and reset state after taking its lock", async () => {
+test("revocation requires verified teacher access and the exact selected completion, and preserves work", async (t) => {
+    const f = await fixture(t);
+    const path = "/api/admin/kit-results/kit-minecraft/reset";
+    const request = { emails: ["a@school.nz"], revokeCertificate: true, completedAt: f.rows[0].completed_at };
+    assert.equal((await f.call(path, "POST", request, false)).status, 403);
+    assert.equal((await f.call(path, "POST", request, true, { "x-verified-email": "" })).status, 401);
+    assert.equal((await f.call(path, "POST", request, true, { "x-verified-email": "student@school.nz" })).status, 403);
+    assert.equal((await f.call(path, "POST", { ...request, completedAt: "2026-10-19T00:00:00Z" })).status, 409);
+    assert.equal(f.audits.length, 0);
+    assert.equal((await f.call(path, "POST", request)).status, 200);
+    assert.equal(f.rows[0].completed_at, null);
+    assert.equal(f.rows[0].certificate_emailed_at, null);
+    assert.deepEqual(f.rows[0].completed_activities, {});
+    assert.equal(f.rows[0].responses.answer, "Keep me");
+    assert.ok(f.rows[0].certificate_revoked_at);
+    assert.equal(f.rows[1].completed, true);
+    assert.equal(f.audits[0][2], "teacher@school.nz");
+    assert.equal(JSON.parse(f.audits[0][3]).reset_action, "certificate_revocation");
+    assert.equal((await f.call(path, "POST", request)).status, 409);
+});
+
+test("a queued certificate send rechecks publication and completion date after taking its lock", async () => {
     const source = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
     const start = source.indexOf("async function sendKitCertificateEmail(");
     const end = source.indexOf("\n// Claims the one automatic", start);
     let live = false;
     let locked = false;
+    let progress = { completed: false };
     const context = vm.createContext({
-        pool: { query: async () => { assert.equal(locked, true); return { rows: [{ completed: false }] }; } },
+        pool: { query: async () => { assert.equal(locked, true); return { rows: [progress] }; } },
         hasDatabase: true,
         kitPublication: { available: async () => { assert.equal(locked, true); return live; } },
         withKitCertificateEmailLock: async (_pool, _db, _email, _kitId, callback) => {
@@ -363,4 +388,6 @@ test("a queued certificate send rechecks publication and reset state after takin
     await assert.rejects(context.sendKitCertificateEmail("a@school.nz", "kit-minecraft", {}), /Not Live/);
     live = true;
     await assert.rejects(context.sendKitCertificateEmail("a@school.nz", "kit-minecraft", {}), /has been reset/);
+    progress = { completed: true, completed_at: "2026-10-21T00:00:00Z" };
+    await assert.rejects(context.sendKitCertificateEmail("a@school.nz", "kit-minecraft", { completedAt: "2026-10-20T00:00:00Z" }), /has been replaced/);
 });

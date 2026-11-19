@@ -154,6 +154,16 @@ empty activity list. Reset requires a warning/confirmation on both the worksheet
 and Licence page; Search reset requests also require explicit confirmation on
 the server. Intentional resets still retain answers and Drive files.
 
+To revoke a certificate, open **Licence Teacher Review → Class Kit Progress**,
+select the kit, and choose **Revoke certificate** beside the student's completed
+record. The action is also available on completed records in **Student Review**.
+It requires verified teacher sign-in, logs who revoked the certificate, and
+clears the completion ticks without deleting saved answers or Drive files.
+Opening the kit does not restore those ticks; the student must complete the
+activity checks again before a new certificate is available. Copies previously
+downloaded or emailed cannot be recalled. The separate weekly Typing Kit is
+not supported by this action.
+
 On the next Search progress/certificate read, a one-time additive recovery
 rechecks saved answers for the four question-based activities. It restores only
 missing ticks that pass the existing server graders, preserves earned ticks and

@@ -120,7 +120,8 @@ function registerActivityBlocks(app, deps) {
                 { ...row?.responses, [key]: effectiveAnswers });
             let saved;
             if (activity.completionMode === "auto" && !B.specialised(activity)) {
-                saved = await setPracticalSkillsActivityCompletion(student, kitId, Number(activityIndex), grade.passed);
+                saved = await setPracticalSkillsActivityCompletion(student, kitId, Number(activityIndex), grade.passed,
+                    { passive: req.body.confirmCompletion !== true });
                 const synced = await syncPracticalSkillsKitCompletion(student, kitId, content);
                 if (synced) saved = synced;
                 if (grade.passed) void autoEmailKitCertificate(req, kitId);

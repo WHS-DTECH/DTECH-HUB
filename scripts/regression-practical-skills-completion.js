@@ -21,6 +21,8 @@ function extract(start, end) {
 async function main() {
     const context = vm.createContext({
         hasDatabase: false,
+        SEARCH_RESULTS_DETECTIVE_ID: "search-results-detective-v1",
+        SEARCH_AND_FIND_ID: "search-and-find-v1",
         memoryPracticalSkillsProgress: new Map(),
         normalizeEmail: (email) => email.trim().toLowerCase(),
         ensurePracticalSkillsProgressSchema: async () => {},
@@ -68,20 +70,22 @@ async function main() {
     await context.setPracticalSkillsActivityCompletion("student@example.school.nz", "kit-login", 3, true);
     let update = queries.at(-1);
     assert.match(update.sql, /jsonb_set\(completed_activities/);
-    assert.deepEqual(Array.from(update.values), ["3", update.values[1], "student@example.school.nz", "kit-login"]);
+    assert.deepEqual(Array.from(update.values), ["3", update.values[1], "student@example.school.nz", "kit-login", false]);
     await context.setPracticalSkillsActivityCompletion("student@example.school.nz", "kit-login", 3, false);
     update = queries.at(-1);
     assert.match(update.sql, /completed_activities - \$1::text/);
-    assert.deepEqual(Array.from(update.values), ["3", "student@example.school.nz", "kit-login"]);
+    assert.deepEqual(Array.from(update.values), ["3", "student@example.school.nz", "kit-login", false]);
     assert.match(server, /ADD COLUMN IF NOT EXISTS completed_activities JSONB NOT NULL DEFAULT '\{\}'::jsonb/);
 
     let handler;
     let checkHandler;
     context.app = {
         get() {},
-        put: (_url, callback) => { handler = callback; },
-        post: (_url, callback) => { checkHandler = callback; }
+        put: (url, callback) => { if (url.endsWith("/activities/:activityIndex")) handler = callback; },
+        post: (url, callback) => { if (url.endsWith("/activities/:activityIndex/check")) checkHandler = callback; }
     };
+    context.requireAdminAccess = () => {};
+    context.autoEmailKitCertificate = async () => false;
     context.SCHOOL_EMAIL_DOMAIN = "example.school.nz";
     context.getRequestUserEmail = (req) => req.email || "";
     context.getPracticalSkillsKitDefinition = (id) => id === "kit-login";
@@ -404,6 +408,7 @@ async function main() {
         },
         window: {
             location: { search: "?kit=kit-login&activity=0" },
+            addEventListener() {},
             clearTimeout() {},
             setTimeout() {},
             KitWorksheetRender: {
