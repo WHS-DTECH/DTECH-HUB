@@ -21,9 +21,13 @@
 #web-results button, #web-drafts button { margin: .25rem; text-align: left; }
 .kw-viewport { height: min(52vh, 30rem); min-height: 16rem; overflow: auto; border: 1px solid #7998a3; border-radius: .65rem; background: #e8f4fa; }
 #web-board { position: relative; }
-.knowledge-web .kw-cloud { position: absolute; display: grid; place-items: center; width: 190px; height: 100px; padding: 10px 18px; border: 2px solid #84a1ad; border-radius: 48% 52% 38% 40% / 50% 50% 41% 41%; overflow-wrap: anywhere; background: #fff; text-align: center; font-weight: 700; }
+.knowledge-web button.kw-cloud { position: absolute; display: grid; place-items: center; width: 190px; height: 100px; padding: 25px 28px 14px; border: 0; border-radius: 0; overflow-wrap: anywhere; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 190 100'%3E%3Cpath d='M38 85 C24 85 13 77 13 65 C13 54 20 47 31 46 C30 33 40 23 54 25 C63 10 87 8 100 23 C113 15 131 20 137 34 C152 29 166 38 166 51 C179 54 181 72 169 81 C161 88 150 88 140 86 C131 90 121 89 113 86 L63 86 C55 89 46 89 38 85 Z' fill='white' stroke='%2384a1ad' stroke-width='2'/%3E%3C/svg%3E") center / 100% 100% no-repeat; text-align: center; font-size: .75rem; line-height: 1.2; font-weight: 700; }
 .knowledge-web .kw-cloud span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.kw-cloud[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--kw-accent); }
+.knowledge-web button.kw-cloud:hover, .knowledge-web button.kw-cloud[aria-pressed="true"] { filter: drop-shadow(0 0 3px var(--kw-accent)); }
+@media (forced-colors: active) {
+    .knowledge-web button.kw-cloud { border: 2px solid ButtonText; border-radius: 45%; background: ButtonFace; }
+    .knowledge-web button.kw-cloud[aria-pressed="true"] { outline: 3px solid Highlight; }
+}
 .kw-entry { padding: .6rem; margin-block: .5rem; border: 1px solid #b6cdd5; border-radius: .5rem; }
 .kw-proposal, #web-my-proposals, #web-manage > .kw-panel { margin-block: 1rem; scroll-margin-top: 1rem; }
 .kw-proposal form { display: grid; gap: .45rem; }
