@@ -16,6 +16,31 @@ const { getSourceMetadata, parseMetadata, isPublicIPv4 } = require("../knowledge
 
 const connectionString = process.env.KNOWLEDGE_WEB_TEST_DATABASE_URL;
 
+test("Timeline includes dated source publications alongside events without inventing dates or times", () => {
+    const script = fs.readFileSync(path.join(__dirname, "../knowledge-web/web.js"), "utf8");
+    const start = script.indexOf("    function timelineEntries(");
+    const end = script.indexOf("    function appendTimelineEntry(", start);
+    assert.ok(start >= 0 && end > start, "Timeline entry function is available");
+    const entries = vm.runInThisContext(`(() => { ${script.slice(start, end)} return timelineEntries; })()`);
+    const cloud = {
+        events: [{ date: "2026-11-12", time: "09:30", description: "Historical event" }],
+        sources: [
+            { title: "Dated report", publicationDate: "2026-11-17", addedAt: "2026-11-20T00:00:00Z" },
+            { title: "Month-only report", publicationDate: "2025-03" },
+            { title: "Undated report", publicationDate: "", addedAt: "2026-11-20T00:00:00Z" }
+        ]
+    };
+    const result = entries(cloud);
+    assert.deepEqual(result.map(({ kind, date, time }) => ({ kind, date, time })), [
+        { kind: "event", date: "2026-11-12", time: "09:30" },
+        { kind: "source", date: "2026-11-17", time: undefined },
+        { kind: "source", date: "2025-03", time: undefined }
+    ]);
+    assert.equal(result[1].source.title, "Dated report");
+    assert.equal(entries({ events: [], sources: cloud.sources }).length, 2, "Dated sources work without events");
+    assert.equal(entries({ events: [], sources: [cloud.sources[2]] }).length, 0, "Date added is not a publication date");
+});
+
 test("Canvas separates overlapping clouds without changing saved positions", () => {
     const script = fs.readFileSync(path.join(__dirname, "../knowledge-web/web.js"), "utf8");
     const start = script.indexOf("    const CLOUD_WIDTH =");

@@ -28,6 +28,7 @@
 .kw-timeline-events ul { list-style: none; padding: 0; }
 .kw-timeline-events ul li { margin-top: .75rem; }
 .kw-timeline-events p { margin: .3rem 0 0; white-space: pre-wrap; }
+.kw-timeline-events a { color: #14516b; text-decoration: underline; font-weight: 650; }
 #web-results, #web-drafts { list-style: none; padding: 0; margin: .4rem 0; }
 #web-results button, #web-drafts button { margin: .25rem; text-align: left; }
 .kw-viewport { height: min(52vh, 30rem); min-height: 16rem; overflow: auto; border: 1px solid #7998a3; border-radius: .65rem; background: #e8f4fa; }

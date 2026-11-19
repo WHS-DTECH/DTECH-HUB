@@ -8,7 +8,7 @@
     <title>Computing History Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=6">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=7">
 </head>
 <body>
     <div class="page-shell">
@@ -37,7 +37,7 @@
                 <p id="web-empty" hidden>No clouds have been published yet. Check back after your teacher releases one.</p>
                 <section id="web-timeline" class="kw-panel kw-timeline" aria-labelledby="web-timeline-title">
                     <h2 id="web-timeline-title">Timeline</h2>
-                    <p id="web-timeline-caption">Select a cloud to see its dated events.</p>
+                    <p id="web-timeline-caption">Select a cloud to see its timeline.</p>
                     <div id="web-timeline-controls" class="kw-timeline-controls" hidden>
                         <div class="kw-actions" role="group" aria-label="Timeline view">
                             <button id="web-timeline-year-view" type="button" aria-pressed="true">Year view</button>
@@ -125,8 +125,9 @@
                         <label>Description<textarea name="description" rows="4" required maxlength="2000"></textarea></label>
                         <label>Historical significance<textarea name="significance" rows="3" required maxlength="2000"></textarea></label>
                         <fieldset>
-                            <legend>Dated events</legend>
-                            <p>Use MM-YYYY or DD-MM-YYYY. A time is optional and needs a full date. Leave out events you have not verified.</p>
+                            <legend>Timeline details</legend>
+                            <p>Add verified historical events using MM-YYYY or DD-MM-YYYY. A time is optional and needs a full date.</p>
+                            <p>Sources with publication dates also appear automatically on the timeline, labelled separately from historical events. Add or edit those dates in Sources below.</p>
                             <div id="web-events"></div>
                             <button id="web-add-event" type="button">Add dated event</button>
                         </fieldset>
@@ -157,6 +158,6 @@
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="/script.js?v=knowledge-web-2"></script>
-    <script src="/knowledge-web/web.js?v=8"></script>
+    <script src="/knowledge-web/web.js?v=9"></script>
 </body>
 </html>
