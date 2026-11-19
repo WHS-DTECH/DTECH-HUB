@@ -5,6 +5,7 @@ The Knowledge Web is a KNOW Mode feature separate from Licence Kit activities an
 ## Phase 1 and 2
 
 - Teachers manage factual clouds at `/knowledge-web/`; only published clouds appear to eligible students.
+- In the teacher cloud editor, **Get source details** can suggest a title, author or organisation, and publication date from a public HTML webpage. It fills only blank fields. Check all suggestions, and write what the source supports yourself; blocked pages, missing metadata, and non-web references require manual entry.
 - Years 9 and 10 students can open a published cloud and propose another cloud with separate sources for its historical claims and proposed connection.
 - Students can save private drafts, resume or revise their own proposals, and see statuses and private teacher notes. Similar titles generate an advisory warning.
 - Teachers review proposals submitted for cloud publication. They can approve and publish a sourced cloud, return it with a private revision note, or decline it with a reason. Unfinished drafts are not in the teacher review area.

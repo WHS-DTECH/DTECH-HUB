@@ -1,16 +1,22 @@
 "use strict";
 const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
+const dns = require("node:dns").promises;
+const http = require("node:http");
+const { EventEmitter } = require("node:events");
+const { Readable } = require("node:stream");
 const path = require("node:path");
 const { test } = require("node:test");
 const express = require("express");
 const { Pool } = require("pg");
 const { registerKnowledgeWeb } = require("../knowledge-web/.store");
+const { getSourceMetadata, parseMetadata, isPublicIPv4 } = require("../knowledge-web/.source-metadata");
 
 const connectionString = process.env.KNOWLEDGE_WEB_TEST_DATABASE_URL;
 
 test("Knowledge Web allows only eligible readers and verified teachers to manage clouds", async (t) => {
     const app = express();
+    app.use(express.json());
     registerKnowledgeWeb(app, {
         getVerifiedEmail: (req) => req.headers["x-verified-test-account"] || "",
         canManage: async (account) => account === "teacher@test.invalid",
@@ -28,7 +34,53 @@ test("Knowledge Web allows only eligible readers and verified teachers to manage
         const headers = { "x-verified-test-account": account, "x-user-role": "admin", "x-user-email": "teacher@test.invalid" };
         assert.equal((await fetch(`${url}/access`, { headers })).status, expected, account);
         assert.equal((await fetch(`${url}/manage/clouds`, { method: "POST", headers })).status, account ? 403 : 401);
+        assert.equal((await fetch(`${url}/manage/source-metadata`, { method: "POST", headers })).status, account ? 403 : 401);
     }
+    const invalid = await fetch(`${url}/manage/source-metadata`, { method: "POST",
+        headers: { "x-verified-test-account": "teacher@test.invalid", "Content-Type": "application/json" },
+        body: JSON.stringify({ url: "http://127.0.0.1/" }) });
+    assert.equal(invalid.status, 400, "Even teachers cannot fetch private addresses");
+});
+
+test("Source lookup extracts supported metadata without inventing missing values", () => {
+    assert.deepEqual(parseMetadata(`<title>Research &amp; computing - Example Museum</title>
+        <meta name="author" content="A Researcher"><meta property="article:published_time" content="2025-03-19T12:00:00Z">`),
+    { title: "Research & computing - Example Museum", author: "A Researcher", publicationDate: "2025-03-19" });
+    assert.deepEqual(parseMetadata(`<title>NZQA announcement - NZQA</title>
+        <div class="page-hero__publish-date">12 November 2026</div>`),
+    { title: "NZQA announcement - NZQA", author: "NZQA", publicationDate: "2026-11-12" });
+    assert.deepEqual(parseMetadata(`<title>Untitled source</title><meta name="date" content="2025-02-31">`),
+        { title: "Untitled source", author: "", publicationDate: "" });
+});
+
+test("Source lookup rejects private addresses and revalidates redirects", async (t) => {
+    for (const address of ["127.0.0.1", "10.1.2.3", "169.254.169.254", "100.64.0.1", "198.18.0.1", "192.0.2.1"]) {
+        assert.equal(isPublicIPv4(address), false, address);
+        await assert.rejects(getSourceMetadata(`http://${address}/`), { status: 400 });
+    }
+    for (const url of ["http://[::1]/", "file:///etc/passwd", "https://user:password@example.com/", "http://example.com:8080/"]) {
+        await assert.rejects(getSourceMetadata(url), { status: 400 });
+    }
+    t.mock.method(dns, "lookup", async (host) => host === "mixed.example"
+        ? [{ address: "8.8.8.8", family: 4 }, { address: "10.0.0.1", family: 4 }]
+        : [{ address: "8.8.8.8", family: 4 }]);
+    let requests = 0;
+    t.mock.method(http, "request", (_url, options, callback) => {
+        requests++;
+        const request = new EventEmitter();
+        request.end = () => {
+            options.lookup("example.com", {}, (_error, address) => assert.equal(address, "8.8.8.8"));
+            const response = Readable.from([]);
+            response.statusCode = 302;
+            response.headers = { location: "http://127.0.0.1/private" };
+            callback(response);
+        };
+        return request;
+    });
+    await assert.rejects(getSourceMetadata("http://example.com/"), { status: 400 });
+    assert.equal(requests, 1, "The redirect to a private address is not requested");
+    await assert.rejects(getSourceMetadata("http://mixed.example/"), { status: 400 });
+    assert.equal(requests, 1, "A hostname with mixed public and private addresses is not requested");
 });
 
 test("PostgreSQL persists drafts, sources and positions; only published clouds reach students",
@@ -78,6 +130,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal((await call("proposals")).status, 403,
             "The student-private proposal list remains teacher-restricted");
         assert.equal((await fetch(`${host}/knowledge-web/%2estore.js`)).status, 404);
+        assert.equal((await fetch(`${host}/knowledge-web/%2esource-metadata.js`)).status, 404);
         assert.deepEqual(await list("clouds", true), []);
         const [seed] = await list("manage/clouds");
         assert.equal(seed.title, "2026 NCEA Digital Examination Disruptions");

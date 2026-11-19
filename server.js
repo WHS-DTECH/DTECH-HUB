@@ -6230,7 +6230,7 @@ app.use(async (req, _res, next) => {
   req.auth_identity.token_present = true;
   const licenceAccessToken = bearerToken.split(".").length !== 3 && (
     (/^\/api\/knowledge-web\/(?:access|clouds|proposals(?:\/duplicates)?|manage\/clouds|manage\/proposals)\/?$/i.test(req.path) && req.method === "GET") ||
-    (/^\/api\/knowledge-web\/(?:proposals|manage\/proposals\/[^/]+\/decision|manage\/clouds)\/?$/i.test(req.path) && req.method === "POST") ||
+    (/^\/api\/knowledge-web\/(?:proposals|manage\/proposals\/[^/]+\/decision|manage\/clouds|manage\/source-metadata)\/?$/i.test(req.path) && req.method === "POST") ||
     (/^\/api\/knowledge-web\/(?:proposals|manage\/clouds)\/[^/]+\/?$/i.test(req.path) && req.method === "PUT") ||
     (req.method === "GET" && /^(?:\/practical-skills\/library\.json|\/api\/practical-skills\/(?:library|my-progress|typing-kit|(?:kit-content|progress)\/[^/]+))\/?$/i.test(req.path)) ||
     (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/licences\/[a-zA-Z0-9_-]+$/.test(req.path)) ||

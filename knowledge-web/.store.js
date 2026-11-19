@@ -1,6 +1,7 @@
 "use strict";
 
 const { randomUUID } = require("node:crypto");
+const { getSourceMetadata } = require("./.source-metadata");
 
 const FIRST_CLOUD = "77b0456a-d3f0-4a2d-a045-6690868331b3";
 const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
@@ -492,6 +493,8 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
     app.get(`${base}/manage/proposals`, route({ staffOnly: true }, async (_req, res) =>
         res.json({ proposals: await readProposals({ includePrivateComment: true }) })));
     app.post(`${base}/manage/proposals/:id/decision`, route({ staffOnly: true }, decideProposal));
+    app.post(`${base}/manage/source-metadata`, route({ staffOnly: true }, async (req, res) =>
+        res.json(await getSourceMetadata(req.body?.url))));
 
     function route({ staffOnly = false } = {}, handler) {
         return async (req, res) => {

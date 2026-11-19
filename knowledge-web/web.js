@@ -136,6 +136,49 @@
         ["title", "Source title", 200], ["author", "Author or organisation", 200], ["publicationDate", "Publication date (optional)", 10],
         ["reference", "URL or written reference", 2048], ["supports", "What this source supports", 1000]
     ];
+
+    async function lookupSource(row, lookupButton, status) {
+        const reference = row.querySelector('[name="reference"]');
+        const url = reference.value.trim();
+        const revision = state.revision;
+        if (!url) {
+            status.textContent = "Enter a webpage URL first.";
+            return;
+        }
+        lookupButton.disabled = true;
+        status.textContent = "Looking up source details...";
+        try {
+            const details = await request("manage/source-metadata", {
+                method: "POST", body: JSON.stringify({ url })
+            });
+            if (revision !== state.revision || !row.isConnected) return;
+            if (reference.value.trim() !== url) {
+                status.textContent = "The URL changed during the lookup. Please look it up again.";
+                return;
+            }
+            const added = [];
+            for (const [key, label] of [["title", "title"], ["author", "author"], ["publicationDate", "publication date"]]) {
+                const field = row.querySelector(`[name="${key}"]`);
+                if (!field.value.trim() && details[key]) {
+                    field.value = details[key];
+                    added.push(label);
+                }
+            }
+            if (added.length) state.dirty = true;
+            resizeTextareas(row);
+            const missing = [["title", "title"], ["author", "author"], ["publicationDate", "publication date"]]
+                .filter(([key]) => !row.querySelector(`[name="${key}"]`).value.trim()).map(([, label]) => label);
+            status.textContent = (added.length
+                ? `Added ${added.join(", ")}. Please check the details and explain what the source supports.`
+                : "No new details were added. Existing entries were kept.")
+                + (missing.length ? ` Enter missing ${missing.join(", ")} manually.` : "");
+        } catch (error) {
+            if (revision === state.revision && row.isConnected) status.textContent = `${error.message} You can enter the details manually.`;
+        } finally {
+            lookupButton.disabled = false;
+        }
+    }
+
     function addRow(kind, values = {}, focus = false, hostId = null) {
         const event = kind.includes("event");
         const host = node(hostId || (event ? "events" : "sources"));
@@ -159,6 +202,13 @@
             input.value = values[key] || "";
             label.append(input);
             row.append(label);
+            if (!event && !hostId && key === "reference") {
+                const status = element("p");
+                status.setAttribute("role", "status");
+                status.setAttribute("aria-live", "polite");
+                const lookup = button("Get source details", () => { void lookupSource(row, lookup, status); });
+                row.append(lookup, status);
+            }
         }
         row.append(button(`Remove ${event ? "event" : "source"}`, () => {
             row.remove();
