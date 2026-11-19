@@ -1353,6 +1353,24 @@ a {
     border-color: #173858;
 }
 
+.hub-minecraft-reminder {
+    margin: 0 0 1rem;
+    padding: 1rem;
+    border: 2px solid #875520;
+    border-radius: .75rem;
+    color: #382407;
+    background: #fff4d8;
+    font-weight: 700;
+}
+
+.hub-minecraft-reminder p {
+    margin: 0;
+}
+
+.hub-minecraft-reminder a {
+    margin-top: .65rem;
+}
+
 .button:disabled {
     color: #4d5974;
     background: #e8edf7;

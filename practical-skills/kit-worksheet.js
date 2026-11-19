@@ -130,7 +130,7 @@
             throw new Error("Your signed-in account changed. Reopen this activity before saving.");
         }
         if (!response.ok) {
-            throw new Error(payload?.error || `Request failed (${response.status})`);
+            throw Object.assign(new Error(payload?.error || `Request failed (${response.status})`), { code: payload?.code });
         }
         return payload;
     }
@@ -176,11 +176,15 @@
     function queueProgressWrite(write) {
         const email = state.email;
         const revision = state.sessionRevision;
-        const guarded = () => {
+        const guarded = async () => {
             if (email !== getSignedInEmail() || revision !== state.sessionRevision) {
                 throw new Error("Your signed-in account changed. Reopen this activity before saving.");
             }
-            return write();
+            const result = await write();
+            if (state.kitId === "kit-minecraft" && revision === state.sessionRevision) {
+                window.dispatchEvent(new Event("hub-minecraft-progress-changed"));
+            }
+            return result;
         };
         state.progressWritePromise = state.progressWritePromise.then(guarded, guarded);
         return state.progressWritePromise;
@@ -1087,6 +1091,7 @@
                 const kitEntry = (snapshot.kits || []).find((entry) => entry.id === state.kitId) || null;
                 updateCompleteBar(kitEntry);
                 showStatusMessage("Kit marked complete. Great work!");
+                if (state.kitId === "kit-minecraft") window.dispatchEvent(new Event("hub-minecraft-progress-changed"));
             } catch (error) {
                 completeBtn.disabled = false;
                 showStatusMessage(error?.message || "Could not mark this kit complete.", true);
@@ -1141,6 +1146,12 @@
         } catch (error) {
             if (session !== state.sessionRevision) return;
             showStatusMessage(error?.message || "Could not load this kit.", true);
+            if (error?.code === "minecraft-builder-locked" || error?.code === "minecraft-hub-paused") {
+                const link = document.createElement("a");
+                link.href = "./kit-worksheet.html?kit=kit-minecraft";
+                link.textContent = "Open Minecraft Player Kit";
+                document.getElementById("worksheet-status-message").append(" ", link);
+            }
             return;
         }
 

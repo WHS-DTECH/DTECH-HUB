@@ -6,6 +6,56 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const { createKitPublication } = require("../practical-skills/kit-publication");
+const { createMinecraftPrerequisite } = require("../practical-skills/minecraft-prerequisite");
+
+test("Minecraft prerequisite locks Builder and pauses only students with a saved Blueprint slideshow", async (t) => {
+    const builder = "kit-minecraft-builder-kit";
+    const player = "kit-minecraft";
+    const progress = new Map([
+        ["student", [{ kit_id: builder, responses: { "1-blocks": { "another-link": "https://example.test/" } } }]],
+        ["legacy", [{ kit_id: player, responses: { "3-blocks": { "blueprint-slideshow-link": "https://example.test/slides" } } }]],
+        ["staff", [{ kit_id: builder, responses: { "1-blocks": { "blueprint-slideshow-link": "https://example.test/slides" } } }]]
+    ]);
+    const policy = createMinecraftPrerequisite({
+        getVerifiedEmail: (req) => req.headers["x-verified-test-account"],
+        getProgress: async (account) => progress.get(account) || [],
+        isStaff: async (account) => account === "staff"
+    });
+    const app = express();
+    policy.register(app);
+    app.use(policy.gate);
+    app.use((_req, res) => res.sendStatus(204));
+    const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
+    t.after(() => new Promise((resolve) => server.close(resolve)));
+    const request = (path, account, method = "GET") => fetch(`http://127.0.0.1:${server.address().port}/api/${path}`, {
+        method, headers: account ? { "x-verified-test-account": account } : { "x-user-email": "staff" }
+    });
+    const builderContent = `practical-skills/kit-content/${builder}`;
+    const status = "practical-skills/minecraft-access";
+    assert.equal((await request(builderContent)).status, 401);
+    assert.equal((await request(builderContent + "?preview=1", "student")).status, 403);
+    assert.equal((await request(`practical-skills/blocks/${builder}/1/submit`, "student", "POST")).status, 403);
+    assert.equal((await request("knowledge-web/clouds", "student")).status, 204, "An unrelated link does not pause the Hub");
+    progress.set("student", [{ kit_id: builder, responses: { "1-blocks": {
+        "blueprint-slideshow-link": "https://docs.google.com/presentation/d/example/edit"
+    } } }]);
+    const paused = await request(status, "student");
+    assert.equal(paused.headers.get("cache-control"), "private, no-store");
+    const notice = await paused.json();
+    assert.equal(notice.hubPaused, true);
+    assert.match(notice.playerUrl, /kit=kit-minecraft$/);
+    assert.equal((await (await request("knowledge-web/clouds", "student")).json()).code, "minecraft-hub-paused");
+    assert.equal((await (await request(status, "legacy")).json()).hubPaused, true);
+    assert.equal((await request("practical-skills/my-progress", "student")).status, 204);
+    assert.equal((await request(`practical-skills/progress/${player}/complete`, "student", "POST")).status, 204);
+    assert.equal((await request("student/login-drive-setup", "student", "POST")).status, 204);
+    assert.equal((await request(builderContent, "staff")).status, 204);
+    assert.equal((await (await request(status, "staff")).json()).hubPaused, false);
+    progress.get("student").push({ kit_id: player, completed: true });
+    assert.equal((await request(builderContent, "student")).status, 204);
+    assert.equal((await request("knowledge-web/clouds", "student")).status, 204);
+    assert.equal((await (await request(status, "student")).json()).hubPaused, false);
+});
 
 async function fixture(t) {
     const saved = [

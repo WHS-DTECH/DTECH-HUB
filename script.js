@@ -5263,6 +5263,75 @@ async function init() {
     initHubGoogleAuth();
 }
 
+let minecraftAccessCheck;
+let minecraftReminderTimer;
+let minecraftReminderToken;
+async function refreshMinecraftAccess() {
+    const token = getActiveHubBearerToken();
+    const noticeId = "hub-minecraft-reminder";
+    if (minecraftAccessCheck?.token === token) return;
+    clearTimeout(minecraftReminderTimer);
+    if (minecraftReminderToken !== token) document.getElementById(noticeId)?.remove();
+    if (!token) {
+        minecraftAccessCheck = null;
+        document.getElementById(noticeId)?.remove();
+        return;
+    }
+    const check = { token };
+    minecraftAccessCheck = check;
+    try {
+        const response = await fetch("/api/practical-skills/minecraft-access", {
+            headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(15000)
+        });
+        if (response.status === 401) {
+            if (minecraftAccessCheck === check) document.getElementById(noticeId)?.remove();
+            return;
+        }
+        if (!response.ok) throw new Error(`Request failed (${response.status}).`);
+        const access = await response.json();
+        if (minecraftAccessCheck !== check || token !== getActiveHubBearerToken()) return;
+        if (!access.hubPaused) {
+            document.getElementById(noticeId)?.remove();
+            return;
+        }
+        const path = location.pathname.toLowerCase();
+        const onLicence = path === access.licenceUrl;
+        const onPlayer = path === "/practical-skills/kit-worksheet.html" &&
+            new URLSearchParams(location.search).get("kit") === "kit-minecraft";
+        if (!onLicence && !onPlayer) {
+            location.replace(access.licenceUrl);
+            return;
+        }
+        minecraftReminderTimer = setTimeout(refreshMinecraftAccess, 20000);
+        if (document.getElementById(noticeId)) return;
+        const notice = document.createElement("section");
+        notice.id = noticeId;
+        notice.className = onPlayer ? "worksheet-safety-note" : "hub-minecraft-reminder";
+        notice.setAttribute("role", "alert");
+        const message = document.createElement("p");
+        message.textContent = access.message;
+        notice.append(message);
+        if (onLicence) {
+            const link = document.createElement("a");
+            link.className = "button button-primary";
+            link.href = access.playerUrl;
+            link.textContent = "Open Minecraft Player Kit";
+            notice.append(link);
+        }
+        (document.querySelector("main") || document.body).prepend(notice);
+        minecraftReminderToken = token;
+    } catch (error) {
+        console.error("Could not check Minecraft Kit access:", error);
+        if (minecraftAccessCheck === check) minecraftReminderTimer = setTimeout(refreshMinecraftAccess, 20000);
+    } finally {
+        if (minecraftAccessCheck === check) minecraftAccessCheck = null;
+    }
+}
+window.addEventListener("hub-auth-state-changed", () => { void refreshMinecraftAccess(); });
+window.addEventListener("hub-minecraft-progress-changed", () => { void refreshMinecraftAccess(); });
+window.addEventListener("pageshow", () => { void refreshMinecraftAccess(); });
+window.addEventListener("focus", () => { void refreshMinecraftAccess(); });
+
 let knowledgeWebAccess;
 window.addEventListener("hub-auth-state-changed", async ({ detail }) => {
     const links = [...document.querySelectorAll("[data-knowledge-web]")];

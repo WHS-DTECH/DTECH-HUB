@@ -6232,7 +6232,7 @@ app.use(async (req, _res, next) => {
     (/^\/api\/knowledge-web\/(?:access|clouds|proposals(?:\/duplicates)?|manage\/clouds|manage\/proposals)\/?$/i.test(req.path) && req.method === "GET") ||
     (/^\/api\/knowledge-web\/(?:proposals|manage\/proposals\/[^/]+\/decision|manage\/clouds|manage\/source-metadata)\/?$/i.test(req.path) && req.method === "POST") ||
     (/^\/api\/knowledge-web\/(?:proposals|manage\/clouds)\/[^/]+\/?$/i.test(req.path) && req.method === "PUT") ||
-    (req.method === "GET" && /^(?:\/practical-skills\/library\.json|\/api\/practical-skills\/(?:library|my-progress|typing-kit|(?:kit-content|progress)\/[^/]+))\/?$/i.test(req.path)) ||
+    (req.method === "GET" && /^(?:\/practical-skills\/library\.json|\/api\/practical-skills\/(?:library|my-progress|minecraft-access|typing-kit|(?:kit-content|progress)\/[^/]+))\/?$/i.test(req.path)) ||
     (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/licences\/[a-zA-Z0-9_-]+$/.test(req.path)) ||
     (["GET", "POST"].includes(req.method) && req.path === "/api/practical-skills/drawing-filing") ||
     (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/document-check$/.test(req.path)) ||
@@ -6268,6 +6268,23 @@ app.use(async (req, _res, next) => {
 
   next();
 });
+const { createMinecraftPrerequisite, PLAYER: MINECRAFT_PLAYER_KIT, BUILDER: MINECRAFT_BUILDER_KIT } =
+  require("./practical-skills/minecraft-prerequisite");
+const minecraftPrerequisite = createMinecraftPrerequisite({
+  getVerifiedEmail: (req) => req.auth_identity?.verified && isSchoolEmail(req.auth_identity.email) ? req.auth_identity.email : "",
+  getProgress: async (email) => {
+    if (!hasDatabase) return [MINECRAFT_PLAYER_KIT, MINECRAFT_BUILDER_KIT]
+      .map((id) => memoryPracticalSkillsProgress.get(`${email}:${id}`)).filter(Boolean);
+    await ensurePracticalSkillsProgressSchema();
+    return (await pool.query(
+      "SELECT kit_id, completed, responses FROM practical_skills_progress WHERE student_email = $1 AND kit_id = ANY($2::text[])",
+      [email, [MINECRAFT_PLAYER_KIT, MINECRAFT_BUILDER_KIT]]
+    )).rows;
+  },
+  isStaff: canManagePracticalSchedule
+});
+minecraftPrerequisite.register(app);
+app.use(minecraftPrerequisite.gate);
 app.use(["/api/practical-skills", "/api/admin/practical-skills"], async (_req, res, next) => {
   res.set("Cache-Control", "private, no-store");
   try {
@@ -15571,12 +15588,15 @@ app.get("/api/practical-skills/my-progress", async (req, res) => {
   try {
     const deferred = req.query?.refresh === "deferred";
     const studentView = req.query?.view === "student";
-    const [manager, visibleKits] = await Promise.all([
+    const [manager, visibleKits, minecraftAccess] = await Promise.all([
       !studentView && access.isManager(),
-      kitPublication.visibleKits(req, { includePreviews: !studentView, studentView })
+      kitPublication.visibleKits(req, { includePreviews: !studentView, studentView }),
+      minecraftPrerequisite.status(req)
     ]);
     if (!deferred) {
-      const liveIds = new Set(visibleKits.filter((kit) => kit.live).map((kit) => kit.id));
+      const liveIds = new Set(visibleKits.filter((kit) => kit.live &&
+        (!minecraftAccess?.hubPaused || kit.id === MINECRAFT_PLAYER_KIT) &&
+        (!minecraftAccess?.builderLocked || kit.id !== MINECRAFT_BUILDER_KIT)).map((kit) => kit.id));
       const definitions = [...PRACTICAL_SKILLS_KIT_DEFINITIONS, ...customPracticalSkillsKits.values()].filter((kit) => liveIds.has(kit.id));
       if (liveIds.has("kit-login")) await refreshLearningSitesCheckIn(studentEmail);
       for (let index = 0; index < definitions.length; index += 4) {
@@ -15588,6 +15608,8 @@ app.get("/api/practical-skills/my-progress", async (req, res) => {
       getPracticalSkillsStudentName(req)
     ]);
     res.json({ ...await buildPracticalSkillsLicenceSnapshot(rows, visibleKits, manager),
+      minecraftAccess: minecraftAccess && rows.some((row) => row.kit_id === MINECRAFT_PLAYER_KIT && row.completed === true)
+        ? { builderLocked: false, hubPaused: false } : minecraftAccess,
       student: { name, email: studentEmail }, progressRefreshPending: deferred });
   } catch (error) {
     console.error("[licence] Could not load saved progress:", error);

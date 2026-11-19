@@ -186,7 +186,12 @@
             .sort((a, b) => (a.applicationOrder || 0) - (b.applicationOrder || 0));
         const licenceKits = [...skillKits, ...applicationKits, ...setupKits];
         const loaded = Boolean(state.email && snapshot);
-        const typingVisible = snapshot?.canManageKits || snapshot?.typingKit?.live !== false;
+        const minecraftAccess = snapshot?.minecraftAccess;
+        const locked = (kit) => Boolean(minecraftAccess &&
+            (minecraftAccess.hubPaused && kit.id !== "kit-minecraft" ||
+                minecraftAccess.builderLocked && kit.id === "kit-minecraft-builder-kit"));
+        const lockMessage = "Locked until Minecraft Player Kit is complete";
+        const typingVisible = !minecraftAccess?.hubPaused && (snapshot?.canManageKits || snapshot?.typingKit?.live !== false);
         const typingPaused = snapshot?.typingKit?.live === false;
         const typingAudience = studentAudience(snapshot?.typingKit);
         const typingCard = typingVisible ? `<a class="licence-stamp is-log" href="./typing-kit.html" aria-label="Typing Kit - ${typingPaused ? "preview Not Live" : "open your seven-week practice log"}. Student access when Live: ${typingAudience.full}.">${audienceBadge(typingAudience)}<span class="licence-stamp-icon" aria-hidden="true">&#9000;</span><strong>Typing Kit</strong><span class="licence-stamp-status">7-WEEK PRACTICE LOG</span><span class="stamp-certificate">${typingPaused ? "Preview Not Live log" : "Open log"} &rarr;</span></a>` : "";
@@ -211,6 +216,7 @@
                 ? `./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}&preview=1`
                 : `./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}`;
             const copy = `<span class="licence-stamp-icon" aria-hidden="true">${escapeHtml(kit.icon)}</span><strong>${escapeHtml(kit.title)}</strong><span class="licence-stamp-status">${earned ? "STAMP EARNED" : loaded ? "Stamp to collect" : state.loading ? "Loading progress..." : "Progress unavailable"}</span>`;
+            if (locked(kit)) return `<div class="licence-stamp">${audienceBadge(audience)}${copy}<span class="stamp-certificate">${lockMessage}</span></div>`;
             const stamp = `<a class="licence-stamp${earned ? " is-earned" : ""}" href="${href}" aria-label="${kit.live === false ? "Preview Not Live" : "Open"} ${escapeHtml(kit.title)}${earned ? ' and certificate' : ''}. Student access when Live: ${audience.full}.">${audienceBadge(audience)}${copy}<span class="stamp-certificate">${kit.live === false ? "Preview Not Live kit" : earned ? "Open kit & certificate" : "Open kit"} &rarr;</span></a>`;
             return snapshot?.canManageKits ? `<div class="licence-teacher-kit">${stamp}<button type="button" role="switch" aria-checked="${kit.live !== false}" aria-label="${escapeHtml(kit.title)} live for students" class="licence-live-pill${kit.live === false ? " is-not-live" : ""}" data-publication="${escapeHtml(kit.id)}" data-live="${kit.live !== false}">${kit.live === false ? "Not Live" : "Live"}</button><a class="licence-edit-link" href="./admin-kits.html?kit=${encodeURIComponent(kit.id)}">Edit kit</a></div>` : stamp;
         }
@@ -259,7 +265,7 @@
                 } finally { button.disabled = false; }
             });
         });
-        const next = loaded ? licenceKits.find((kit) => kit.live !== false && !kitsById.get(kit.id)?.isComplete) : null;
+        const next = loaded ? licenceKits.find((kit) => kit.live !== false && !locked(kit) && !kitsById.get(kit.id)?.isComplete) : null;
         const nextPanel = document.getElementById("ps-next-step");
         nextPanel.hidden = !loaded;
         if (loaded) {
@@ -304,11 +310,11 @@
                     <span class="ps-kit-pill">${timeLabel}</span>`}
                 </div>
                 <div class="ps-kit-actions">
-                    <a class="button button-primary" href="./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}${kit.live === false ? "&preview=1" : ""}">${kit.live === false ? "Preview Not Live kit" : progress.isComplete ? "View kit & certificate" : "Open kit"} &rarr;</a>
+                    ${locked(kit) ? `<span class="ps-kit-pill">${lockMessage}</span>` : `<a class="button button-primary" href="./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}${kit.live === false ? "&preview=1" : ""}">${kit.live === false ? "Preview Not Live kit" : progress.isComplete ? "View kit & certificate" : "Open kit"} &rarr;</a>
                     <details class="ps-kit-manage"><summary>Manage progress</summary>
                         <button type="button" class="button button-secondary" data-kit="${kit.id}" data-action="complete" ${progress.isComplete ? "disabled" : ""}>Mark Complete</button>
                         <button type="button" class="button button-secondary" data-kit="${kit.id}" data-action="reset">Reset</button>
-                    </details>
+                    </details>`}
                 </div>
             `;
             list.appendChild(item);

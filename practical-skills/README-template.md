@@ -1,5 +1,9 @@
 # Practical Skills Module Template
 
+## Minecraft prerequisite
+
+Minecraft Builder Kit requires a completed Minecraft Player Kit for students, in addition to the normal kit publication and course rules. If a student's saved Blueprint Mission work already contains a slideshow share link, the signed-in Hub directs them to My Licence and leaves Player Kit available while pausing other signed-in activities. Completing Player Kit removes both restrictions. The check uses the link saved in the Hub, not Google Drive sharing permissions. Staff are exempt from the prerequisite; keep Player Kit Live so students can finish it. Module Template
+
 This folder is the reusable Practical Skills module for HUB sites.
 
 ## Folder Structure

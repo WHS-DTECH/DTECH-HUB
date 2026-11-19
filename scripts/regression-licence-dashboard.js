@@ -149,18 +149,34 @@ async function main() {
     snapshot = { ...snapshot, licenceKits: [...snapshot.licenceKits,
         { id: "kit-minecraft-coder", title: "Minecraft Coder Kit", live: false, skillArea: "Application Kits", application: "Minecraft", applicationOrder: 2 },
         { id: "kit-minecraft", title: "Minecraft Player Kit", live: true, skillArea: "Application Kits", application: "Minecraft", applicationOrder: 0 },
-        { id: "kit-minecraft-builder", title: "Minecraft Builder Kit", live: false, skillArea: "Application Kits", application: "Minecraft", applicationOrder: 1 }
+        { id: "kit-minecraft-builder-kit", title: "Minecraft Builder Kit", live: false, skillArea: "Application Kits", application: "Minecraft", applicationOrder: 1 }
     ] };
     events["hub-auth-state-changed"]();
     await tick();
     const applicationCards = nodes.get("ps-application-kits").innerHTML;
     assert.equal(nodes.get("ps-application-kits").hidden, false);
     assert.equal((applicationCards.match(/class="licence-application-group"/g) || []).length, 1);
-    assert.match(applicationCards, /kit=kit-minecraft-builder&preview=1/);
+    assert.match(applicationCards, /kit=kit-minecraft-builder-kit&preview=1/);
     assert.match(applicationCards, /data-publication="kit-minecraft-coder" data-live="false"/);
     assert.doesNotMatch(nodes.get("ps-stamp-list").innerHTML, /Minecraft/);
     assert.ok(applicationCards.indexOf("Minecraft Player Kit") < applicationCards.indexOf("Minecraft Builder Kit"));
     assert.ok(applicationCards.indexOf("Minecraft Builder Kit") < applicationCards.indexOf("Minecraft Coder Kit"));
+
+    const teacherSnapshot = snapshot;
+    snapshot = { ...snapshot, canManageKits: false, kits: [],
+        licenceKits: snapshot.licenceKits.filter((kit) => kit.id !== "kit-minecraft-coder").map((kit) => ({ ...kit, live: true })),
+        minecraftAccess: { builderLocked: true, hubPaused: false } };
+    events["hub-auth-state-changed"]();
+    await tick();
+    assert.match(nodes.get("ps-application-kits").innerHTML, /Locked until Minecraft Player Kit is complete/);
+    assert.doesNotMatch(nodes.get("ps-application-kits").innerHTML, /kit=kit-minecraft-builder-kit/);
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /kit=kit-login/);
+    snapshot = { ...snapshot, minecraftAccess: { builderLocked: true, hubPaused: true } };
+    events["hub-auth-state-changed"]();
+    await tick();
+    assert.match(nodes.get("ps-next-link").href, /kit=kit-minecraft$/);
+    assert.doesNotMatch(nodes.get("ps-stamp-list").innerHTML, /kit=kit-login|typing-kit\.html/);
+    snapshot = teacherSnapshot;
 
     snapshot = { ...snapshot, progressRefreshPending: true };
     background = {};
