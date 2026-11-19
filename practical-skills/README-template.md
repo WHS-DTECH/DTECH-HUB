@@ -111,6 +111,27 @@ course (for staff previewing Student View, it uses their selected course).
 The small **JNR/MID/SNR** or **MID/SNR** badge on each stamp shows which
 students can open the kit when it is Live.
 
+### KNOW Mode: Computing History Knowledge Web
+
+The **Knowledge Web** link in Licence and My Licence is available to current
+Years 9–10 students and teaching staff. In Teacher View, open
+**Licence → Manage Knowledge Web**. The first visit that loads clouds creates
+the initial NCEA disruptions draft in PostgreSQL; it has no verified sources
+yet and does not appear on the shared web. Check the history and dated events,
+add at least one source with a note about what it supports, then use
+**Publish to shared web** when ready. Save Draft keeps it private.
+
+The shared web supports title search, keyboard navigation, pan and zoom. This
+phase does not add student contributions or change DO Kit completion. In later
+phases only new historical clouds will require approval. Kites must include
+evidence but publish immediately; ordinary discussion comments and questions
+will not require individual citations. Moderation will be reactive, through
+reports and hide/remove controls, not routine review of student arguments.
+
+Run `node --test scripts/regression-knowledge-web.js` for access checks. Set
+`KNOWLEDGE_WEB_TEST_DATABASE_URL` to an isolated PostgreSQL test database to also
+exercise draft visibility, publishing and persistence.
+
 Validate with `node --test scripts/regression-google-drawings-links.js`.
 
 ## Search Kit progress safeguards

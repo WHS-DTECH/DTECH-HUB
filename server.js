@@ -6229,6 +6229,9 @@ app.use(async (req, _res, next) => {
 
   req.auth_identity.token_present = true;
   const licenceAccessToken = bearerToken.split(".").length !== 3 && (
+    (/^\/api\/knowledge-web\/(?:access|clouds|manage\/clouds)\/?$/i.test(req.path) && req.method === "GET") ||
+    (/^\/api\/knowledge-web\/manage\/clouds\/?$/i.test(req.path) && req.method === "POST") ||
+    (/^\/api\/knowledge-web\/manage\/clouds\/[^/]+\/?$/i.test(req.path) && req.method === "PUT") ||
     (req.method === "GET" && /^(?:\/practical-skills\/library\.json|\/api\/practical-skills\/(?:library|my-progress|typing-kit|(?:kit-content|progress)\/[^/]+))\/?$/i.test(req.path)) ||
     (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/licences\/[a-zA-Z0-9_-]+$/.test(req.path)) ||
     (["GET", "POST"].includes(req.method) && req.path === "/api/practical-skills/drawing-filing") ||
@@ -6283,6 +6286,11 @@ const kitPublication = require("./practical-skills/kit-publication").createKitPu
 });
 app.use(kitPublication.gate);
 kitPublication.register(app, requireAdminAccess);
+require("./knowledge-web/.store").registerKnowledgeWeb(app, {
+  pool, canManage: canManagePracticalSchedule, getStudentProfile: getLearningSitesStudentProfile,
+  getVerifiedEmail: (req) => req.auth_identity?.verified && isSchoolEmail(req.auth_identity.email) ? req.auth_identity.email : "",
+  getContributorName: getPracticalSkillsStudentName
+});
 app.use("/images/activities", express.static(path.join(__dirname, "public", "images", "activities")));
 app.get("/practical-skills/library.json", kitPublication.requireLibraryAccess, async (_req, res) => {
   try {

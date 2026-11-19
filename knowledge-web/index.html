@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
+    <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
+    <title>Computing History Knowledge Web | DTECH-HUB</title>
+    <link rel="icon" href="/images/favicon.ico">
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=1">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero">
+            <nav class="topbar" aria-label="Primary">
+                <a class="brand" href="/index.html">Computer Lab</a>
+                <div class="utility-actions">
+                    <button id="hub-google-signin" class="google-signin-button" type="button">Sign in with Google</button>
+                    <button id="hub-google-signout" type="button" hidden>Sign out</button>
+                    <a id="hub-staff-link" href="/teacher-view.html" hidden>Teacher View</a>
+                </div>
+            </nav>
+        </header>
+        <main class="knowledge-web">
+            <p class="section-kicker">KNOW MODE &middot; YEARS 9&ndash;10</p>
+            <h1 id="web-title">Computing History Knowledge Web</h1>
+            <p>Explore computing history and the evidence behind it. There is no set route to follow.</p>
+            <div class="kw-actions">
+                <a href="/practical-skills/checklist.html">Back to My Licence</a>
+                <a id="web-explore-link" href="/knowledge-web/" hidden>Open shared web</a>
+                <a id="web-manage-link" href="/knowledge-web/?manage=1" hidden>Manage clouds</a>
+            </div>
+            <p id="web-status" role="status" aria-live="polite"></p>
+            <button type="button" id="web-retry" hidden>Retry</button>
+            <section id="web-explore" aria-label="Explore the Knowledge Web" hidden>
+                <p id="web-empty" hidden>No clouds have been published yet. Check back after your teacher releases one.</p>
+                <div class="kw-columns" id="web-clouds" hidden>
+                    <div class="kw-panel">
+                        <label for="web-search">Find a cloud by title</label>
+                        <input id="web-search" type="search" autocomplete="off">
+                        <ul id="web-results" aria-label="Clouds by title"></ul>
+                        <div class="kw-actions" aria-label="Canvas controls">
+                            <button type="button" id="web-zoom-out" aria-label="Zoom out">−</button>
+                            <button type="button" id="web-zoom-in" aria-label="Zoom in">+</button>
+                            <button type="button" id="web-reset">Reset view</button>
+                            <output id="web-zoom" aria-live="polite">100%</output>
+                        </div>
+                        <p id="web-pan-help">Scroll or use the arrow keys in the map to pan. You can also explore from the cloud list.</p>
+                        <div id="web-viewport" class="kw-viewport" tabindex="0" role="region" aria-label="Knowledge Web canvas" aria-describedby="web-pan-help">
+                            <div id="web-board"></div>
+                        </div>
+                    </div>
+                    <article class="kw-panel" id="web-detail" aria-label="Selected cloud" aria-live="polite"></article>
+                </div>
+            </section>
+            <section id="web-manage" aria-label="Manage clouds" hidden>
+                <p>Drafts are private to teachers. Check the historical details and sources before publishing a cloud to students.</p>
+                <p id="web-save-status" role="status" aria-live="polite"></p>
+                <div class="kw-columns">
+                    <div class="kw-panel">
+                        <button id="web-new" type="button">New draft cloud</button>
+                        <ul id="web-drafts" aria-label="Draft and published clouds"></ul>
+                    </div>
+                    <form id="web-form" class="kw-panel" hidden>
+                        <h2 id="web-editor-title">Edit cloud</h2>
+                        <p id="web-metadata"></p>
+                        <label>Cloud title<input name="title" required maxlength="120"></label>
+                        <label>Description<textarea name="description" rows="4" required maxlength="2000"></textarea></label>
+                        <label>Historical significance<textarea name="significance" rows="3" required maxlength="2000"></textarea></label>
+                        <fieldset>
+                            <legend>Dated events</legend>
+                            <p>Use YYYY-MM or YYYY-MM-DD. Leave out events you have not verified.</p>
+                            <div id="web-events"></div>
+                            <button id="web-add-event" type="button">Add dated event</button>
+                        </fieldset>
+                        <fieldset>
+                            <legend>Sources</legend>
+                            <p>At least one source is required to publish. Explain what each source supports.</p>
+                            <div id="web-sources"></div>
+                            <button id="web-add-source" type="button">Add source</button>
+                        </fieldset>
+                        <fieldset class="kw-coordinates">
+                            <legend>Shared canvas position</legend>
+                            <label>From left <input name="x" type="number" required min="0" max="3000"></label>
+                            <label>From top <input name="y" type="number" required min="0" max="3000"></label>
+                        </fieldset>
+                        <div class="kw-actions">
+                            <button id="web-save" type="submit" value="save">Save draft</button>
+                            <button id="web-publish" type="submit" value="publish">Publish to shared web</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="/script.js?v=knowledge-web-1"></script>
+    <script src="/knowledge-web/web.js?v=1"></script>
+</body>
+</html>

@@ -1444,6 +1444,8 @@ function renderGlobalNavbar() {
             <summary id="hub-practical-skills-summary">Licence</summary>
             <div class="nav-drawer" role="menu">
                 <a id="hub-practical-skills-link" role="menuitem" href="/practical-skills/checklist.html">My Licence</a>
+                <a data-knowledge-web="explore" role="menuitem" href="/knowledge-web/" hidden>Knowledge Web</a>
+                <a data-knowledge-web="manage" role="menuitem" href="/knowledge-web/?manage=1" hidden>Manage Knowledge Web</a>
                 <a id="hub-licence-library-link" role="menuitem" hidden href="/practical-skills/?category=Licence%20Kit">Licence Library</a>
                 <a id="hub-upload-kits-link" role="menuitem" href="/practical-skills/admin-kits.html" hidden>Upload Kits</a>
                 <a id="hub-teacher-review-link" role="menuitem" href="/practical-skills/teacher-results.html" hidden>Teacher Review</a>
@@ -5261,4 +5263,35 @@ async function init() {
     initHubGoogleAuth();
 }
 
+let knowledgeWebAccess;
+window.addEventListener("hub-auth-state-changed", async ({ detail }) => {
+    const links = [...document.querySelectorAll("[data-knowledge-web]")];
+    if (!links.length) return;
+    const token = detail.signedIn ? getActiveHubBearerToken() : "";
+    if (!token || knowledgeWebAccess?.token !== token) {
+        links.forEach((element) => { element.hidden = true; });
+        knowledgeWebAccess = token ? {
+            token,
+            result: fetch("/api/knowledge-web/access", { headers: withHubAuthHeaders({}, undefined, true), cache: "no-store" })
+                .then((response) => {
+                    if (response.status === 401 || response.status === 403) return null;
+                    if (!response.ok) throw new Error(`Request failed (${response.status}).`);
+                    return response.json();
+                })
+                .catch((error) => {
+                    console.error("Could not check Knowledge Web access:", error);
+                    if (knowledgeWebAccess?.token === token) knowledgeWebAccess = null;
+                    return null;
+                })
+        } : null;
+    }
+    const request = knowledgeWebAccess;
+    if (!request) return;
+    const access = await request.result;
+    if (knowledgeWebAccess !== request) return;
+    links.forEach((element) => {
+        element.hidden = !access || (element.dataset.knowledgeWeb === "manage" &&
+            (!access.canManage || getEffectiveHubViewMode() !== "teacher"));
+    });
+});
 init();

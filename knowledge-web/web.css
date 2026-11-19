@@ -1,0 +1,30 @@
+.knowledge-web { --kw-ink: #143347; --kw-accent: #1b5b69; color: var(--kw-ink); padding: 1.5rem 0 3rem; }
+.knowledge-web [hidden] { display: none !important; }
+.knowledge-web h1 { font-size: clamp(1.7rem, 4vw, 2.8rem); margin: .25rem 0; }
+.knowledge-web h2 { font-size: 1.3rem; }
+.knowledge-web label { display: grid; gap: .3rem; font-weight: 650; margin-block: .65rem; }
+.knowledge-web p, .knowledge-web li { overflow-wrap: anywhere; }
+.knowledge-web :is(input, textarea, button, fieldset) { border: 1px solid #7998a3; border-radius: .5rem; background: #fff; color: var(--kw-ink); font: inherit; padding: .5rem; }
+.knowledge-web :is(input, textarea) { width: 100%; }
+.knowledge-web button { cursor: pointer; }
+.knowledge-web button:hover, .knowledge-web button[aria-pressed="true"] { background: #dfedf3; border-color: var(--kw-accent); }
+.knowledge-web button:disabled { cursor: default; opacity: .7; }
+.knowledge-web :focus-visible { outline: 3px solid #1c6576; outline-offset: 3px; }
+.knowledge-web fieldset { margin-block: .75rem; min-width: 0; }
+.kw-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; margin-block: .65rem; }
+.kw-actions a { margin-inline-end: .75rem; }
+.kw-columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1rem; align-items: start; }
+#web-manage .kw-columns { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+.kw-panel { min-width: 0; padding: 1rem; border: 1px solid #b6cdd5; border-radius: .8rem; background: #fff; }
+#web-results, #web-drafts { list-style: none; padding: 0; margin: .4rem 0; max-height: 12rem; overflow: auto; }
+#web-results button, #web-drafts button { margin: .25rem; text-align: left; }
+.kw-viewport { height: min(52vh, 30rem); min-height: 16rem; overflow: auto; border: 1px solid #7998a3; border-radius: .65rem; background: #e8f4fa; }
+#web-board { position: relative; }
+.knowledge-web .kw-cloud { position: absolute; display: grid; place-items: center; width: 190px; height: 100px; padding: 10px 18px; border: 2px solid #84a1ad; border-radius: 48% 52% 38% 40% / 50% 50% 41% 41%; overflow-wrap: anywhere; background: #fff; text-align: center; font-weight: 700; }
+.knowledge-web .kw-cloud span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.kw-cloud[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--kw-accent); }
+.kw-entry { padding: .6rem; margin-block: .5rem; border: 1px solid #b6cdd5; border-radius: .5rem; }
+.kw-coordinates { display: flex; flex-wrap: wrap; gap: .6rem; }
+#web-detail p { white-space: pre-wrap; }
+#web-save-status, #web-status { min-height: 1.25em; }
+@media (max-width: 750px) { .kw-columns, #web-manage .kw-columns { grid-template-columns: minmax(0, 1fr); } }
