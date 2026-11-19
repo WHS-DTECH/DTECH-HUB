@@ -72,6 +72,11 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             assert.equal(res.status, 200);
             return (await res.json()).clouds;
         };
+        const teacherCloudResponse = await call("clouds");
+        assert.equal(teacherCloudResponse.status, 200);
+        assert.equal((await teacherCloudResponse.json()).canManage, true, "Teachers can open the shared-cloud view");
+        assert.equal((await call("proposals")).status, 403,
+            "The student-private proposal list remains teacher-restricted");
         assert.equal((await fetch(`${host}/knowledge-web/%2estore.js`)).status, 404);
         assert.deepEqual(await list("clouds", true), []);
         const [seed] = await list("manage/clouds");

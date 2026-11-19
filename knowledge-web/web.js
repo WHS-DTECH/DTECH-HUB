@@ -517,10 +517,11 @@
         node("status").textContent = token ? "Loading the Knowledge Web..." : "Sign in with your school Google account to open the Knowledge Web.";
         if (!token) return;
         try {
-            const [result, proposals] = await Promise.all([
-                request(manage ? "manage/clouds" : "clouds"),
-                request(manage ? "manage/proposals" : "proposals")
-            ]);
+            const result = await request(manage ? "manage/clouds" : "clouds");
+            let proposals = { proposals: [] };
+            if (manage || result.canPropose) {
+                proposals = await request(manage ? "manage/proposals" : "proposals");
+            }
             if (revision !== state.revision) return;
             state.clouds = result.clouds;
             state.proposals = proposals.proposals;
