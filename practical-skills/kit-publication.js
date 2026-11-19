@@ -62,16 +62,16 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
         }
         return requestAccess.get(req);
     }
-    async function audienceAllows(kit, access) {
-        return kit.studentAudience === "all" || await access.isManager()
+    async function audienceAllows(kit, access, studentView = false) {
+        return kit.studentAudience === "all" || (!studentView && await access.isManager())
             || ["MiddleDTECH", "SeniorDTECH"].includes(await access.course());
     }
-    async function visibleKits(req, { includePreviews = false } = {}) {
+    async function visibleKits(req, { includePreviews = false, studentView = false } = {}) {
         const access = accessFor(req);
-        const manager = includePreviews && await access.isManager();
+        const manager = !studentView && includePreviews && await access.isManager();
         const all = (await catalog()).filter((kit) => kit.status !== "deleted" && (manager || kit.live));
         if (manager) return all;
-        const allowed = await Promise.all(all.map((kit) => audienceAllows(kit, access)));
+        const allowed = await Promise.all(all.map((kit) => audienceAllows(kit, access, studentView)));
         return all.filter((_kit, index) => allowed[index]);
     }
     async function requireLibraryAccess(req, res, next) {

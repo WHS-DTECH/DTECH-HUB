@@ -77,11 +77,13 @@
         }
     }
 
-    function withAuthHeaders(headers = {}) {
+    function withAuthHeaders(headers = {}, allowAccessToken = false) {
+        if (typeof withHubAuthHeaders === "function") return withHubAuthHeaders(headers, state.email, allowAccessToken);
         const next = state.email ? { ...headers, "x-user-email": state.email } : { ...headers };
         const raw = getStoredAuthRaw();
         const auth = raw && getSignedInEmail() ? JSON.parse(raw) : {};
-        if (auth.idToken) next.Authorization = `Bearer ${auth.idToken}`;
+        const token = auth.idToken || (allowAccessToken ? auth.accessToken : "");
+        if (token) next.Authorization = `Bearer ${token}`;
         return next;
     }
 
@@ -134,7 +136,20 @@
     }
 
     function fetchSnapshot(deferred = false) {
-        return loadJson(`/api/practical-skills/my-progress${deferred ? "?refresh=deferred" : ""}`, { headers: withAuthHeaders() });
+        const params = new URLSearchParams();
+        if (deferred) params.set("refresh", "deferred");
+        if (typeof readStoredHubViewMode === "function" && readStoredHubViewMode() === "student") params.set("view", "student");
+        return loadJson(`/api/practical-skills/my-progress${params.size ? `?${params}` : ""}`, { headers: withAuthHeaders({}, true) });
+    }
+
+    function studentAudience(kit) {
+        return kit?.studentAudience === "middle-senior"
+            ? { short: "MID/SNR", full: "MiddleDTECH and SeniorDTECH" }
+            : { short: "JNR/MID/SNR", full: "JuniorDTECH, MiddleDTECH and SeniorDTECH" };
+    }
+
+    function audienceBadge(audience) {
+        return `<span class="licence-kit-audience" title="Student access when Live: ${audience.full}">${audience.short}</span>`;
     }
 
     function renderBadges(badges) {
@@ -173,7 +188,8 @@
         const loaded = Boolean(state.email && snapshot);
         const typingVisible = snapshot?.canManageKits || snapshot?.typingKit?.live !== false;
         const typingPaused = snapshot?.typingKit?.live === false;
-        const typingCard = typingVisible ? `<a class="licence-stamp is-log" href="./typing-kit.html" aria-label="Typing Kit - open your seven-week practice log"><span class="licence-stamp-icon" aria-hidden="true">&#9000;</span><strong>Typing Kit</strong><span>7-WEEK PRACTICE LOG</span><span class="stamp-certificate">${typingPaused ? "Preview Not Live log" : "Open log"} &rarr;</span></a>` : "";
+        const typingAudience = studentAudience(snapshot?.typingKit);
+        const typingCard = typingVisible ? `<a class="licence-stamp is-log" href="./typing-kit.html" aria-label="Typing Kit - ${typingPaused ? "preview Not Live" : "open your seven-week practice log"}. Student access when Live: ${typingAudience.full}.">${audienceBadge(typingAudience)}<span class="licence-stamp-icon" aria-hidden="true">&#9000;</span><strong>Typing Kit</strong><span class="licence-stamp-status">7-WEEK PRACTICE LOG</span><span class="stamp-certificate">${typingPaused ? "Preview Not Live log" : "Open log"} &rarr;</span></a>` : "";
         const kitsById = new Map((snapshot?.kits || []).map((kit) => [kit.id, kit]));
         const completed = loaded ? Number(snapshot.stampCompletedCount ?? snapshot.completedCount ?? 0) : 0;
         const total = loaded ? Number(snapshot.stampTotalKits ?? snapshot.totalKits ?? kitDefinitions.length) : kitDefinitions.length;
@@ -189,12 +205,13 @@
         document.getElementById("ps-licence-progress-count").textContent = loaded ? `${completed} / ${total} stamps`
             : state.email ? state.loading ? "Loading..." : "Progress unavailable" : "Sign in to view";
         function renderStamp(kit) {
+            const audience = studentAudience(kit);
             const earned = loaded && kitsById.get(kit.id)?.isComplete;
             const href = snapshot?.canManageKits && kit.live === false
                 ? `./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}&preview=1`
                 : `./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}`;
-            const copy = `<span class="licence-stamp-icon" aria-hidden="true">${escapeHtml(kit.icon)}</span><strong>${escapeHtml(kit.title)}</strong><span>${earned ? "STAMP EARNED" : loaded ? "Stamp to collect" : state.loading ? "Loading progress..." : "Progress unavailable"}</span>`;
-            const stamp = `<a class="licence-stamp${earned ? " is-earned" : ""}" href="${href}" aria-label="${kit.live === false ? "Preview" : "Open"} ${escapeHtml(kit.title)}${earned ? ' and certificate' : ''}">${copy}<span class="stamp-certificate">${kit.live === false ? "Preview Not Live kit" : earned ? "Open kit & certificate" : "Open kit"} &rarr;</span></a>`;
+            const copy = `<span class="licence-stamp-icon" aria-hidden="true">${escapeHtml(kit.icon)}</span><strong>${escapeHtml(kit.title)}</strong><span class="licence-stamp-status">${earned ? "STAMP EARNED" : loaded ? "Stamp to collect" : state.loading ? "Loading progress..." : "Progress unavailable"}</span>`;
+            const stamp = `<a class="licence-stamp${earned ? " is-earned" : ""}" href="${href}" aria-label="${kit.live === false ? "Preview Not Live" : "Open"} ${escapeHtml(kit.title)}${earned ? ' and certificate' : ''}. Student access when Live: ${audience.full}.">${audienceBadge(audience)}${copy}<span class="stamp-certificate">${kit.live === false ? "Preview Not Live kit" : earned ? "Open kit & certificate" : "Open kit"} &rarr;</span></a>`;
             return snapshot?.canManageKits ? `<div class="licence-teacher-kit">${stamp}<button type="button" role="switch" aria-checked="${kit.live !== false}" aria-label="${escapeHtml(kit.title)} live for students" class="licence-live-pill${kit.live === false ? " is-not-live" : ""}" data-publication="${escapeHtml(kit.id)}" data-live="${kit.live !== false}">${kit.live === false ? "Not Live" : "Live"}</button><a class="licence-edit-link" href="./admin-kits.html?kit=${encodeURIComponent(kit.id)}">Edit kit</a></div>` : stamp;
         }
         const typingStamp = snapshot?.canManageKits ? `<div class="licence-teacher-kit">${typingCard}<button type="button" role="switch" aria-checked="${!typingPaused}" aria-label="Typing Kit live for students" class="licence-live-pill${typingPaused ? " is-not-live" : ""}" data-publication="kit-typing" data-live="${!typingPaused}">${typingPaused ? "Not Live" : "Live"}</button></div>` : typingCard;

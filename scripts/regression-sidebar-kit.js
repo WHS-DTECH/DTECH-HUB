@@ -17,27 +17,28 @@ const context = vm.createContext({
     document: { body: { dataset: {} } },
     hubAuthState: { profile: { email: "student@example.test" } },
     normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
-    withHubAuthHeaders: (_headers, email) => ({ "x-user-email": email }),
+    readStoredHubViewMode: () => "student",
+    withHubAuthHeaders: (_headers, email, allowAccessToken) => {
+        assert.equal(allowAccessToken, true);
+        return { "x-user-email": email };
+    },
     console: { error() {} }
 });
 vm.runInContext(source.slice(start, end), context);
 async function main() {
     context.fetch = async (url, options) => {
         assert.equal(options.cache, "no-store");
-        if (url.endsWith("my-progress")) {
-            assert.equal(options.headers["x-user-email"], "student@example.test");
-            return { ok: true, json: async () => ({ kits: [
-                { id: "kit-paused", isComplete: false, live: false },
-                { id: "kit-login", isComplete: true }, { id: "kit-minecraft", isComplete: false },
-                { id: "kit-search", isComplete: false }
-            ] }) };
-        }
-        assert.equal(url, "/api/practical-skills/kit-content/kit-minecraft");
-        return { ok: true, json: async () => ({ content: { identity: { name: "Minecraft Builder Kit" } } }) };
+        assert.equal(url, "/api/practical-skills/my-progress?refresh=deferred&view=student");
+        assert.equal(options.headers["x-user-email"], "student@example.test");
+        return { ok: true, json: async () => ({ kits: [
+            { id: "kit-paused", isComplete: false, live: false },
+            { id: "kit-login", isComplete: true }, { id: "kit-minecraft", title: "Minecraft Builder Kit", isComplete: false },
+            { id: "kit-search", isComplete: false }
+        ] }) };
     };
     await context.loadAndRenderSidebarKit(panel);
     assert.equal(title.textContent, "Minecraft Builder Kit");
-    assert.equal(open.href, "/practical-skills/kit-worksheet.html?kit=kit-minecraft");
+    assert.equal(open.href, "/practical-skills/checklist.html");
     assert.equal(open.hidden, false);
     assert.equal(retry.hidden, true);
     context.fetch = async () => ({ ok: true, json: async () => ({ kits: [{ id: "kit-login", isComplete: true }] }) });

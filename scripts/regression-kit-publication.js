@@ -119,6 +119,24 @@ test("Unity and other restricted kits only appear and open for verified Middle/S
         { "x-verified-email": "junior@school.nz" })).status, 200);
 });
 
+test("staff see restricted and Not Live kits in Teacher View, but Student View follows their selected course", async (t) => {
+    const f = await fixture(t);
+    f.saved.push({ kit_id: "kit-unity-setup", content: { identity: { name: "Unity Setup Kit" } } });
+    const service = createKitPublication({ ...f.deps, getStudentCourse: async () => "JuniorDTECH" });
+    const teacher = { headers: { "x-admin": "yes" } };
+    const all = await service.visibleKits(teacher, { includePreviews: true });
+    assert.ok(all.some((kit) => kit.id === "kit-unity-setup"));
+    assert.ok(all.some((kit) => kit.id === "kit-files" && !kit.live));
+    const juniorPreview = await service.visibleKits(teacher, { studentView: true });
+    assert.deepEqual(juniorPreview.map((kit) => kit.id), ["kit-minecraft", "kit-typing"]);
+    const middlePreview = await createKitPublication({ ...f.deps, getStudentCourse: async () => "MiddleDTECH" })
+        .visibleKits(teacher, { studentView: true });
+    assert.ok(middlePreview.some((kit) => kit.id === "kit-unity-setup"));
+    assert.ok(middlePreview.every((kit) => kit.live));
+    const junior = await service.visibleKits({ headers: { "x-verified-email": "junior@school.nz" } }, { includePreviews: true });
+    assert.deepEqual(junior.map((kit) => kit.id), ["kit-minecraft", "kit-typing"]);
+});
+
 test("Typing publication persists, blocks student reads and all paused writes, and leaves stamp counts unchanged", async (t) => {
     const f = await fixture(t);
     assert.equal(await f.service.available("kit-typing"), true, "Existing access stays Live until explicitly changed");

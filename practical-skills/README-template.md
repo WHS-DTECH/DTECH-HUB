@@ -105,6 +105,11 @@ choose whether a Live kit is open to all students or only MiddleDTECH and
 SeniorDTECH. Unity Setup defaults to the latter; other kits default to all
 students. The same restriction applies to direct kit links and does not delete
 saved student progress.
+**Teacher View** on My Licence shows all non-deleted kits, including Not Live
+kits for preview. **Student View** shows only Live kits for the student's
+course (for staff previewing Student View, it uses their selected course).
+The small **JNR/MID/SNR** or **MID/SNR** badge on each stamp shows which
+students can open the kit when it is Live.
 
 Validate with `node --test scripts/regression-google-drawings-links.js`.
 

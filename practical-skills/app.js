@@ -338,7 +338,7 @@
         const leaveLibrary = () => pageLocation.replace("/practical-skills/checklist.html");
         if (studentView) return leaveLibrary();
         try {
-            const headers = licencePage && typeof withHubAuthHeaders === "function" ? withHubAuthHeaders() : undefined;
+            const headers = licencePage && typeof withHubAuthHeaders === "function" ? withHubAuthHeaders({}, undefined, true) : undefined;
             const response = await fetch(dataPath, { cache: "no-store", headers });
             if (licencePage && (response.status === 401 || response.status === 403)) return leaveLibrary();
             if (!response.ok) {
@@ -347,7 +347,7 @@
 
             const payload = await response.json();
             if (licencePage && (readStoredHubViewMode() === "student"
-                || withHubAuthHeaders().Authorization !== headers?.Authorization)) return leaveLibrary();
+                || withHubAuthHeaders({}, undefined, true).Authorization !== headers?.Authorization)) return leaveLibrary();
             if (!Array.isArray(payload)) throw new Error("The library response must be a card list.");
             library = payload.filter((item) => isPathways || String(item?.id || "") !== featuredChecklistId);
             if (!isPathways && !requestedCategory && library.some((item) => item.cardLabel === "LICENCE KIT")) {

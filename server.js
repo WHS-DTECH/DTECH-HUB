@@ -6229,6 +6229,7 @@ app.use(async (req, _res, next) => {
 
   req.auth_identity.token_present = true;
   const licenceAccessToken = bearerToken.split(".").length !== 3 && (
+    (req.method === "GET" && /^(?:\/practical-skills\/library\.json|\/api\/practical-skills\/(?:library|my-progress|typing-kit|(?:kit-content|progress)\/[^/]+))\/?$/i.test(req.path)) ||
     (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/licences\/[a-zA-Z0-9_-]+$/.test(req.path)) ||
     (["GET", "POST"].includes(req.method) && req.path === "/api/practical-skills/drawing-filing") ||
     (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/document-check$/.test(req.path)) ||
@@ -6278,7 +6279,7 @@ const kitPublication = require("./practical-skills/kit-publication").createKitPu
   pool, builtIns: PRACTICAL_SKILLS_KIT_DEFINITIONS, getDefaultContent: getDefaultPracticalSkillsKitContent,
   schoolDomain: SCHOOL_EMAIL_DOMAIN, getRequestUserEmail, canManage: canManagePracticalSchedule,
   getVerifiedEmail: (req) => req.auth_identity?.verified && isSchoolEmail(req.auth_identity.email) ? req.auth_identity.email : "",
-  getStudentCourse: async (email) => getResearchReportProgrammeFolder(await getLearningSitesStudentProfile(email))
+  getStudentCourse: getLicenceStudentCourse
 });
 app.use(kitPublication.gate);
 kitPublication.register(app, requireAdminAccess);
@@ -6621,7 +6622,10 @@ async function canManagePracticalSchedule(email) {
   const roleGrantsTeacherView = ["Admin", "Lead Teacher", "Teacher", "Technician"].includes(assignedRole);
   const isDeveloperAdmin = isDeveloperAdminEmail(normalizedEmail);
   const canAdmin = Boolean(rolePermission?.admin || isDeveloperAdmin);
-  return Boolean(staffEmailSet.has(normalizedEmail) || roleGrantsTeacherView || canAdmin);
+  const canonicalEmail = canonicalizeEmail(normalizedEmail);
+  const isStaff = staffEmailSet.has(normalizedEmail) || Boolean(canonicalEmail &&
+    [...staffEmailSet].some((staffEmail) => canonicalizeEmail(staffEmail) === canonicalEmail));
+  return Boolean(isStaff || roleGrantsTeacherView || canAdmin);
 }
 
 async function listPracticalEvents() {
@@ -15549,17 +15553,19 @@ async function buildPracticalSkillsLicenceSnapshot(rows, visibleKits, manager = 
 }
 
 app.get("/api/practical-skills/my-progress", async (req, res) => {
-  const studentEmail = normalizeEmail(getRequestUserEmail(req));
-  if (!studentEmail || !studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
-    res.status(401).json({ error: "School sign-in required." });
+  const access = kitPublication.accessFor(req);
+  const studentEmail = access.email;
+  if (!studentEmail) {
+    res.status(401).json({ error: "Sign in again with your school Google account to load your licence." });
     return;
   }
 
   try {
     const deferred = req.query?.refresh === "deferred";
+    const studentView = req.query?.view === "student";
     const [manager, visibleKits] = await Promise.all([
-      kitPublication.accessFor(req).isManager(),
-      kitPublication.visibleKits(req, { includePreviews: true })
+      !studentView && access.isManager(),
+      kitPublication.visibleKits(req, { includePreviews: !studentView, studentView })
     ]);
     if (!deferred) {
       const liveIds = new Set(visibleKits.filter((kit) => kit.live).map((kit) => kit.id));
@@ -15951,6 +15957,13 @@ function resolveSidebarCourse(profile, checkIn) {
     return checkIn?.completed ? getCourseProgrammeFolder(checkIn.answers?.course) : "";
   }
   return getResearchReportProgrammeFolder(profile);
+}
+
+async function getLicenceStudentCourse(email) {
+  const profile = await getLearningSitesStudentProfile(email);
+  if (!profile.courseIds?.includes("STAFF")) return getResearchReportProgrammeFolder(profile);
+  const preference = await getStaffCoursePreference(email);
+  return preference || resolveSidebarCourse(profile, await getSavedLearningSitesCheckIn(email)) || "JuniorDTECH";
 }
 
 app.get("/api/practical-skills/my-course", async (req, res) => {

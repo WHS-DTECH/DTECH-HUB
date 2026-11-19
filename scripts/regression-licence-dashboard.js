@@ -25,6 +25,7 @@ async function main() {
     let deferred;
     let background;
     let timeout = false;
+    let viewMode = "";
     function node() {
         return { textContent: "", html: "", get innerHTML() { return this.html; },
             set innerHTML(value) { this.html = value; this.children = []; }, hidden: false, classList: { add() {}, remove() {} },
@@ -35,7 +36,7 @@ async function main() {
         document: { getElementById(id) { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id); }, createElement: node, querySelectorAll: () => [] },
         localStorage: { getItem: () => auth }, sessionStorage: { getItem: () => null },
         window: { addEventListener: (name, handler) => { events[name] = handler; }, setInterval: () => 1, clearInterval() {} },
-        AbortSignal,
+        AbortSignal, URLSearchParams, readStoredHubViewMode: () => viewMode,
         fetch: async (url, options) => {
             requests.push({ url, options });
             assert.ok(options.signal instanceof AbortSignal, "Every request has a bounded timeout");
@@ -56,6 +57,7 @@ async function main() {
     assert.equal((nodes.get("ps-stamp-list").innerHTML.match(/is-earned/g) || []).length, 1);
     assert.match(nodes.get("ps-stamp-list").innerHTML, /kit=kit-login/);
     assert.match(nodes.get("ps-stamp-list").innerHTML, /Open kit & certificate/);
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /JNR\/MID\/SNR/);
     assert.match(nodes.get("ps-application-kits").innerHTML, /<a class="licence-stamp" href="\.\/kit-worksheet.html\?kit=kit-minecraft"/, "Application stamps open their kits too");
     assert.doesNotMatch(nodes.get("ps-stamp-list").innerHTML, /kit=kit-minecraft/, "Applications are separate from the large skill cards");
     assert.match(nodes.get("ps-application-kits").innerHTML, /Application = Minecraft/);
@@ -72,7 +74,7 @@ async function main() {
     assert.doesNotMatch(nodes.get("ps-kit-list").children[3].innerHTML, /data-action|certificate/, "Typing history has no completion, reset or certificate actions");
 
     snapshot = { ...snapshot, customKits: [
-        { id: "kit-unity-setup", title: "Unity Setup", skillArea: "Application Setups", custom: true },
+        { id: "kit-unity-setup", title: "Unity Setup", skillArea: "Application Setups", studentAudience: "middle-senior", custom: true },
         { id: "kit-other-setup", title: "Other Setup", skillArea: "Application Setups", custom: true }
     ] };
     events["hub-auth-state-changed"]();
@@ -80,6 +82,7 @@ async function main() {
     assert.doesNotMatch(nodes.get("ps-stamp-list").innerHTML, /kit-unity-setup|kit-other-setup/);
     assert.match(nodes.get("ps-application-kits").innerHTML, /<h2>Application Setups<\/h2>/);
     assert.match(nodes.get("ps-application-kits").innerHTML, /kit-unity-setup/);
+    assert.match(nodes.get("ps-application-kits").innerHTML, /kit=kit-unity-setup"[^>]+><span class="licence-kit-audience"[^>]+>MID\/SNR<\/span>/);
     assert.match(nodes.get("ps-application-kits").innerHTML, /kit-other-setup/);
     assert.match(nodes.get("ps-application-kits").innerHTML, /Application = Minecraft/);
     assert.ok(nodes.get("ps-kit-list").children.some((item) => /Unity Setup/.test(item.innerHTML)));
@@ -222,12 +225,19 @@ async function main() {
     assert.equal(nodes.get("ps-student-name").textContent, "Your name belongs here");
     assert.equal(nodes.get("ps-next-step").hidden, true);
     assert.ok(!nodes.get("ps-stamp-list").innerHTML.includes("is-earned"), "Signing out clears awards and ignores old requests");
+    viewMode = "student";
+    auth = JSON.stringify({ expiresAt: Date.now() + 60000, profile: { email: "student@school.nz" }, accessToken: "test-oauth" });
+    deferred = null;
+    events["hub-auth-state-changed"]();
+    await tick();
+    assert.equal(requests.at(-1).url, "/api/practical-skills/my-progress?refresh=deferred&view=student");
+    assert.equal(requests.at(-1).options.headers.Authorization, "Bearer test-oauth");
     const navigation = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
     const styles = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
     assert.match(navigation, /id="hub-senior-task-list-link" class="hub-senior-task-list-link" href="\/task-list\.html" hidden><span class="hub-task-list-course" data-task-list-course hidden><\/span><span class="hub-task-list-label">Task List<\/span><\/a>/);
     assert.match(navigation, /id="hub-upload-kits-link" role="menuitem" href="\/practical-skills\/admin-kits\.html" hidden>Upload Kits<\/a>/);
     assert.doesNotMatch(navigation, /id="hub-browse-task-list-link"/, "Task List is not duplicated in Browse");
-    assert.match(navigation, /if \(hubUploadKitsLink\) \{\s*hubUploadKitsLink\.hidden = !canAdmin;/, "Kit uploader link is visible to admins only");
+    assert.match(navigation, /if \(hubUploadKitsLink\) \{\s*hubUploadKitsLink\.hidden = !\(canAdmin && inTeacherMode\);/, "Kit uploader link is visible to admins in Teacher View only");
     assert.match(styles, /\.nav-dropdown-practical-skills summary\s*\{[^}]*background:\s*#2867bd/s, "Licence uses the blue navbar color");
     assert.match(styles, /\.topbar-links a\.hub-senior-task-list-link\s*\{[^}]*background:\s*#2f8f61/s, "Senior Task List uses the green navbar color");
     assert.match(styles, /\.topbar-links a\.hub-senior-task-list-link\s*\{[^}]*flex-direction:\s*column/s, "Task List button stacks its course label above the name");

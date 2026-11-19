@@ -137,12 +137,12 @@
 
     function fetchKitContent(kitId) {
         return loadJson(`/api/practical-skills/kit-content/${encodeURIComponent(kitId)}${preview ? "?preview=1" : ""}`, {
-            headers: withAuthHeaders()
+            headers: withAuthHeaders({}, true)
         });
     }
 
     function fetchKitProgress(kitId) {
-        return loadJson(`/api/practical-skills/progress/${encodeURIComponent(kitId)}`, { headers: withAuthHeaders() });
+        return loadJson(`/api/practical-skills/progress/${encodeURIComponent(kitId)}`, { headers: withAuthHeaders({}, true) });
     }
 
     function completeKit(kitId) {

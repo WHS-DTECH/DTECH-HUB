@@ -514,7 +514,13 @@ test("licence reads verify OAuth sign-in before the publication gate without ena
     for (const token of ["", "expired-oauth", "wrong-audience", "eyJinvalid.payload.signature", "network-failure"]) {
         assert.equal((await call(token)).verified, false);
     }
-    assert.equal((await call("valid-oauth", "/api/practical-skills/progress/kit-unity-setup")).verified, false);
+    for (const route of ["/api/practical-skills/my-progress?refresh=deferred", "/practical-skills/library.json",
+        "/api/practical-skills/kit-content/kit-unity-setup", "/api/practical-skills/progress/kit-unity-setup",
+        "/api/practical-skills/typing-kit"]) {
+        assert.equal((await call("valid-oauth", route)).verified, true, route);
+        assert.equal((await call("expired-oauth", route)).verified, false, route);
+        assert.equal((await call("valid-oauth", route, "POST")).verified, false, route);
+    }
     assert.equal((await call("valid-oauth", licencePath, "PUT")).verified, false);
     const reviewPath = "/api/admin/kit-document-review/kit-google-drawings/0";
     assert.equal((await call("valid-oauth", reviewPath, "PUT")).source, "google_access_token", "Teacher Completed ticks accept OAuth sign-in");

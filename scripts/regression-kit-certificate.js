@@ -53,7 +53,8 @@ async function main() {
         canManagePracticalSchedule: async () => false,
         kitPublication: {
             available: async () => true, filterSnapshot: async (snapshot) => snapshot,
-            catalog: async () => [{ id: "kit-login", live: true }]
+            accessFor: (req) => ({ email: req.auth_identity.verified ? req.auth_identity.email : "", isManager: async () => false }),
+            visibleKits: async () => [{ id: "kit-login", live: true }]
         },
         computePracticalSkillsSnapshot: (rows) => ({ kits: rows.map((row) => ({ id: row.kit_id, isComplete: row.completed, completedAt: row.completed_at })), badges: [] }),
         smtpTransporter: {}, SMTP_FROM: "hub@example.school.nz",
@@ -278,6 +279,7 @@ async function main() {
             } };
         },
         window: {
+            addEventListener() {},
             location: { search: "?kit=kit-login" }, clearTimeout() {}, setTimeout() {}, confirm: () => true,
             KitWorksheetRender: { renderKitOverview() {}, visibleLoginSites: () => [] },
             print: () => { assert.ok(classes.has("printing-certificate")); printCalled = true; }

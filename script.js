@@ -2097,14 +2097,14 @@ async function handleHubDriveSyncClick(options = {}) {
     }
 }
 
-function withHubAuthHeaders(headers = {}, email = getActiveHubEmail()) {
+function withHubAuthHeaders(headers = {}, email = getActiveHubEmail(), allowAccessToken = false) {
     if (!email) {
         return headers;
     }
 
     const nextHeaders = { ...headers, "x-user-email": email };
     const bearerToken = getActiveHubBearerToken();
-    if (bearerToken && bearerToken.startsWith("eyJ") && bearerToken.split(".").length === 3) {
+    if (bearerToken && (allowAccessToken || bearerToken.startsWith("eyJ") && bearerToken.split(".").length === 3)) {
         nextHeaders.Authorization = `Bearer ${bearerToken}`;
     }
 
@@ -2523,8 +2523,9 @@ async function loadAndRenderSidebarKit(panel) {
     const current = () => title.dataset.requestId === requestId
         && normalizeEmail(hubAuthState.profile?.email || "") === email;
     try {
-        const response = await fetch("/api/practical-skills/my-progress", {
-            headers: withHubAuthHeaders({}, email), cache: "no-store"
+        const studentView = readStoredHubViewMode() === "student" ? "&view=student" : "";
+        const response = await fetch(`/api/practical-skills/my-progress?refresh=deferred${studentView}`, {
+            headers: withHubAuthHeaders({}, email, true), cache: "no-store"
         });
         const snapshot = await response.json();
         if (!response.ok) throw new Error(snapshot.error || `HTTP ${response.status}`);

@@ -81,8 +81,11 @@ test("saved licence loads without completion refresh; normal reads still reconci
             SCHOOL_EMAIL_DOMAIN: "school.nz", PRACTICAL_SKILLS_KIT_DEFINITIONS: definitions,
             customPracticalSkillsKits: new Map(),
             kitPublication: {
-                accessFor: () => ({ isManager: async () => true }),
-                visibleKits: async () => definitions.map((kit, index) => ({ ...kit, live: index !== 9 }))
+                accessFor: (req) => ({ email: req.email.endsWith("@school.nz") ? req.email : "", isManager: async () => true }),
+                visibleKits: async (_req, options) => {
+                    if (options.studentView) assert.equal(options.includePreviews, false);
+                    return definitions.map((kit, index) => ({ ...kit, live: index !== 9 }));
+                }
             },
             refreshLearningSitesCheckIn: async () => { refreshed++; },
             syncPracticalSkillsKitCompletion: async (email, id) => {
@@ -95,7 +98,7 @@ test("saved licence loads without completion refresh; normal reads still reconci
             },
             getAllPracticalSkillsProgressRows: async () => rows,
             getPracticalSkillsStudentName: async () => "Synthetic Student",
-            buildPracticalSkillsLicenceSnapshot: async saved => ({ kits: saved, canManageKits: true }),
+            buildPracticalSkillsLicenceSnapshot: async (saved, _visible, manager) => ({ kits: saved, canManageKits: manager }),
             console
         });
         const start = source.indexOf('app.get("/api/practical-skills/my-progress"');
@@ -113,6 +116,7 @@ test("saved licence loads without completion refresh; normal reads still reconci
         assert.equal(saved.body.student.name, "Synthetic Student");
         assert.equal(saved.body.canManageKits, true);
         assert.equal(saved.body.progressRefreshPending, true);
+        assert.equal((await call({ refresh: "deferred", view: "student" })).body.canManageKits, false);
         assert.equal(refreshed, 0);
         assert.equal(synced.length, 0, "Initial read neither creates nor regrades progress");
         const fresh = await call();

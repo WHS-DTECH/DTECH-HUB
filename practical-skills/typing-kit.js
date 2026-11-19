@@ -30,7 +30,8 @@
         const session = auth();
         if (!session || session.profile.email.toLowerCase() !== state.email) throw new Error("Sign in with your school Google account again.");
         const headers = { "Content-Type": "application/json", "x-user-email": state.email };
-        const googleToken = session.idToken || session.accessToken;
+        const googleToken = typeof window.getActiveHubBearerToken === "function"
+            ? window.getActiveHubBearerToken() : session.idToken || session.accessToken;
         if (googleToken) headers.Authorization = `Bearer ${googleToken}`;
         const response = await fetch(`/api/practical-skills/typing-kit${path}`, {
             ...options, headers, cache: "no-store", signal: AbortSignal.timeout(60000)
