@@ -2,17 +2,50 @@
 const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
 const dns = require("node:dns").promises;
+const fs = require("node:fs");
 const http = require("node:http");
 const { EventEmitter } = require("node:events");
 const { Readable } = require("node:stream");
 const path = require("node:path");
 const { test } = require("node:test");
+const vm = require("node:vm");
 const express = require("express");
 const { Pool } = require("pg");
 const { registerKnowledgeWeb } = require("../knowledge-web/.store");
 const { getSourceMetadata, parseMetadata, isPublicIPv4 } = require("../knowledge-web/.source-metadata");
 
 const connectionString = process.env.KNOWLEDGE_WEB_TEST_DATABASE_URL;
+
+test("Canvas separates overlapping clouds without changing saved positions", () => {
+    const script = fs.readFileSync(path.join(__dirname, "../knowledge-web/web.js"), "utf8");
+    const start = script.indexOf("    const CLOUD_WIDTH =");
+    const end = script.indexOf("    function renderExplore()", start);
+    assert.ok(start >= 0 && end > start, "Canvas layout function is available");
+    const layout = vm.runInThisContext(`(() => { ${script.slice(start, end)} return layoutClouds; })()`);
+    const clouds = [
+        { id: "first", publishedAt: "2025-01-01", position: { x: 48, y: 80 } },
+        { id: "second", publishedAt: "2025-01-02", position: { x: 50, y: 90 } },
+        { id: "third", publishedAt: "2025-01-03", position: { x: 75, y: 200 } },
+        { id: "separate", publishedAt: "2025-01-03", position: { x: 600, y: 80 } },
+        ...Array.from({ length: 20 }, (_, i) => ({
+            id: `additional-${i}`, publishedAt: "2025-01-04", position: { x: 48, y: 80 }
+        }))
+    ];
+    const saved = JSON.stringify(clouds);
+    const positions = layout(clouds);
+    assert.deepEqual(positions.get("first"), { x: 48, y: 80 });
+    assert.deepEqual(positions.get("separate"), { x: 600, y: 80 });
+    assert.equal(JSON.stringify(clouds), saved, "Saved positions are not modified");
+    assert.deepEqual([...layout([...clouds].reverse())], [...positions], "Placement is stable regardless of list order");
+    const rectangles = [...positions.values()];
+    for (let i = 0; i < rectangles.length; i++) {
+        for (let j = i + 1; j < rectangles.length; j++) {
+            const a = rectangles[i], b = rectangles[j];
+            assert.ok(a.x + 190 <= b.x || b.x + 190 <= a.x || a.y + 100 <= b.y || b.y + 100 <= a.y,
+                `Clouds ${i} and ${j} overlap`);
+        }
+    }
+});
 
 test("Knowledge Web allows only eligible readers and verified teachers to manage clouds", async (t) => {
     const app = express();

@@ -5,7 +5,7 @@
     const form = node("form");
     const proposalForm = node("proposal-form");
     const state = {
-        clouds: [], selected: null, editing: null, editingProposal: null, proposalParentId: null,
+        clouds: [], positions: new Map(), selected: null, editing: null, editingProposal: null, proposalParentId: null,
         proposals: [], canPropose: false, zoom: 1, token: null, revision: 0,
         dirty: false, proposalDirty: false, saving: false, duplicatesAcknowledgedTitle: "",
         timelineView: "year", timelineYear: "", timelineDay: ""
@@ -169,8 +169,9 @@
         updatePressed();
         if (centre) {
             const viewport = node("viewport");
-            viewport.scrollTo((cloud.position.x + 95) * state.zoom - viewport.clientWidth / 2,
-                (cloud.position.y + 50) * state.zoom - viewport.clientHeight / 2);
+            const position = state.positions.get(cloud.id);
+            viewport.scrollTo((position.x + CLOUD_WIDTH / 2) * state.zoom - viewport.clientWidth / 2,
+                (position.y + CLOUD_HEIGHT / 2) * state.zoom - viewport.clientHeight / 2);
         }
     }
 
@@ -197,21 +198,49 @@
         node("zoom-in").disabled = state.zoom === 1.75;
     }
 
+    const CLOUD_WIDTH = 190;
+    const CLOUD_HEIGHT = 100;
+    const CLOUD_GAP = 16;
+
+    function layoutClouds(clouds) {
+        const positions = new Map();
+        const placed = [];
+        const ordered = [...clouds].sort((a, b) =>
+            a.publishedAt.localeCompare(b.publishedAt) || a.id.localeCompare(b.id));
+        for (const cloud of ordered) {
+            const position = { ...cloud.position };
+            const neighbours = placed.filter((other) =>
+                position.x < other.x + CLOUD_WIDTH + CLOUD_GAP && other.x < position.x + CLOUD_WIDTH + CLOUD_GAP
+            ).sort((a, b) => a.y - b.y);
+            for (const other of neighbours) {
+                if (position.y + CLOUD_HEIGHT + CLOUD_GAP <= other.y) break;
+                if (position.y < other.y + CLOUD_HEIGHT + CLOUD_GAP) position.y = other.y + CLOUD_HEIGHT + CLOUD_GAP;
+            }
+            positions.set(cloud.id, position);
+            placed.push(position);
+        }
+        return positions;
+    }
+
     function renderExplore() {
         node("empty").hidden = state.clouds.length !== 0;
         node("clouds").hidden = state.clouds.length === 0;
         renderTimeline();
         if (!state.clouds.length) return;
         const board = node("board");
+        state.positions = layoutClouds(state.clouds);
         board.replaceChildren();
-        board.style.width = `${Math.max(390, ...state.clouds.map(({ position }) => position.x + 212))}px`;
-        board.style.height = `${Math.max(260, ...state.clouds.map(({ position }) => position.y + 125))}px`;
+        board.style.setProperty("--kw-cloud-width", `${CLOUD_WIDTH}px`);
+        board.style.setProperty("--kw-cloud-height", `${CLOUD_HEIGHT}px`);
+        board.style.width = `${Math.max(390, ...[...state.positions.values()].map(({ x }) => x + CLOUD_WIDTH + 22))}px`;
+        board.style.height = `${Math.max(260, ...[...state.positions.values()].map(({ y }) => y + CLOUD_HEIGHT + 25))}px`;
         for (const cloud of state.clouds) {
+            const position = state.positions.get(cloud.id);
             const item = button("", () => showCloud(cloud, false));
             item.className = "kw-cloud";
             item.dataset.cloudId = cloud.id;
-            item.style.left = `${cloud.position.x}px`;
-            item.style.top = `${cloud.position.y}px`;
+            item.style.left = `${position.x}px`;
+            item.style.top = `${position.y}px`;
             item.append(element("span", cloud.title));
             board.append(item);
         }
@@ -657,6 +686,7 @@
         const revision = ++state.revision;
         state.token = token;
         state.clouds = [];
+        state.positions.clear();
         state.selected = null;
         state.timelineView = "year";
         state.timelineYear = state.timelineDay = "";
