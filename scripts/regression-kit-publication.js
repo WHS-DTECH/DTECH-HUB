@@ -44,19 +44,22 @@ async function fixture(t) {
     const pool = { query, connect: async () => ({ query, release() { queries.push({ sql: "RELEASE" }); } }) };
     const deps = { pool, builtIns: [{ id: "kit-minecraft" }], getDefaultContent: () => ({}), schoolDomain: "school.nz",
         getRequestUserEmail: (req) => req.headers?.["x-admin"] === "yes" ? "teacher@school.nz" : "student@school.nz",
+        getVerifiedEmail: (req) => req.headers?.["x-admin"] === "yes" ? "teacher@school.nz" : req.headers?.["x-verified-email"] || "",
+        getStudentCourse: async (email) => ({ junior: "JuniorDTECH", middle: "MiddleDTECH", senior: "SeniorDTECH" })[email.split("@")[0]] || "",
         canManage: async (email) => email === "teacher@school.nz" };
     const service = createKitPublication(deps);
     const app = express();
     app.use(express.json());
     service.register(app, (req, res, next) => req.headers["x-admin"] === "yes" ? next() : res.status(403).json({ error: "Admin required" }));
     app.use(service.gate);
+    app.get("/practical-skills/library.json", service.requireLibraryAccess, (_req, res) => res.json([]));
     app.all(/^\/api\/practical-skills\//, (_req, res) => res.json({ reached: true, readOnly: res.locals.kitPreview === true }));
     const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
     t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
     const base = `http://127.0.0.1:${server.address().port}`;
     return { service, deps, rows, audits, queries, saved, flags, failUpdate: () => { failUpdate = true; },
-        call: (url, method = "GET", body, admin = true) => fetch(base + url, {
-            method, headers: { "Content-Type": "application/json", ...(admin ? { "x-admin": "yes" } : {}) }, body: body ? JSON.stringify(body) : undefined
+        call: (url, method = "GET", body, admin = true, headers = {}) => fetch(base + url, {
+            method, headers: { "Content-Type": "application/json", ...(admin ? { "x-admin": "yes" } : {}), ...headers }, body: body ? JSON.stringify(body) : undefined
         }) };
 }
 
@@ -73,19 +76,47 @@ test("Unity category is available from the saved catalogue before opening the wo
 test("teacher catalog includes database kits without requiring custom marker or prior library navigation; flags survive fresh services", async (t) => {
     const f = await fixture(t);
     const snapshot = { kits: [{ id: "kit-minecraft", isComplete: true }, { id: "kit-files", isComplete: false }], totalPoints: 100 };
-    const teacher = await f.service.filterSnapshot(snapshot, true);
+    const teacher = f.service.filterSnapshot(snapshot, await f.service.visibleKits({ headers: { "x-admin": "yes" } }, { includePreviews: true }), true);
     assert.deepEqual(teacher.licenceKits.map((kit) => kit.id), ["kit-minecraft", "kit-files"]);
     assert.equal(teacher.licenceKits[1].live, false);
     assert.equal(teacher.licenceKits[0].skillArea, "Application Kits");
     assert.equal(teacher.licenceKits[0].application, "Minecraft");
     assert.equal(teacher.stampTotalKits, 2);
-    assert.equal((await f.service.filterSnapshot(snapshot)).stampTotalKits, 1);
+    assert.equal(f.service.filterSnapshot(snapshot, await f.service.visibleKits({})).stampTotalKits, 1);
     assert.equal(teacher.totalPoints, 100);
     await f.service.setLive("kit-minecraft", false, "teacher@school.nz");
     assert.equal(await createKitPublication(f.deps).available("kit-minecraft"), false);
     f.saved[0].content = { bannerTitle: "Edited in an old builder" };
     assert.equal(await f.service.available("kit-minecraft"), false, "Editing kit content cannot silently republish it");
-    assert.equal((await f.service.filterSnapshot(snapshot)).licenceKits.length, 0);
+    assert.equal(f.service.filterSnapshot(snapshot, await f.service.visibleKits({})).licenceKits.length, 0);
+});
+
+test("Unity and other restricted kits only appear and open for verified Middle/Senior students and staff", async (t) => {
+    const f = await fixture(t);
+    const content = { identity: { name: "Unity Setup Kit" } };
+    f.saved.push({ kit_id: "kit-unity-setup", content },
+        { kit_id: "kit-example", content: { identity: { studentAudience: "middle-senior" } } });
+    const kits = [{ id: "kit-unity-setup", isComplete: true }];
+    for (const [user, allowed, status] of [["junior", false, 403], ["unknown", false, 403],
+        ["middle", true, 200], ["senior", true, 200], ["teacher", true, 200], ["", false, 401]]) {
+        const headers = user ? { "x-verified-email": `${user}@school.nz` } : { "x-user-email": "teacher@school.nz" };
+        const snapshot = f.service.filterSnapshot({ kits }, await f.service.visibleKits({ headers }));
+        assert.equal(snapshot.kits.some((kit) => kit.id === "kit-unity-setup"), allowed, user);
+        assert.equal(snapshot.stampCompletedCount, allowed ? 1 : 0, user);
+        assert.equal(snapshot.stampTotalKits, allowed ? 3 : 1, user);
+        for (const [url, method] of [
+            ["/kit-content/kit-unity-setup", "GET"],
+            ["/progress/kit-unity-setup/certificate.pdf", "GET"],
+            ["/blocks/kit-unity-setup/0/licences/unity-school-licence", "GET"],
+            ["/kit-content/kit-example", "GET"],
+            ["/progress/kit-unity-setup/complete", "POST"]
+        ]) assert.equal((await f.call(`/api/practical-skills${url}`, method, undefined, false, headers)).status, status, `${user}: ${url}`);
+        assert.equal((await f.call("/practical-skills/library.json", "GET", undefined, false, headers)).status,
+            user === "teacher" ? 200 : user ? 403 : 401);
+    }
+    content.identity.studentAudience = "all";
+    assert.equal((await f.call("/api/practical-skills/kit-content/kit-unity-setup", "GET", undefined, false,
+        { "x-verified-email": "junior@school.nz" })).status, 200);
 });
 
 test("Typing publication persists, blocks student reads and all paused writes, and leaves stamp counts unchanged", async (t) => {
@@ -103,7 +134,8 @@ test("Typing publication persists, blocks student reads and all paused writes, a
         }
     }
     assert.equal((await (await f.call("/api/practical-skills/typing-kit")).json()).readOnly, true);
-    const snapshot = await f.service.filterSnapshot({ kits: [{ id: "kit-minecraft", isComplete: true }] }, true);
+    const snapshot = f.service.filterSnapshot({ kits: [{ id: "kit-minecraft", isComplete: true }] },
+        await f.service.visibleKits({ headers: { "x-admin": "yes" } }, { includePreviews: true }), true);
     assert.equal(snapshot.typingKit.live, false);
     assert.equal(snapshot.stampTotalKits, 2);
     assert.equal(snapshot.stampCompletedCount, 1);
@@ -114,16 +146,17 @@ test("Typing publication persists, blocks student reads and all paused writes, a
     assert.equal(f.queries.some(({ sql }) => /DELETE.*typing_kit|UPDATE typing_kit_attempts/.test(sql)), false);
 });
 
-test("both student library routes hide paused Typing without hiding unrelated resources", async () => {
+test("both teacher library routes require teacher access and hide paused Typing", async () => {
     const source = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
+    const requireLibraryAccess = () => {};
     for (const route of ["/practical-skills/library.json", "/api/practical-skills/library"]) {
         const start = source.indexOf(`app.get("${route}"`);
         const end = source.indexOf("\n});", start) + 4;
         const handlers = new Map();
         let live = false;
         const context = vm.createContext({
-            app: { get(name, handler) { handlers.set(name, handler); } },
-            kitPublication: { catalog: async () => [{ id: "kit-typing", live }] },
+            app: { get(name, access, handler) { assert.equal(access, requireLibraryAccess); handlers.set(name, handler); } },
+            kitPublication: { requireLibraryAccess, catalog: async () => [{ id: "kit-typing", live }] },
             ensureCustomPracticalSkillsKitsLoaded: async () => {},
             readPracticalSkillsLibraryFile: async () => [{ id: "kit-typing" }, { id: "unrelated-resource" }],
             getPracticalSkillsKitDefinition: () => null,

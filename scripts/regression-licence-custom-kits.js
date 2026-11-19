@@ -48,7 +48,7 @@ test("licence progress loads and syncs all registered kits, with matching action
     const routes = source.slice(start, end);
     assert.match(routes, /const definitions = \[\.\.\.PRACTICAL_SKILLS_KIT_DEFINITIONS, \.\.\.customPracticalSkillsKits\.values\(\)\]/);
     assert.match(routes, /definitions\.slice\(index, index \+ 4\)\.map\(\(kit\) => syncPracticalSkillsKitCompletion/);
-    assert.equal((routes.match(/await buildPracticalSkillsLicenceSnapshot\(rows(?:, manager)?\)/g) || []).length, 4);
+    assert.equal((routes.match(/await buildPracticalSkillsLicenceSnapshot\(rows, /g) || []).length, 4);
     const memoryStart = source.indexOf("async function getAllPracticalSkillsProgressRows(");
     const memoryEnd = source.indexOf("\nasync function setPracticalSkillsKitCompletion(", memoryStart);
     const progressContext = vm.createContext({
@@ -73,14 +73,17 @@ test("licence progress loads and syncs all registered kits, with matching action
 test("saved licence loads without completion refresh; normal reads still reconcile live kits with bounded concurrency", async () => {
         let handler, refreshed = 0, active = 0, peak = 0;
         const synced = [];
-        const definitions = Array.from({ length: 10 }, (_, index) => ({ id: `kit-${index}` }));
+        const definitions = Array.from({ length: 10 }, (_, index) => ({ id: index === 1 ? "kit-login" : `kit-${index}` }));
         const rows = [{ kit_id: "kit-0", completed: true }];
         const context = vm.createContext({
             app: { get(route, fn) { handler = fn; } },
             normalizeEmail: value => value.toLowerCase(), getRequestUserEmail: req => req.email,
             SCHOOL_EMAIL_DOMAIN: "school.nz", PRACTICAL_SKILLS_KIT_DEFINITIONS: definitions,
             customPracticalSkillsKits: new Map(),
-            kitPublication: { catalog: async () => definitions.map((kit, index) => ({ ...kit, live: index !== 9 })) },
+            kitPublication: {
+                accessFor: () => ({ isManager: async () => true }),
+                visibleKits: async () => definitions.map((kit, index) => ({ ...kit, live: index !== 9 }))
+            },
             refreshLearningSitesCheckIn: async () => { refreshed++; },
             syncPracticalSkillsKitCompletion: async (email, id) => {
                 assert.equal(email, "student@school.nz");
@@ -90,7 +93,6 @@ test("saved licence loads without completion refresh; normal reads still reconci
                 active--;
                 synced.push(id);
             },
-            canManagePracticalSchedule: async () => true,
             getAllPracticalSkillsProgressRows: async () => rows,
             getPracticalSkillsStudentName: async () => "Synthetic Student",
             buildPracticalSkillsLicenceSnapshot: async saved => ({ kits: saved, canManageKits: true }),

@@ -5,6 +5,8 @@
     const dataPath = config.libraryPath || "/practical-skills/library.json";
     const libraryName = config.libraryName || "practical skills";
     const isPathways = Boolean(config.libraryPath);
+    const licencePage = !isPathways && document.querySelector("#licence-library-page");
+    const licenceStatus = licencePage && document.getElementById("licence-library-status");
     const featuredChecklistId = "practical-skills-checklist";
     const grid = document.getElementById("practical-skills-grid");
     const meta = document.getElementById("practical-skills-results-meta");
@@ -332,13 +334,20 @@
     }
 
     async function loadPracticalSkillsLibrary() {
+        const studentView = licencePage && typeof readStoredHubViewMode === "function" && readStoredHubViewMode() === "student";
+        const leaveLibrary = () => pageLocation.replace("/practical-skills/checklist.html");
+        if (studentView) return leaveLibrary();
         try {
-            const response = await fetch(dataPath, { cache: "no-store" });
+            const headers = licencePage && typeof withHubAuthHeaders === "function" ? withHubAuthHeaders() : undefined;
+            const response = await fetch(dataPath, { cache: "no-store", headers });
+            if (licencePage && (response.status === 401 || response.status === 403)) return leaveLibrary();
             if (!response.ok) {
                 throw new Error(`Could not load ${libraryName} library.`);
             }
 
             const payload = await response.json();
+            if (licencePage && (readStoredHubViewMode() === "student"
+                || withHubAuthHeaders().Authorization !== headers?.Authorization)) return leaveLibrary();
             if (!Array.isArray(payload)) throw new Error("The library response must be a card list.");
             library = payload.filter((item) => isPathways || String(item?.id || "") !== featuredChecklistId);
             if (!isPathways && !requestedCategory && library.some((item) => item.cardLabel === "LICENCE KIT")) {
@@ -346,6 +355,10 @@
             }
         } catch (error) {
             console.error(`Could not load ${libraryName}`, error);
+            if (licenceStatus) {
+                licenceStatus.textContent = "Could not load the Licence Library. Refresh to try again, or open My Licence from the hub.";
+                return;
+            }
             if (meta) meta.textContent = "Library could not be loaded.";
             if (grid) {
                 grid.replaceChildren();
@@ -367,6 +380,18 @@
         populateFilters();
         bindControls();
         renderCards();
+        if (licencePage) {
+            licencePage.hidden = false;
+            licencePage.style.display = "";
+            licenceStatus.hidden = true;
+            window.addEventListener("hub-auth-state-changed", ({ detail }) => {
+                if (!detail.signedIn || readStoredHubViewMode() === "student") {
+                    licencePage.hidden = true;
+                    licencePage.style.display = "none";
+                    leaveLibrary();
+                }
+            });
+        }
     }
 
     loadPracticalSkillsLibrary();

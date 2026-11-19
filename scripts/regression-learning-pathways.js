@@ -40,7 +40,8 @@ async function testDashboard() {
     let fails = false;
     const context = vm.createContext({
         URLSearchParams,
-        document: { querySelector: () => config, getElementById: (id) => elements[`#${id}`], createElement: (tag) => new Element(tag) },
+        document: { querySelector: (selector) => selector === "[data-library-path]" ? config : null,
+            getElementById: (id) => elements[`#${id}`], createElement: (tag) => new Element(tag) },
         fetch: async (url, options) => {
             assert.equal(url, config.dataset.libraryPath || "/practical-skills/library.json");
             assert.equal(options.cache, "no-store");

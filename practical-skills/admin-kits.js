@@ -38,6 +38,7 @@
     const skillAreaInput = document.querySelector("#kit-skill-area");
     const kitStatusInput = document.querySelector("#kit-status");
     const yearLevelInput = document.querySelector("#kit-year-level");
+    const studentAudienceInput = document.querySelector("#kit-student-audience");
     const bannerSubtitleInput = document.querySelector("#kit-banner-subtitle");
     const instructionsInput = document.querySelector("#kit-instructions");
     const teacherNotesInput = document.querySelector("#kit-teacher-notes");
@@ -253,7 +254,8 @@
                 name: nameInput.value,
                 skillArea: skillAreaInput.value,
                 status: kitStatusInput.value,
-                yearLevel: yearLevelInput.value
+                yearLevel: yearLevelInput.value,
+                studentAudience: studentAudienceInput.value
             },
             theme: {
                 color: themeColorInput.value,
@@ -289,6 +291,7 @@
         skillAreaInput.value = normaliseSkillArea(content.identity?.skillArea);
         kitStatusInput.value = content.identity?.status || "active";
         setYearLevelSelection(content.identity?.yearLevel);
+        studentAudienceInput.value = content.identity?.studentAudience || "";
         bannerSubtitleInput.value = content.bannerSubtitle || "";
         instructionsInput.value = content.instructions || "";
         teacherNotesInput.value = content.teacherNotes || "";

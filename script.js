@@ -1444,7 +1444,7 @@ function renderGlobalNavbar() {
             <summary id="hub-practical-skills-summary">Licence</summary>
             <div class="nav-drawer" role="menu">
                 <a id="hub-practical-skills-link" role="menuitem" href="/practical-skills/checklist.html">My Licence</a>
-                <a role="menuitem" href="/practical-skills/?category=Licence%20Kit">Licence Library</a>
+                <a id="hub-licence-library-link" role="menuitem" hidden href="/practical-skills/?category=Licence%20Kit">Licence Library</a>
                 <a id="hub-upload-kits-link" role="menuitem" href="/practical-skills/admin-kits.html" hidden>Upload Kits</a>
                 <a id="hub-teacher-review-link" role="menuitem" href="/practical-skills/teacher-results.html" hidden>Teacher Review</a>
                 <a id="hub-licence-setup-link" role="menuitem" href="/practical-skills/licence-kit-setup.html" hidden>Licence Kit Setup</a>
@@ -2356,7 +2356,7 @@ function ensureGlobalHubSidebar() {
                 <h3 id="hub-sidebar-kit-heading">Current Learning Kit</h3>
                 <p class="hub-sidebar-kit-title" id="hub-sidebar-kit-title">Loading your kit...</p>
                 <p id="hub-sidebar-kit-description" aria-live="polite">Checking your Licence progress.</p>
-                <a class="hub-sidebar-kit-action" id="hub-sidebar-kit-open" hidden>Open Kit &#8594;</a>
+                <a class="hub-sidebar-kit-action" id="hub-sidebar-kit-open" hidden>Open My Licence &#8594;</a>
                 <button class="hub-sidebar-kit-action" id="hub-sidebar-kit-retry" type="button" hidden>Retry loading kit</button>
             </section>
             <section class="hub-sidebar-licence-card" aria-labelledby="hub-sidebar-licence-heading">
@@ -2539,15 +2539,12 @@ async function loadAndRenderSidebarKit(panel) {
             description.textContent = "View your Licence to see your stamps and certificates.";
             return;
         }
-        const contentResponse = await fetch(`/api/practical-skills/kit-content/${encodeURIComponent(next.id)}`, { cache: "no-store" });
-        const content = await contentResponse.json();
-        if (!contentResponse.ok) throw new Error(content.error || `HTTP ${contentResponse.status}`);
-        const name = String(content.content?.identity?.name || content.content?.bannerTitle || "").trim();
+        const name = String(next.title || "").trim();
         if (!name) throw new Error("The kit title could not be loaded.");
         if (!current()) return;
         title.textContent = name;
         description.textContent = "Continue your activities";
-        open.href = `/practical-skills/kit-worksheet.html?kit=${encodeURIComponent(next.id)}`;
+        open.href = "/practical-skills/checklist.html";
         open.hidden = false;
     } catch (error) {
         console.error("Could not load sidebar learning kit", error);
@@ -3577,6 +3574,8 @@ function renderHubAuthUi() {
     }
     if (hubPracticalSkillsMenu) {
         hubPracticalSkillsMenu.hidden = !signedIn;
+        const libraryLink = hubPracticalSkillsMenu.querySelector("#hub-licence-library-link");
+        if (libraryLink) libraryLink.hidden = !(signedIn && inTeacherMode);
         if (!signedIn) {
             hubPracticalSkillsMenu.open = false;
         }

@@ -2,7 +2,14 @@
 const { TYPING_KIT_CARD } = require("./typing-kit-store");
 const { withUnityHubLicence } = require("./unity-setup");
 
-function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain, getRequestUserEmail, canManage }) {
+function getStudentAudience(kitId, content) {
+    const saved = content.identity?.studentAudience;
+    if (saved === "all" || saved === "middle-senior") return saved;
+    const unity = /^kit-unity-setup(?:-|$)/.test(kitId) || /\bunity\s+setup\b/i.test(content.identity?.name || content.bannerTitle || "");
+    return unity ? "middle-senior" : "all";
+}
+
+function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain, getRequestUserEmail, getVerifiedEmail, canManage, getStudentCourse }) {
     let schema;
     async function ensureSchema() {
         if (!schema) schema = (async () => {
@@ -31,6 +38,7 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
                 skillArea: content.identity?.skillArea || "Skill Kits",
                 application: content.identity?.application || "",
                 applicationOrder: Number.isFinite(content.identity?.applicationOrder) ? content.identity.applicationOrder : 0,
+                studentAudience: getStudentAudience(id, content),
                 status: content.deletedAt ? "deleted" : content.identity?.status || "active",
                 live: !content.deletedAt && (explicit ?? (content.publicationLive !== false && (content.identity?.status || "active") === "active")),
                 custom: id !== "kit-typing" && !builtIns.some((kit) => kit.id === id)
@@ -40,6 +48,44 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
     async function available(kitId) {
         return Boolean((await catalog()).find((kit) => kit.id === kitId)?.live);
     }
+    const requestAccess = new WeakMap();
+    function accessFor(req) {
+        if (!requestAccess.has(req)) {
+            const email = getVerifiedEmail(req);
+            let manager;
+            let course;
+            requestAccess.set(req, {
+                email,
+                isManager: () => manager ??= email ? canManage(email) : false,
+                course: () => course ??= email ? getStudentCourse(email) : ""
+            });
+        }
+        return requestAccess.get(req);
+    }
+    async function audienceAllows(kit, access) {
+        return kit.studentAudience === "all" || await access.isManager()
+            || ["MiddleDTECH", "SeniorDTECH"].includes(await access.course());
+    }
+    async function visibleKits(req, { includePreviews = false } = {}) {
+        const access = accessFor(req);
+        const manager = includePreviews && await access.isManager();
+        const all = (await catalog()).filter((kit) => kit.status !== "deleted" && (manager || kit.live));
+        if (manager) return all;
+        const allowed = await Promise.all(all.map((kit) => audienceAllows(kit, access)));
+        return all.filter((_kit, index) => allowed[index]);
+    }
+    async function requireLibraryAccess(req, res, next) {
+        res.set("Cache-Control", "private, no-store");
+        const access = accessFor(req);
+        if (!access.email) return res.status(401).json({ error: "School sign-in required." });
+        try {
+            if (await access.isManager()) return next();
+            return res.status(403).json({ error: "The Licence Library is for teachers. Open My Licence to find your kits." });
+        } catch (error) {
+            console.error("[kit-publication] Library access check failed:", error.message);
+            return res.status(503).json({ error: "Library access could not be checked. Please retry." });
+        }
+    }
     async function setLive(kitId, live, email) {
         await ensureSchema();
         await pool.query(`INSERT INTO practical_skills_kit_publication (kit_id, live, updated_by_email) VALUES ($1,$2,$3)
@@ -47,27 +93,38 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
         [kitId, live, email]);
     }
     async function gate(req, res, next) {
-        const path = req.path;
-        const match = path.match(/^\/api\/practical-skills\/(?:progress|kit-content|research-report)\/(kit-[a-z0-9-]+)/)
-            || path.match(/^\/api\/practical-skills\/blocks\/(kit-[a-z0-9-]+)/);
-        const kitId = match?.[1] || (path === "/api/practical-skills/minecraft-exports-folder" ? "kit-minecraft"
-            : /^\/api\/practical-skills\/typing-kit(?:\/|$)/.test(path) ? "kit-typing" : null);
+        const path = req.path.toLowerCase();
+        const match = req.path.match(/^\/api\/practical-skills\/(?:progress|kit-content|research-report|blocks)\/([^/]+)/i);
+        let kitId;
+        try {
+            kitId = match ? decodeURIComponent(match[1]).trim()
+                : /^\/api\/practical-skills\/minecraft-exports-folder\/?$/.test(path) ? "kit-minecraft"
+                : /^\/api\/practical-skills\/typing-kit(?:\/|$)/.test(path) ? "kit-typing" : null;
+        } catch (_error) {
+            return res.status(400).json({ error: "Invalid kit link." });
+        }
         if (!kitId) return next();
         try {
+            const access = accessFor(req);
             const licencePreview = /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/licences\/[a-zA-Z0-9_-]+$/.test(path);
             if (req.method === "GET" && (path.startsWith("/api/practical-skills/kit-content/") || licencePreview) && req.query?.preview === "1") {
                 res.set("Cache-Control", "private, no-store");
-                if (await canManage(getRequestUserEmail(req))) return next();
+                if (await access.isManager()) return next();
                 return res.status(403).json({ error: "Kit preview is only available to teachers who manage kits." });
             }
-            if (await available(kitId)) return next();
-            if (kitId === "kit-typing" && path === "/api/practical-skills/typing-kit" && req.method === "GET"
-                && await canManage(getRequestUserEmail(req))) {
+            const kit = (await catalog()).find((item) => item.id === kitId);
+            if (kit?.live) {
+                if (await audienceAllows(kit, access)) return next();
+                if (!access.email) return res.status(401).json({ error: "School sign-in required." });
+                return res.status(403).json({ error: "This kit is not available for your DTECH course." });
+            }
+            if (kitId === "kit-typing" && /^\/api\/practical-skills\/typing-kit\/?$/.test(path) && req.method === "GET"
+                && await access.isManager()) {
                 res.locals.kitPreview = true;
                 return next();
             }
             const preview = req.method === "GET" && /\/(?:kit-content|research-report)\//.test(path)
-                && await canManage(getRequestUserEmail(req));
+                && await access.isManager();
             if (preview) return next();
             return res.status(403).json({ error: "This kit is Not Live. Student access, completion and certificates are paused." });
         } catch (error) {
@@ -75,16 +132,15 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
             return res.status(503).json({ error: "Kit availability could not be checked. Please retry." });
         }
     }
-    async function filterSnapshot(snapshot, manager = false) {
-        const all = (await catalog()).filter((kit) => kit.status !== "deleted");
-        const visible = all.filter((kit) => kit.id !== "kit-typing" && (manager || kit.live));
+    function filterSnapshot(snapshot, all, manager = false) {
+        const visible = all.filter((kit) => kit.id !== "kit-typing");
         const byId = new Map(snapshot.kits.map((kit) => [kit.id, kit]));
         const kits = visible.map((kit) => ({ ...byId.get(kit.id), ...kit }));
         return {
             ...snapshot, kits, customKits: kits.filter((kit) => kit.custom), licenceKits: kits,
             stampTotalKits: kits.length, stampCompletedCount: kits.filter((kit) => kit.isComplete).length,
             canManageKits: manager,
-            typingKit: all.find((kit) => kit.id === "kit-typing")
+            typingKit: all.find((kit) => kit.id === "kit-typing") || { live: false }
         };
     }
     function register(app, requireAdminAccess) {
@@ -139,7 +195,7 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
             } finally { client?.release(); }
         });
     }
-    return { catalog, available, gate, filterSnapshot, register, setLive };
+    return { catalog, available, accessFor, visibleKits, requireLibraryAccess, gate, filterSnapshot, register, setLive };
 }
 
 module.exports = { createKitPublication };

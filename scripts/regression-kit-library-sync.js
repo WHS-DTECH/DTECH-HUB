@@ -7,7 +7,7 @@ const { withTypingKitCard } = require("../practical-skills/typing-kit-store");
 
 const root = path.join(__dirname, "..");
 const serverSource = fs.readFileSync(path.join(root, "server.js"), "utf8");
-const library = JSON.parse(fs.readFileSync(path.join(root, "practical-skills", "library.json"), "utf8"));
+const library = JSON.parse(fs.readFileSync(path.join(root, "practical-skills", ".library.json"), "utf8"));
 const existingCards = [{
     id: "kit-google-search",
     title: "Google Search",
@@ -26,7 +26,7 @@ const libraryRouteEnd = serverSource.indexOf('\nrequire("./learning-pathways/lib
 assert.ok(libraryRouteIndex >= 0 && libraryRouteEnd > libraryRouteIndex, "Licence library route exists");
 const libraryRoutes = {};
 const libraryRouteContext = vm.createContext({
-    app: { get: (url, handler) => { libraryRoutes[url] = handler; } },
+    app: { get: (url, _access, handler) => { libraryRoutes[url] = handler; } },
     ensureCustomPracticalSkillsKitsLoaded: async () => {},
     kitPublication: { catalog: async () => [{ id: "kit-login", live: true }] },
     readPracticalSkillsLibraryFile: async () => [

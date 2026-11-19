@@ -223,7 +223,7 @@ const memoryStudentTrackerComments = new Map();
 const memoryEmailLogs = [];
 const memoryPracticalSkillsProgress = new Map();
 const memoryPracticalSkillsKitContent = new Map();
-const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", "library.json");
+const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", ".library.json");
 
 // Server-authoritative catalog so scoring/badges can't be spoofed from the client.
 // Keep ids/points/timeframeHours in sync with practical-skills/checklist.js kitDefinitions until the kit catalog is server-driven.
@@ -6276,13 +6276,14 @@ app.use(["/api/practical-skills", "/api/admin/practical-skills"], async (_req, r
 app.use("/images/activities", express.static(path.join(__dirname, "images", "activities")));
 const kitPublication = require("./practical-skills/kit-publication").createKitPublication({
   pool, builtIns: PRACTICAL_SKILLS_KIT_DEFINITIONS, getDefaultContent: getDefaultPracticalSkillsKitContent,
-  schoolDomain: SCHOOL_EMAIL_DOMAIN, getRequestUserEmail, canManage: canManagePracticalSchedule
+  schoolDomain: SCHOOL_EMAIL_DOMAIN, getRequestUserEmail, canManage: canManagePracticalSchedule,
+  getVerifiedEmail: (req) => req.auth_identity?.verified && isSchoolEmail(req.auth_identity.email) ? req.auth_identity.email : "",
+  getStudentCourse: async (email) => getResearchReportProgrammeFolder(await getLearningSitesStudentProfile(email))
 });
 app.use(kitPublication.gate);
 kitPublication.register(app, requireAdminAccess);
 app.use("/images/activities", express.static(path.join(__dirname, "public", "images", "activities")));
-app.get("/practical-skills/library.json", async (_req, res) => {
-  res.set("Cache-Control", "no-store");
+app.get("/practical-skills/library.json", kitPublication.requireLibraryAccess, async (_req, res) => {
   try {
     await ensureCustomPracticalSkillsKitsLoaded();
     const liveIds = new Set((await kitPublication.catalog()).filter((kit) => kit.live).map((kit) => kit.id));
@@ -6301,7 +6302,6 @@ app.get("/practical-skills/library.json", async (_req, res) => {
         : card);
     const activityCards = (await Promise.all(kitCards.map((card) => buildPracticalSkillsActivityLibraryCards(card))))
       .flat();
-    res.set("Cache-Control", "no-store");
     res.json([...kitCards, ...activityCards]);
   } catch (_error) {
     res.status(500).json({ error: "Could not load Practical Skills library" });
@@ -15318,7 +15318,7 @@ app.get("/api/practicals/events", async (_req, res) => {
   }
 });
 
-app.get("/api/practical-skills/library", async (_req, res) => {
+app.get("/api/practical-skills/library", kitPublication.requireLibraryAccess, async (_req, res) => {
   try {
     const liveIds = new Set((await kitPublication.catalog()).filter((kit) => kit.live).map((kit) => kit.id));
     const rows = (await readPracticalSkillsLibraryFile()).filter((card) => (!getPracticalSkillsKitDefinition(card.id) && card.id !== "kit-typing") || liveIds.has(card.id))
@@ -15395,7 +15395,7 @@ app.get("/api/admin/practical-skills/preview-users", requireAdminAccess, async (
   }
 });
 
-app.get("/api/admin/practical-skills/library", requireAdminAccess, async (_req, res) => {
+app.get("/api/admin/practical-skills/library", kitPublication.requireLibraryAccess, requireAdminAccess, async (_req, res) => {
   try {
     const rows = await readPracticalSkillsLibraryFile();
     res.json({ cards: rows });
@@ -15404,7 +15404,7 @@ app.get("/api/admin/practical-skills/library", requireAdminAccess, async (_req, 
   }
 });
 
-app.put("/api/admin/practical-skills/library", requireAdminAccess, async (req, res) => {
+app.put("/api/admin/practical-skills/library", kitPublication.requireLibraryAccess, requireAdminAccess, async (req, res) => {
   const cards = Array.isArray(req.body?.cards) ? req.body.cards : null;
   if (!cards) {
     res.status(400).json({ error: "cards array is required" });
@@ -15519,7 +15519,7 @@ async function getPracticalSkillsStudentName(req, studentEmail = "") {
   return verifiedName || schoolName || email;
 }
 
-async function buildPracticalSkillsLicenceSnapshot(rows, manager = false) {
+async function buildPracticalSkillsLicenceSnapshot(rows, visibleKits, manager = false) {
   await ensureCustomPracticalSkillsKitsLoaded();
   const snapshot = computePracticalSkillsSnapshot(rows);
   const customKits = await Promise.all([...customPracticalSkillsKits.values()].map(async (kit) => {
@@ -15545,7 +15545,7 @@ async function buildPracticalSkillsLicenceSnapshot(rows, manager = false) {
     customKits: visibleCustomKits,
     stampCompletedCount: snapshot.completedCount + visibleCustomKits.filter((kit) => kit.isComplete).length,
     stampTotalKits: snapshot.totalKits + visibleCustomKits.length
-  }, manager);
+  }, visibleKits, manager);
 }
 
 app.get("/api/practical-skills/my-progress", async (req, res) => {
@@ -15557,20 +15557,23 @@ app.get("/api/practical-skills/my-progress", async (req, res) => {
 
   try {
     const deferred = req.query?.refresh === "deferred";
+    const [manager, visibleKits] = await Promise.all([
+      kitPublication.accessFor(req).isManager(),
+      kitPublication.visibleKits(req, { includePreviews: true })
+    ]);
     if (!deferred) {
-      const liveIds = new Set((await kitPublication.catalog()).filter((kit) => kit.live).map((kit) => kit.id));
+      const liveIds = new Set(visibleKits.filter((kit) => kit.live).map((kit) => kit.id));
       const definitions = [...PRACTICAL_SKILLS_KIT_DEFINITIONS, ...customPracticalSkillsKits.values()].filter((kit) => liveIds.has(kit.id));
-      await refreshLearningSitesCheckIn(studentEmail);
+      if (liveIds.has("kit-login")) await refreshLearningSitesCheckIn(studentEmail);
       for (let index = 0; index < definitions.length; index += 4) {
         await Promise.all(definitions.slice(index, index + 4).map((kit) => syncPracticalSkillsKitCompletion(studentEmail, kit.id)));
       }
     }
-    const [manager, rows, name] = await Promise.all([
-      canManagePracticalSchedule(studentEmail),
+    const [rows, name] = await Promise.all([
       getAllPracticalSkillsProgressRows(studentEmail),
       getPracticalSkillsStudentName(req)
     ]);
-    res.json({ ...await buildPracticalSkillsLicenceSnapshot(rows, manager),
+    res.json({ ...await buildPracticalSkillsLicenceSnapshot(rows, visibleKits, manager),
       student: { name, email: studentEmail }, progressRefreshPending: deferred });
   } catch (error) {
     console.error("[licence] Could not load saved progress:", error);
@@ -15599,7 +15602,7 @@ app.post("/api/practical-skills/progress/:kitId/complete", async (req, res) => {
     await setPracticalSkillsKitCompletion(studentEmail, kitId, true);
     void autoEmailKitCertificate(req, kitId);
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
-    res.json(await buildPracticalSkillsLicenceSnapshot(rows));
+    res.json(await buildPracticalSkillsLicenceSnapshot(rows, await kitPublication.visibleKits(req)));
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not save Practical Skills progress." });
   }
@@ -15623,7 +15626,7 @@ app.post("/api/practical-skills/progress/:kitId/reset", async (req, res) => {
   try {
     await setPracticalSkillsKitCompletion(studentEmail, kitId, false);
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
-    res.json(await buildPracticalSkillsLicenceSnapshot(rows));
+    res.json(await buildPracticalSkillsLicenceSnapshot(rows, await kitPublication.visibleKits(req)));
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not reset Practical Skills progress." });
   }
@@ -15646,7 +15649,7 @@ app.get("/api/practical-skills/progress/:kitId", async (req, res) => {
     const certificate = await getPracticalSkillsCertificate(req, kitId);
     const certificateEmailed = await autoEmailKitCertificate(req, kitId, certificate);
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
-    const snapshot = await buildPracticalSkillsLicenceSnapshot(rows);
+    const snapshot = await buildPracticalSkillsLicenceSnapshot(rows, await kitPublication.visibleKits(req));
     const row = rows.find((entry) => String(entry?.kit_id || "").trim() === kitId);
     res.json({
       kit: snapshot.kits.find((entry) => entry.id === kitId) || null,

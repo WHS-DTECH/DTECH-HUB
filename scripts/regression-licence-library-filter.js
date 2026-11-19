@@ -20,26 +20,50 @@ class Element {
     addEventListener(event, handler) { this.events[event] = handler; }
 }
 
-async function load(search) {
+async function load(search, { teacher = null, mode = "teacher" } = {}) {
     const nodes = new Map();
     const element = (id) => {
         if (!nodes.has(id)) nodes.set(id, new Element());
         return nodes.get(id);
     };
+    const page = teacher === null ? null : element("licence-library-page");
+    if (page) page.hidden = true;
+    let redirected;
     const context = vm.createContext({
-        URLSearchParams, location: { search },
-        document: { querySelector: () => null, getElementById: element, createElement: () => new Element() },
-        fetch: async () => ({ ok: true, json: async () => [
+        URLSearchParams, location: { search, replace: (target) => { redirected = target; } },
+        document: { querySelector: (selector) => selector === "#licence-library-page" ? page : null,
+            getElementById: element, createElement: () => new Element() },
+        readStoredHubViewMode: () => mode,
+        withHubAuthHeaders: () => ({ Authorization: "Bearer mock-id-token" }),
+        window: { addEventListener() {} },
+        fetch: async (_url, options) => {
+            if (page) assert.equal(options.headers.Authorization, "Bearer mock-id-token");
+            if (teacher === false) return { ok: false, status: 403 };
+            return { ok: true, json: async () => [
             { id: "kit-a", title: "A Kit", cardLabel: "LICENCE KIT", area: "Skill Kits", href: "/kit-a", status: "active", yearLevel: "Junior DTECH" },
             { id: "activity-a", title: "An Activity", cardLabel: "PRACTICAL SKILL", area: "Skill Kits", href: "/activity-a", status: "active", yearLevel: "All Years" },
             { id: "kit-b", title: "B Kit", cardLabel: "LICENCE KIT", area: "Application Kits", href: "/kit-b", status: "active", yearLevel: "All Years" },
             { id: "kit-c", title: "C Kit", cardLabel: "LICENCE KIT", area: "Application Kits", href: "/kit-c", status: "active", yearLevel: "Year 9 DTECH" }
-        ] }), console
+            ] };
+        }, console
     });
     vm.runInContext(fs.readFileSync(path.join(root, "practical-skills", "app.js"), "utf8"), context);
     await new Promise((resolve) => setImmediate(resolve));
-    return { element };
+    return { element, page, redirected };
 }
+
+test("A direct library visit shows cards only for a teacher in Teacher View", async () => {
+    for (const options of [{ teacher: false }, { teacher: true, mode: "student" }]) {
+        const { page, redirected, element } = await load("", options);
+        assert.equal(page.hidden, true);
+        assert.equal(redirected, "/practical-skills/checklist.html");
+        assert.equal(element("practical-skills-grid").children.length, 0);
+    }
+    const { page, redirected, element } = await load("", { teacher: true });
+    assert.equal(page.hidden, false);
+    assert.equal(redirected, undefined);
+    assert.equal(element("practical-skills-grid").children.length, 3);
+});
 
 test("Licence Library menu starts with only Licence Kits and All remains selectable", async () => {
     const navigation = fs.readFileSync(path.join(root, "script.js"), "utf8");

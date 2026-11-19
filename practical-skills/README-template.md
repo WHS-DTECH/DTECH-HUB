@@ -17,7 +17,7 @@ This folder is the reusable Practical Skills module for HUB sites.
 
 ## Typing Kit
 
-Open **Typing Kit** from My Licence or the Licence Library. Its seven calendar
+Students open **Typing Kit** from My Licence. Its seven calendar
 weeks initially start on Monday **26 October 2026** and finish on Sunday
 **13 December 2026**. Each week has Period 1 and Period 2, linking to fourteen
 daily records. Every submitted attempt is retained; the dashboard shows the
@@ -98,6 +98,13 @@ Live until explicitly published. Teacher preview remains read-only.
 The Upload menu, Kit Content Builder and Licence Kit Setup links are hidden in
 Student View, including for staff previewing that view. In Teacher View, upload
 tools remain available to staff and builder/setup links require admin access.
+
+Students find their kits on **My Licence**. The **Licence Library** is available
+in Teacher View only. In **Edit kit**, use **Student access on My Licence** to
+choose whether a Live kit is open to all students or only MiddleDTECH and
+SeniorDTECH. Unity Setup defaults to the latter; other kits default to all
+students. The same restriction applies to direct kit links and does not delete
+saved student progress.
 
 Validate with `node --test scripts/regression-google-drawings-links.js`.
 
@@ -215,7 +222,7 @@ kit content API. Open Kit links to its worksheet. When all kits are complete,
 the panel points to Licence stamps and certificates instead. Loading failures
 are visible with a Retry button; stale responses from other accounts are ignored.
 
-- `GET /api/practical-skills/library` - Public read for student page
+- `GET /api/practical-skills/library` - Licence Library, verified staff only
 - `GET /api/admin/practical-skills/library` - Admin-only read
 - `PUT /api/admin/practical-skills/library` - Admin-only publish/save
 - `GET /api/admin/practical-skills/preview-users` - Admin-only directory names and basic profile details for the user/course preview
@@ -274,7 +281,7 @@ Sidebar navigation and Quick Links are unaffected.
 
 In `server.js`, ensure this file path constant points to this module folder:
 
-- `PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", "library.json")`
+- `PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", ".library.json")`
 
 ## Required Navigation Links
 
@@ -288,9 +295,9 @@ Use this checklist when cloning the module to another HUB.
 - `Module Route Base`: `/practical-skills/`
 - `Student Page`: `practical-skills/index.html`
 - `Admin Page`: `practical-skills/admin.html`
-- `Data File`: `practical-skills/library.json`
+- `Data File`: `practical-skills/.library.json` (server-side fallback)
 - `Server Constant`: `PRACTICAL_SKILLS_LIBRARY_FILE`
-- `Public API`: `GET /api/practical-skills/library`
+- `Teacher API`: `GET /api/practical-skills/library`
 - `Admin APIs`: `GET /api/admin/practical-skills/library`, `PUT /api/admin/practical-skills/library`
 - `Navbar Label`: `Practical Skills`
 - `Admin Menu Label`: `Practical Skills Library`
@@ -302,7 +309,7 @@ Update these files for site-specific naming and visual tweaks:
 
 - `practical-skills/index.html`
 - `practical-skills/admin.html`
-- `practical-skills/library.json`
+- `practical-skills/.library.json`
 - `script.js`
 - `admin-menu.html`
 

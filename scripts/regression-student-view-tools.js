@@ -19,9 +19,10 @@ test("Upload and kit editing links follow view mode as well as permissions on ev
         "hubUploadKitsLink", "hubTeacherReviewLink", "hubLicenceSetupLink",
         "worksheetLicenceSetupLink", "hubSettingsLink", "hubUploadMenu",
         "hubStudentWorkMenu", "hubPracticalSkillsMenu", "hubSeniorTaskListLink",
-        "hubAccessBadge", "hubBrowseMenu"]) {
+        "hubAccessBadge", "hubBrowseMenu", "hubLicenceLibraryLink"]) {
         nodes[name] = { hidden: true, open: false };
     }
+    nodes.hubPracticalSkillsMenu.querySelector = () => nodes.hubLicenceLibraryLink;
     const noop = () => {};
     const context = vm.createContext({
         ...nodes, hubBrowseButtons: [], hubUnitPlansButtons: [], hubCourseOutlinesButtons: [],
@@ -46,6 +47,7 @@ test("Upload and kit editing links follow view mode as well as permissions on ev
     const check = (uploadVisible, adminVisible) => {
         context.renderHubAuthUi();
         assert.equal(nodes.hubUploadMenu.hidden, !uploadVisible);
+        assert.equal(nodes.hubLicenceLibraryLink.hidden, !uploadVisible);
         for (const name of adminTools) assert.equal(nodes[name].hidden, !adminVisible, name);
     };
     check(false, false);
