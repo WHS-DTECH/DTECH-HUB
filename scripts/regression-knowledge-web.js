@@ -141,16 +141,26 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
 
         const body = {
             title: "Test-only historical cloud", description: "Test description", significance: "Test significance",
-            events: [{ date: "2026-11-18", description: "Test event" }], position: { x: 70, y: 120 }, publish: false,
-            sources: [{ title: "Test source", author: "Test organisation", publicationDate: "2026-11",
+            events: [{ date: "18-11-2026", description: "Test event" }, { date: "2026-10", description: "Earlier event" }],
+            position: { x: 70, y: 120 }, publish: false,
+            sources: [{ title: "Test source", author: "Test organisation", publicationDate: "11-2026",
                 reference: "https://example.test/article", supports: "Supports the test event." }]
         };
+        for (const invalidDate of ["31-02-2026", "13-2026", "00-11-2026"]) {
+            const invalid = await call("manage/clouds", {
+                method: "POST", body: { ...body, events: [{ date: invalidDate, description: "Invalid" }] }
+            });
+            assert.equal(invalid.status, 400, invalidDate);
+            assert.match((await invalid.json()).error, /MM-YYYY or DD-MM-YYYY/);
+        }
         const created = await call("manage/clouds", { method: "POST", body });
         assert.equal(created.status, 201);
         const { id } = await created.json();
         const find = (clouds) => clouds.find((cloud) => cloud.id === id);
         const cloudDraft = find(await list("manage/clouds"));
         assert.equal(cloudDraft.publishedAt, null);
+        assert.deepEqual(cloudDraft.events.map((event) => event.date), ["2026-11-18", "2026-10"]);
+        assert.equal(cloudDraft.sources[0].publicationDate, "2026-11");
         assert.ok(cloudDraft.sources[0].addedAt);
         assert.deepEqual(await list("clouds", true), []);
         assert.equal((await call(`manage/clouds/${id}`, { student: true, method: "PUT", body: { ...cloudDraft, publish: true } })).status, 403);
@@ -223,9 +233,9 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         })).json();
         assert.equal(possibleDuplicates.matches[0].id, id, "Published similar titles are suggested before submission");
         assert.equal(possibleDuplicates.matches[0].kind, "cloud");
-        const connectionSource = { title: "Connection evidence", author: "Test publisher", publicationDate: "",
+        const connectionSource = { title: "Connection evidence", author: "Test publisher", publicationDate: "02-2024",
             reference: "Document 7", supports: "Supports the relationship between the historical topics." };
-        const cloudSource = { title: "Historical source", author: "Test publisher", publicationDate: "2025-11",
+        const cloudSource = { title: "Historical source", author: "Test publisher", publicationDate: "29-02-2024",
             reference: "https://example.test/history", supports: "Supports the historical description." };
         const submission = {
             ...draft, ...draftBody, intent: "submit", title: "Test-only historical cloud",
@@ -233,7 +243,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             significance: "This topic belongs in computing history.",
             connection: "The events share an underlying relationship described by the cited evidence.",
             sources: [cloudSource], connectionSources: [connectionSource],
-            events: [{ date: "2025-10-12", description: "A significant historical milestone." }]
+            events: [{ date: "12-10-2025", description: "A significant historical milestone." }]
         };
         const duplicateGuard = await call(`proposals/${draft.id}`, { student: true, method: "PUT", body: submission });
         assert.equal(duplicateGuard.status, 409);
@@ -247,6 +257,9 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal(submitted.status, "Submitted");
         assert.equal(submitted.sources.length, 1);
         assert.equal(submitted.connectionSources.length, 1);
+        assert.equal(submitted.sources[0].publicationDate, "2024-02-29");
+        assert.equal(submitted.connectionSources[0].publicationDate, "2024-02");
+        assert.equal(submitted.events[0].date, "2025-10-12");
         assert.ok(submitted.submittedAt);
         const reviewerList = (await (await call("manage/proposals")).json()).proposals;
         assert.equal(reviewerList.length, 1);

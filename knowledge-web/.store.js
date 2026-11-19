@@ -18,12 +18,16 @@ function text(value, field, limit, required = true) {
 }
 
 function date(value, field) {
-    const when = text(value ?? "", field, 10, false);
+    let when = text(value ?? "", field, 10, false);
     if (!when) return "";
+    const localDay = when.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    const localMonth = when.match(/^(\d{2})-(\d{4})$/);
+    if (localDay) when = `${localDay[3]}-${localDay[2]}-${localDay[1]}`;
+    else if (localMonth) when = `${localMonth[2]}-${localMonth[1]}`;
     const day = when.length === 7 ? `${when}-01` : when;
     const parsed = new Date(day);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== day) {
-        throw problem(400, `${field} must be a real date in YYYY-MM or YYYY-MM-DD format.`);
+        throw problem(400, `${field} must be a real date in MM-YYYY or DD-MM-YYYY format.`);
     }
     return when;
 }

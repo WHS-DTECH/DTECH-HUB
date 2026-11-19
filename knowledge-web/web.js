@@ -10,6 +10,10 @@
         dirty: false, proposalDirty: false, saving: false, duplicatesAcknowledgedTitle: ""
     };
     const formatDate = (value) => value ? new Date(value).toLocaleDateString("en-NZ", { timeZone: "Pacific/Auckland" }) : "";
+    const formatHistoricalDate = (value) => {
+        const match = String(value || "").match(/^(\d{4})-(\d{2})(?:-(\d{2}))?$/);
+        return match ? [match[3], match[2], match[1]].filter(Boolean).join("-") : value || "";
+    };
 
     function element(tag, value) {
         const el = document.createElement(tag);
@@ -61,7 +65,7 @@
         );
         if (cloud.events.length) {
             const list = element("ul");
-            cloud.events.forEach((event) => list.append(element("li", `${event.date}: ${event.description}`)));
+            cloud.events.forEach((event) => list.append(element("li", `${formatHistoricalDate(event.date)}: ${event.description}`)));
             detail.append(element("h3", "Dated events"), list);
         }
         const sources = element("ul");
@@ -69,7 +73,7 @@
             const row = element("li");
             const title = element(source.url ? "a" : "strong", source.title);
             if (source.url) title.href = source.url;
-            row.append(title, element("p", `${[source.author, source.publicationDate].filter(Boolean).join(" · ")}${source.url ? "" : ` — ${source.reference}`}`),
+            row.append(title, element("p", `${[source.author, formatHistoricalDate(source.publicationDate)].filter(Boolean).join(" · ")}${source.url ? "" : ` — ${source.reference}`}`),
                 element("p", `Supports: ${source.supports}`), element("small", `Added ${formatDate(source.addedAt)}`));
             sources.append(row);
         }
@@ -130,10 +134,10 @@
     }
 
     const eventFields = [
-        ["date", "Date", 10], ["description", "What happened", 500]
+        ["date", "Date (MM-YYYY or DD-MM-YYYY)", 10], ["description", "What happened", 500]
     ];
     const sourceFields = [
-        ["title", "Source title", 200], ["author", "Author or organisation", 200], ["publicationDate", "Publication date (optional)", 10],
+        ["title", "Source title", 200], ["author", "Author or organisation", 200], ["publicationDate", "Publication date (optional; MM-YYYY or DD-MM-YYYY)", 10],
         ["reference", "URL or written reference", 2048], ["supports", "What this source supports", 1000]
     ];
 
@@ -160,7 +164,7 @@
             for (const [key, label] of [["title", "title"], ["author", "author"], ["publicationDate", "publication date"]]) {
                 const field = row.querySelector(`[name="${key}"]`);
                 if (!field.value.trim() && details[key]) {
-                    field.value = details[key];
+                    field.value = key === "publicationDate" ? formatHistoricalDate(details[key]) : details[key];
                     added.push(label);
                 }
             }
@@ -199,7 +203,8 @@
             input.name = key;
             input.maxLength = limit;
             input.required = key !== "publicationDate";
-            input.value = values[key] || "";
+            input.value = key === "date" || key === "publicationDate" ? formatHistoricalDate(values[key]) : values[key] || "";
+            if (key === "date" || key === "publicationDate") input.placeholder = "MM-YYYY or DD-MM-YYYY";
             label.append(input);
             row.append(label);
             if (!event && !hostId && key === "reference") {
@@ -303,7 +308,7 @@
             const entry = element("li");
             entry.append(element(source.url ? "a" : "strong", source.title));
             if (source.url) entry.firstChild.href = source.url;
-            entry.append(element("p", `${source.author}${source.publicationDate ? ` · ${source.publicationDate}` : ""} — ${source.supports}`));
+            entry.append(element("p", `${source.author}${source.publicationDate ? ` · ${formatHistoricalDate(source.publicationDate)}` : ""} — ${source.supports}`));
             list.append(entry);
         }
         parent.append(list);
@@ -358,7 +363,7 @@
                 element("h4", "Historical significance"), element("p", proposal.significance || "Not provided."),
                 element("h4", "Dated events"));
             const events = element("ul");
-            proposal.events.forEach((event) => events.append(element("li", `${event.date}: ${event.description}`)));
+            proposal.events.forEach((event) => events.append(element("li", `${formatHistoricalDate(event.date)}: ${event.description}`)));
             card.append(events, element("h4", "Sources supporting the proposed cloud"));
             sourceList(card, proposal.sources);
             card.append(element("h4", "Connection preserved for the student (not published as a kite)"),
