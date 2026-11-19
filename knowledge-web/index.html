@@ -8,7 +8,7 @@
     <title>Computing History Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=1">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=2">
 </head>
 <body>
     <div class="page-shell">
@@ -53,6 +53,45 @@
                     </div>
                     <article class="kw-panel" id="web-detail" aria-label="Selected cloud" aria-live="polite"></article>
                 </div>
+                <section id="web-proposal" class="kw-panel kw-proposal" aria-label="Propose a new historical cloud" hidden>
+                    <h2>Propose a new cloud</h2>
+                    <p id="web-proposal-parent"></p>
+                    <form id="web-proposal-form">
+                        <label>Cloud title<input name="title" required maxlength="120"></label>
+                        <label>Historical description<textarea name="description" rows="4" required maxlength="2000"></textarea></label>
+                        <label>Historical significance<textarea name="significance" rows="3" required maxlength="2000"></textarea></label>
+                        <fieldset>
+                            <legend>Dated events (optional)</legend>
+                            <div id="web-proposal-events"></div>
+                            <button id="web-add-proposal-event" type="button">Add dated event</button>
+                        </fieldset>
+                        <fieldset>
+                            <legend>Historical supporting sources</legend>
+                            <p>For each source, explain the historical detail it supports.</p>
+                            <div id="web-proposal-sources"></div>
+                            <button id="web-add-proposal-source" type="button">Add historical source</button>
+                        </fieldset>
+                        <label>How does this cloud relate to <strong id="web-proposal-parent-title"></strong>?<textarea name="connection" rows="4" required maxlength="2000"></textarea></label>
+                        <fieldset>
+                            <legend>Evidence for this connection</legend>
+                            <p>Explain what each source supports. This supports your proposed connection; it does not automatically create a kite.</p>
+                            <div id="web-connection-sources"></div>
+                            <button id="web-add-connection-source" type="button">Add connection evidence</button>
+                        </fieldset>
+                        <div class="kw-actions">
+                            <button type="button" id="web-save-proposal">Save draft</button>
+                            <button type="submit" id="web-submit-proposal">Submit cloud for teacher review</button>
+                            <button type="button" id="web-cancel-proposal">Close editor</button>
+                        </div>
+                        <p id="web-proposal-status" role="status" aria-live="polite"></p>
+                        <ul id="web-duplicates" aria-label="Possible matching clouds" hidden></ul>
+                    </form>
+                </section>
+                <section id="web-my-proposals" class="kw-panel" aria-label="My cloud proposals" hidden>
+                    <h2>My cloud proposals</h2>
+                    <p>Your private drafts, proposal statuses and any teacher revision notes appear here.</p>
+                    <div id="web-proposal-list"></div>
+                </section>
             </section>
             <section id="web-manage" aria-label="Manage clouds" hidden>
                 <p>Drafts are private to teachers. Check the historical details and sources before publishing a cloud to students.</p>
@@ -91,11 +130,16 @@
                         </div>
                     </form>
                 </div>
+                <section class="kw-panel">
+                    <h2>Student cloud proposals</h2>
+                    <p>Review the factual basis for proposed historical clouds. The connection is preserved for the student; approving a cloud does not create or publish a kite.</p>
+                    <div id="web-reviews"></div>
+                </section>
             </section>
         </main>
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="/script.js?v=knowledge-web-1"></script>
-    <script src="/knowledge-web/web.js?v=1"></script>
+    <script src="/script.js?v=knowledge-web-2"></script>
+    <script src="/knowledge-web/web.js?v=2"></script>
 </body>
 </html>

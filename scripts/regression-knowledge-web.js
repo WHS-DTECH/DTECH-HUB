@@ -13,13 +13,18 @@ test("Knowledge Web allows only eligible readers and verified teachers to manage
     const app = express();
     registerKnowledgeWeb(app, {
         getVerifiedEmail: (req) => req.headers["x-verified-test-account"] || "",
-        canManage: async () => false,
-        getStudentProfile: async (account) => ({ available: account !== "inactive", year: { junior: 8, middle: 9, senior: 11, inactive: 10 }[account] })
+        canManage: async (account) => account === "teacher@test.invalid",
+        getStudentProfile: async (account) => ({
+            available: account !== "inactive@test.invalid",
+            year: { "junior@test.invalid": 8, "student-one@test.invalid": 10, "student-two@test.invalid": 9,
+                "senior@test.invalid": 11, "inactive@test.invalid": 10 }[account]
+        })
     });
     const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
     t.after(() => new Promise((resolve) => server.close(resolve)));
     const url = `http://127.0.0.1:${server.address().port}/api/knowledge-web`;
-    for (const [account, expected] of [["", 401], ["junior", 403], ["middle", 200], ["senior", 403], ["inactive", 403]]) {
+    for (const [account, expected] of [["", 401], ["junior@test.invalid", 403], ["student-one@test.invalid", 200],
+        ["student-two@test.invalid", 200], ["senior@test.invalid", 403], ["inactive@test.invalid", 403]]) {
         const headers = { "x-verified-test-account": account, "x-user-role": "admin", "x-user-email": "teacher@test.invalid" };
         assert.equal((await fetch(`${url}/access`, { headers })).status, expected, account);
         assert.equal((await fetch(`${url}/manage/clouds`, { method: "POST", headers })).status, account ? 403 : 401);
@@ -46,7 +51,8 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
                 pool, getVerifiedEmail: (req) => req.headers["x-verified-test-account"] || "",
                 canManage: async (account) => account === "teacher@test.invalid",
                 getStudentProfile: async () => ({ available: true, year: 10 }),
-                getContributorName: async () => "Test Teacher"
+                getContributorName: async (_req, account) => account === "teacher@test.invalid" ? "Test Teacher"
+                    : account.startsWith("student-two") ? "Test Student Two" : "Test Student One"
             });
             app.use(express.static(path.resolve(__dirname, "..")));
             const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
@@ -54,9 +60,10 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             return `http://127.0.0.1:${server.address().port}`;
         }
         let host = await startApp();
-        const call = (uri, { student = false, method = "GET", body } = {}) => fetch(`${host}/api/knowledge-web/${uri}`, {
+        const call = (uri, { student = false, account, method = "GET", body } = {}) => fetch(`${host}/api/knowledge-web/${uri}`, {
             method,
-            headers: { "Content-Type": "application/json", "x-verified-test-account": student ? "student@test.invalid" : "teacher@test.invalid" },
+            headers: { "Content-Type": "application/json", "x-verified-test-account": account
+                || (student ? "student-one@test.invalid" : "teacher@test.invalid") },
             body: body && JSON.stringify(body)
         });
         const list = async (uri, student) => {
@@ -84,12 +91,12 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal(created.status, 201);
         const { id } = await created.json();
         const find = (clouds) => clouds.find((cloud) => cloud.id === id);
-        const draft = find(await list("manage/clouds"));
-        assert.equal(draft.publishedAt, null);
-        assert.ok(draft.sources[0].addedAt);
+        const cloudDraft = find(await list("manage/clouds"));
+        assert.equal(cloudDraft.publishedAt, null);
+        assert.ok(cloudDraft.sources[0].addedAt);
         assert.deepEqual(await list("clouds", true), []);
-        assert.equal((await call(`manage/clouds/${id}`, { student: true, method: "PUT", body: { ...draft, publish: true } })).status, 403);
-        const update = { ...draft, position: { x: 280, y: 130 }, publish: true };
+        assert.equal((await call(`manage/clouds/${id}`, { student: true, method: "PUT", body: { ...cloudDraft, publish: true } })).status, 403);
+        const update = { ...cloudDraft, position: { x: 280, y: 130 }, publish: true };
         assert.equal((await call(`manage/clouds/${id}`, { method: "PUT", body: update })).status, 200);
         assert.equal((await call(`manage/clouds/${id}`, { method: "PUT", body: update })).status, 409);
 
@@ -101,10 +108,157 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.ok(published.publishedAt);
         assert.equal(published.contributor, "Test Teacher");
         assert.deepEqual(published.position, update.position);
-        assert.equal(published.sources[0].id, draft.sources[0].id);
-        assert.equal(published.sources[0].addedAt, draft.sources[0].addedAt);
+        assert.equal(published.sources[0].id, cloudDraft.sources[0].id);
+        assert.equal(published.sources[0].addedAt, cloudDraft.sources[0].addedAt);
         assert.equal(published.sources[0].url, "https://example.test/article");
         assert.doesNotMatch(JSON.stringify(published), /teacher@test\.invalid/);
         assert.equal((await call(`manage/clouds/${id}`, { method: "PUT", body: { ...published, publish: false, sources: [] } })).status, 400);
         assert.equal((await list("clouds", true))[0].sources.length, 1);
+
+        const firstPublished = (await list("clouds", true))[0];
+        const draftBody = {
+            intent: "draft", title: "", description: "", significance: "", connection: "",
+            originalCloudId: firstPublished.id, sources: [{ title: "Researching this source" }],
+            connectionSources: [], events: [{ date: "", description: "" }]
+        };
+        const draftResponse = await call("proposals", { student: true, method: "POST", body: draftBody });
+        assert.equal(draftResponse.status, 201);
+        const draftResult = await draftResponse.json();
+        assert.equal(draftResult.status, "Draft");
+        const studentDrafts = await (await call("proposals", { student: true })).json();
+        assert.equal(studentDrafts.proposals.length, 1);
+        const draft = studentDrafts.proposals[0];
+        assert.equal(draft.id, draftResult.id);
+        assert.equal(draft.title, "");
+        assert.equal(draft.originalCloudId, firstPublished.id);
+        assert.equal(draft.revision, 1);
+        assert.equal(draft.contributor, "Test Student One");
+        assert.equal(draft.sources[0].title, "Researching this source");
+        assert.deepEqual(draft.events, [{ date: "", description: "" }]);
+        assert.ok(!JSON.stringify(draft).includes("contributorEmail"));
+        assert.deepEqual((await (await call("proposals", { account: "student-two@test.invalid" })).json()).proposals, []);
+        const secondStudentDraftResponse = await call("proposals", { account: "student-two@test.invalid", method: "POST", body: {
+            ...draftBody, title: "Private Draft About Connected Networks"
+        } });
+        assert.equal(secondStudentDraftResponse.status, 201);
+        const secondStudentDraft = await secondStudentDraftResponse.json();
+        const ownDraftDuplicate = await (await call(
+            `proposals/duplicates?title=${encodeURIComponent("Private Draft About Connected Networks")}`,
+            { account: "student-two@test.invalid" }
+        )).json();
+        assert.equal(ownDraftDuplicate.matches[0].id, secondStudentDraft.id);
+        assert.equal(ownDraftDuplicate.matches[0].kind, "proposal");
+        assert.equal(ownDraftDuplicate.matches[0].status, "Draft");
+        assert.equal((await (await call("manage/proposals")).json()).proposals.length, 0,
+            "Unfinished drafts are not placed in the teacher review area");
+        assert.equal((await call("proposals", { account: "teacher@test.invalid" })).status, 403);
+        assert.equal((await call("manage/proposals", { student: true })).status, 403);
+        assert.equal((await call(`manage/proposals/${draft.id}/decision`, {
+            student: true, method: "POST", body: { action: "approve", comment: "fake teacher" }
+        })).status, 403);
+        assert.equal((await call(`proposals/${draft.id}`, {
+            account: "student-two@test.invalid", method: "PUT", body: { ...draft, ...draftBody }
+        })).status, 404);
+
+        const possibleDuplicates = await (await call(`proposals/duplicates?title=${encodeURIComponent("Test only historical cloud")}`, {
+            student: true
+        })).json();
+        assert.equal(possibleDuplicates.matches[0].id, id, "Published similar titles are suggested before submission");
+        assert.equal(possibleDuplicates.matches[0].kind, "cloud");
+        const connectionSource = { title: "Connection evidence", author: "Test publisher", publicationDate: "",
+            reference: "Document 7", supports: "Supports the relationship between the historical topics." };
+        const cloudSource = { title: "Historical source", author: "Test publisher", publicationDate: "2025-11",
+            reference: "https://example.test/history", supports: "Supports the historical description." };
+        const submission = {
+            ...draft, ...draftBody, intent: "submit", title: "Test-only historical cloud",
+            description: "A historical description supported by the submitted sources.",
+            significance: "This topic belongs in computing history.",
+            connection: "The events share an underlying relationship described by the cited evidence.",
+            sources: [cloudSource], connectionSources: [connectionSource],
+            events: [{ date: "2025-10-12", description: "A significant historical milestone." }]
+        };
+        const duplicateGuard = await call(`proposals/${draft.id}`, { student: true, method: "PUT", body: submission });
+        assert.equal(duplicateGuard.status, 409);
+        assert.ok((await duplicateGuard.json()).duplicates.some((match) => match.id === id));
+        const submitResponse = await call(`proposals/${draft.id}`, {
+            student: true, method: "PUT", body: { ...submission, duplicatesAcknowledged: true }
+        });
+        assert.equal(submitResponse.status, 200);
+        assert.equal((await submitResponse.json()).status, "Submitted");
+        const submitted = (await (await call("proposals", { student: true })).json()).proposals[0];
+        assert.equal(submitted.status, "Submitted");
+        assert.equal(submitted.sources.length, 1);
+        assert.equal(submitted.connectionSources.length, 1);
+        assert.ok(submitted.submittedAt);
+        const reviewerList = (await (await call("manage/proposals")).json()).proposals;
+        assert.equal(reviewerList.length, 1);
+        assert.equal(reviewerList[0].contributorEmail, "student-one@test.invalid");
+        assert.equal((await call(`proposals/${draft.id}`, {
+            student: true, method: "PUT", body: { ...submission, duplicatesAcknowledged: true }
+        })).status, 409, "Submitted proposals cannot be edited until returned");
+        assert.equal((await call(`manage/proposals/${draft.id}/decision`, {
+            student: true, method: "POST", body: { action: "approve", comment: "No" }
+        })).status, 403);
+        assert.equal((await call(`manage/proposals/${draft.id}/decision`, {
+            method: "POST", body: { action: "return", comment: "" }
+        })).status, 400, "Returning requires a private explanation");
+        const returnedResponse = await call(`manage/proposals/${draft.id}/decision`, {
+            method: "POST", body: { action: "return", comment: "Please add one clearer dated event." }
+        });
+        assert.equal((await returnedResponse.json()).status, "Returned for Revision");
+        const returned = (await (await call("proposals", { student: true })).json()).proposals[0];
+        assert.equal(returned.teacherComment, "Please add one clearer dated event.");
+        assert.equal(returned.originalCloudId, firstPublished.id);
+        assert.equal(returned.connectionSources[0].supports, connectionSource.supports);
+        const secondStudentProposals = (await (await call("proposals", { account: "student-two@test.invalid" })).json()).proposals;
+        assert.deepEqual(secondStudentProposals.map((proposal) => proposal.id), [secondStudentDraft.id],
+            "Revision comments and proposals remain private to their author");
+
+        const revisedSubmit = await call(`proposals/${draft.id}`, {
+            student: true, method: "PUT",
+            body: { ...submission, revision: returned.revision, duplicatesAcknowledged: true,
+                description: "Revised factual description, with an added source explanation." }
+        });
+        assert.equal((await revisedSubmit.json()).status, "Submitted");
+        assert.equal((await call(`manage/proposals/${draft.id}/decision`, {
+            method: "POST", body: { action: "approve", comment: "" }
+        })).status, 200);
+        const approved = (await (await call("proposals", { student: true })).json()).proposals[0];
+        assert.equal(approved.status, "Approved");
+        assert.ok(approved.publishedAt === undefined, "Review decisions do not invent a separate proposal timestamp");
+        assert.ok(approved.decidedAt);
+        assert.ok(approved.publishedCloudId);
+        assert.equal(approved.originalCloudId, firstPublished.id);
+        assert.equal(approved.connection, submission.connection);
+        assert.equal(approved.connectionSources[0].supports, connectionSource.supports);
+        const sharedClouds = await list("clouds", true);
+        assert.equal(sharedClouds.length, 2);
+        const approvedCloud = sharedClouds.find((cloud) => cloud.id === approved.publishedCloudId);
+        assert.equal(approvedCloud.title, submission.title);
+        assert.equal(approvedCloud.description, "Revised factual description, with an added source explanation.");
+        assert.equal(approvedCloud.contributor, "Test Student One");
+        assert.equal(approvedCloud.sources[0].supports, cloudSource.supports);
+        assert.equal((await list("clouds", false)).length, 2, "Another eligible student can see the approved cloud");
+        assert.equal(await pool.query("SELECT to_regclass('knowledge_web_kites') AS name").then((result) => result.rows[0].name),
+            null, "Phase 2 preserves a draft connection and does not create live kites");
+        const audit = await pool.query(`SELECT action,actor_email,comment FROM knowledge_web_proposal_events WHERE proposal_id=$1 ORDER BY created_at,id`, [draft.id]);
+        assert.deepEqual(audit.rows.map((row) => row.action), ["Draft saved", "Submitted", "Returned for Revision", "Submitted", "Approved"]);
+        assert.equal(audit.rows[2].actor_email, "teacher@test.invalid");
+        assert.equal(audit.rows[2].comment, "Please add one clearer dated event.");
+
+        const declineDraft = await call("proposals", { account: "student-two@test.invalid", method: "POST", body: {
+            ...draftBody, intent: "submit", title: "Distinct declined cloud", description: "A supported historical description.",
+            significance: "Historical relevance.", connection: "Supported proposed relationship.", sources: [cloudSource],
+            connectionSources: [connectionSource], events: [], duplicatesAcknowledged: true
+        } });
+        const declinedId = (await declineDraft.json()).id;
+        assert.equal(declineDraft.status, 201);
+        const declined = await call(`manage/proposals/${declinedId}/decision`, {
+            method: "POST", body: { action: "decline", comment: "This proposal needs a stronger historical foundation." }
+        });
+        assert.equal((await declined.json()).status, "Declined");
+        const declinedStudent = (await (await call("proposals", { account: "student-two@test.invalid" })).json())
+            .proposals.find((proposal) => proposal.id === declinedId);
+        assert.equal(declinedStudent.status, "Declined");
+        assert.equal(declinedStudent.teacherComment, "This proposal needs a stronger historical foundation.");
     });
