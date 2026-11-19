@@ -8,7 +8,7 @@
     <title>Computing History Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=4">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=5">
 </head>
 <body>
     <div class="page-shell">
@@ -35,6 +35,22 @@
             <button type="button" id="web-retry" hidden>Retry</button>
             <section id="web-explore" aria-label="Explore the Knowledge Web" hidden>
                 <p id="web-empty" hidden>No clouds have been published yet. Check back after your teacher releases one.</p>
+                <section id="web-timeline" class="kw-panel kw-timeline" aria-labelledby="web-timeline-title">
+                    <h2 id="web-timeline-title">Timeline</h2>
+                    <p id="web-timeline-caption">Select a cloud to see its dated events.</p>
+                    <div id="web-timeline-controls" class="kw-timeline-controls" hidden>
+                        <div class="kw-actions" role="group" aria-label="Timeline view">
+                            <button id="web-timeline-year-view" type="button" aria-pressed="true">Year view</button>
+                            <button id="web-timeline-day-view" type="button" aria-pressed="false">Day view</button>
+                        </div>
+                        <label for="web-timeline-year">Year <select id="web-timeline-year"></select></label>
+                        <label id="web-timeline-day-label" for="web-timeline-day" hidden>Day <select id="web-timeline-day"></select></label>
+                    </div>
+                    <p id="web-timeline-message" role="status"></p>
+                    <div id="web-timeline-scroll" class="kw-timeline-scroll" tabindex="0" role="region" aria-label="Timeline events">
+                        <ol id="web-timeline-events" class="kw-timeline-events"></ol>
+                    </div>
+                </section>
                 <div class="kw-columns" id="web-clouds" hidden>
                     <div class="kw-panel">
                         <label for="web-search">Find a cloud by title</label>
@@ -62,7 +78,7 @@
                         <label>Historical significance<textarea name="significance" rows="3" required maxlength="2000"></textarea></label>
                         <fieldset>
                             <legend>Dated events (optional)</legend>
-                            <p>Use MM-YYYY or DD-MM-YYYY.</p>
+                            <p>Use MM-YYYY or DD-MM-YYYY. A time is optional and needs a full date when submitting.</p>
                             <div id="web-proposal-events"></div>
                             <button id="web-add-proposal-event" type="button">Add dated event</button>
                         </fieldset>
@@ -110,7 +126,7 @@
                         <label>Historical significance<textarea name="significance" rows="3" required maxlength="2000"></textarea></label>
                         <fieldset>
                             <legend>Dated events</legend>
-                            <p>Use MM-YYYY or DD-MM-YYYY. Leave out events you have not verified.</p>
+                            <p>Use MM-YYYY or DD-MM-YYYY. A time is optional and needs a full date. Leave out events you have not verified.</p>
                             <div id="web-events"></div>
                             <button id="web-add-event" type="button">Add dated event</button>
                         </fieldset>
@@ -141,6 +157,6 @@
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="/script.js?v=knowledge-web-2"></script>
-    <script src="/knowledge-web/web.js?v=6"></script>
+    <script src="/knowledge-web/web.js?v=7"></script>
 </body>
 </html>

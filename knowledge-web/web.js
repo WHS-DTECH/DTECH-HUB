@@ -7,7 +7,8 @@
     const state = {
         clouds: [], selected: null, editing: null, editingProposal: null, proposalParentId: null,
         proposals: [], canPropose: false, zoom: 1, token: null, revision: 0,
-        dirty: false, proposalDirty: false, saving: false, duplicatesAcknowledgedTitle: ""
+        dirty: false, proposalDirty: false, saving: false, duplicatesAcknowledgedTitle: "",
+        timelineView: "year", timelineYear: "", timelineDay: ""
     };
     const formatDate = (value) => value ? new Date(value).toLocaleDateString("en-NZ", { timeZone: "Pacific/Auckland" }) : "";
     const formatHistoricalDate = (value) => {
@@ -56,8 +57,93 @@
         }
     }
 
+    function renderTimeline() {
+        const cloud = state.clouds.find((entry) => entry.id === state.selected);
+        const controls = node("timeline-controls");
+        const caption = node("timeline-caption");
+        const message = node("timeline-message");
+        const list = node("timeline-events");
+        const scroll = node("timeline-scroll");
+        list.replaceChildren();
+        controls.hidden = !cloud || !cloud.events.length;
+        scroll.hidden = !cloud || !cloud.events.length;
+        message.textContent = "";
+        caption.textContent = cloud ? `Dated events for ${cloud.title}` : "Select a cloud to see its dated events.";
+        if (!cloud) return;
+        if (!cloud.events.length) {
+            message.textContent = "This cloud has no dated events yet.";
+            return;
+        }
+
+        const years = [...new Set(cloud.events.map((event) => event.date.slice(0, 4)))].sort();
+        if (!years.includes(state.timelineYear)) state.timelineYear = years[0];
+        const year = node("timeline-year");
+        year.replaceChildren(...years.map((value) => {
+            const option = element("option", value);
+            option.value = value;
+            return option;
+        }));
+        year.value = state.timelineYear;
+        const events = cloud.events.filter((event) => event.date.startsWith(`${state.timelineYear}-`));
+        const days = [...new Set(events.filter((event) => event.date.length === 10).map((event) => event.date))].sort();
+        if (!days.includes(state.timelineDay)) state.timelineDay = days[0] || "";
+        const day = node("timeline-day");
+        day.replaceChildren(...days.map((value) => {
+            const option = element("option", formatHistoricalDate(value));
+            option.value = value;
+            return option;
+        }));
+        day.value = state.timelineDay;
+        const dayView = state.timelineView === "day";
+        node("timeline-day-label").hidden = !dayView || !days.length;
+        node("timeline-year-view").setAttribute("aria-pressed", String(!dayView));
+        node("timeline-day-view").setAttribute("aria-pressed", String(dayView));
+        list.classList.toggle("kw-timeline-day", dayView);
+
+        if (dayView) {
+            if (!days.length) {
+                message.textContent = "No exact days are recorded for this year. Month-only events are available in Year view.";
+                scroll.hidden = true;
+                return;
+            }
+            message.textContent = "Times are shown as recorded, without time-zone conversion. Events without a time are not placed in a time order.";
+            const sorted = events.filter((event) => event.date === state.timelineDay)
+                .sort((a, b) => (a.time || "99:99").localeCompare(b.time || "99:99"));
+            for (const event of sorted) {
+                const item = element("li");
+                item.append(element("strong", event.time || "Time not recorded"), element("p", event.description));
+                list.append(item);
+            }
+            return;
+        }
+
+        message.textContent = "Month-only events have no recorded day. Times, where provided, are shown as recorded.";
+        const months = [...new Set(events.map((event) => event.date.slice(0, 7)))].sort();
+        for (const month of months) {
+            const item = element("li");
+            item.append(element("strong", formatHistoricalDate(month)));
+            const monthEvents = element("ul");
+            const sorted = events.filter((event) => event.date.startsWith(month))
+                .sort((a, b) => a.date.localeCompare(b.date) || (a.time || "99:99").localeCompare(b.time || "99:99"));
+            for (const event of sorted) {
+                const entry = element("li");
+                const label = event.date.length === 7 ? "Day not recorded" : formatHistoricalDate(event.date);
+                entry.append(element("b", `${label}${event.time ? ` · ${event.time}` : ""}`), element("p", event.description));
+                monthEvents.append(entry);
+            }
+            item.append(monthEvents);
+            list.append(item);
+        }
+    }
+
     function showCloud(cloud, centre) {
+        if (state.selected !== cloud.id) {
+            state.timelineView = "year";
+            state.timelineYear = "";
+            state.timelineDay = "";
+        }
         state.selected = cloud.id;
+        renderTimeline();
         const detail = node("detail");
         detail.replaceChildren(
             element("h2", cloud.title), element("p", cloud.description),
@@ -65,7 +151,7 @@
         );
         if (cloud.events.length) {
             const list = element("ul");
-            cloud.events.forEach((event) => list.append(element("li", `${formatHistoricalDate(event.date)}: ${event.description}`)));
+            cloud.events.forEach((event) => list.append(element("li", `${formatHistoricalDate(event.date)}${event.time ? ` · ${event.time}` : ""}: ${event.description}`)));
             detail.append(element("h3", "Dated events"), list);
         }
         const sources = element("ul");
@@ -114,6 +200,7 @@
     function renderExplore() {
         node("empty").hidden = state.clouds.length !== 0;
         node("clouds").hidden = state.clouds.length === 0;
+        renderTimeline();
         if (!state.clouds.length) return;
         const board = node("board");
         board.replaceChildren();
@@ -134,7 +221,8 @@
     }
 
     const eventFields = [
-        ["date", "Date (MM-YYYY or DD-MM-YYYY)", 10], ["description", "What happened", 500]
+        ["date", "Date (MM-YYYY or DD-MM-YYYY)", 10], ["time", "Time (optional; as recorded)", 5],
+        ["description", "What happened", 500]
     ];
     const sourceFields = [
         ["title", "Source title", 200], ["author", "Author or organisation", 200], ["publicationDate", "Publication date (optional; MM-YYYY or DD-MM-YYYY)", 10],
@@ -198,11 +286,12 @@
         row.append(element("legend", kind === "source" ? "Source" : "Dated event"));
         for (const [key, title, limit] of fields) {
             const label = element("label", title);
-            const input = element(key === "date" || key === "publicationDate" ? "input" : "textarea");
+            const input = element(key === "date" || key === "time" || key === "publicationDate" ? "input" : "textarea");
             if (input.tagName === "TEXTAREA") input.rows = 1;
+            if (key === "time") input.type = "time";
             input.name = key;
             input.maxLength = limit;
-            input.required = key !== "publicationDate";
+            input.required = key !== "publicationDate" && key !== "time";
             input.value = key === "date" || key === "publicationDate" ? formatHistoricalDate(values[key]) : values[key] || "";
             if (key === "date" || key === "publicationDate") input.placeholder = "MM-YYYY or DD-MM-YYYY";
             label.append(input);
@@ -363,7 +452,7 @@
                 element("h4", "Historical significance"), element("p", proposal.significance || "Not provided."),
                 element("h4", "Dated events"));
             const events = element("ul");
-            proposal.events.forEach((event) => events.append(element("li", `${formatHistoricalDate(event.date)}: ${event.description}`)));
+            proposal.events.forEach((event) => events.append(element("li", `${formatHistoricalDate(event.date)}${event.time ? ` · ${event.time}` : ""}: ${event.description}`)));
             card.append(events, element("h4", "Sources supporting the proposed cloud"));
             sourceList(card, proposal.sources);
             card.append(element("h4", "Connection preserved for the student (not published as a kite)"),
@@ -569,6 +658,9 @@
         state.token = token;
         state.clouds = [];
         state.selected = null;
+        state.timelineView = "year";
+        state.timelineYear = state.timelineDay = "";
+        renderTimeline();
         state.editing = null;
         state.editingProposal = null;
         state.proposalParentId = null;
@@ -623,6 +715,14 @@
     node("add-source").addEventListener("click", () => addRow("source", {}, true));
     node("add-event").addEventListener("click", () => addRow("event", {}, true));
     node("search").addEventListener("input", renderSearch);
+    node("timeline-year-view").addEventListener("click", () => { state.timelineView = "year"; renderTimeline(); });
+    node("timeline-day-view").addEventListener("click", () => { state.timelineView = "day"; renderTimeline(); });
+    node("timeline-year").addEventListener("change", (event) => {
+        state.timelineYear = event.target.value;
+        state.timelineDay = "";
+        renderTimeline();
+    });
+    node("timeline-day").addEventListener("change", (event) => { state.timelineDay = event.target.value; renderTimeline(); });
     node("zoom-out").addEventListener("click", () => zoom(state.zoom - .25));
     node("zoom-in").addEventListener("click", () => zoom(state.zoom + .25));
     node("reset").addEventListener("click", () => { zoom(1); node("viewport").scrollTo(0, 0); });

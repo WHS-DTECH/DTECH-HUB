@@ -32,6 +32,22 @@ function date(value, field) {
     return when;
 }
 
+function readEvent(event, allowIncomplete = false) {
+    const when = date(event?.date, "Event date");
+    if (!when && !allowIncomplete) throw problem(400, "Each event needs a date.");
+    const time = text(event?.time ?? "", "Event time", 5, false);
+    if (time && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+        throw problem(400, "Event time must be in HH:MM format.");
+    }
+    if (time && !allowIncomplete && when.length !== 10) {
+        throw problem(400, "Add a full day, month and year when recording an event time.");
+    }
+    return {
+        date: when, description: text(event?.description || "", "Event description", 500, !allowIncomplete),
+        ...(time ? { time } : {})
+    };
+}
+
 function readCloud(body) {
     if (!Array.isArray(body?.sources) || body.sources.length > 20 || !Array.isArray(body.events) || body.events.length > 20) {
         throw problem(400, "Provide up to 20 sources and 20 dated events.");
@@ -53,11 +69,7 @@ function readCloud(body) {
     if (sources.some(({ id }) => typeof id !== "string" || !UUID.test(id)) || new Set(sources.map(({ id }) => id.toLowerCase())).size !== sources.length) {
         throw problem(400, "Source identifiers must be valid and distinct.");
     }
-    const events = body.events.map((event) => {
-        const when = date(event?.date, "Event date");
-        if (!when) throw problem(400, "Each event needs a date.");
-        return { date: when, description: text(event.description, "Event description", 500) };
-    });
+    const events = body.events.map((event) => readEvent(event));
     const { x, y } = body.position || {};
     if (![x, y].every((n) => Number.isInteger(n) && n >= 0 && n <= 3000)) throw problem(400, "Cloud coordinates must be whole numbers from 0 to 3000.");
     if (typeof body.publish !== "boolean") throw problem(400, "Choose whether to save or publish.");
@@ -107,11 +119,7 @@ function readProposal(body, allowIncomplete) {
         throw problem(400, "Add at least one source supporting the proposed connection before submitting.");
     }
     if (body?.events !== undefined && !Array.isArray(body.events)) throw problem(400, "Dated events must be a list.");
-    const events = (body?.events || []).map((event) => {
-        const when = date(event?.date, "Event date");
-        if (!when && !allowIncomplete) throw problem(400, "Each dated event needs a date.");
-        return { date: when, description: text(event?.description || "", "Event description", 500, !allowIncomplete) };
-    });
+    const events = (body?.events || []).map((event) => readEvent(event, allowIncomplete));
     if (events.length > 20) throw problem(400, "Provide up to 20 dated events.");
     const originalCloudId = String(body?.originalCloudId || "");
     if (!UUID.test(originalCloudId)) throw problem(400, "Select a published cloud for the proposed connection.");

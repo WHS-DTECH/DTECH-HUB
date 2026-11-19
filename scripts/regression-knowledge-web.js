@@ -141,7 +141,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
 
         const body = {
             title: "Test-only historical cloud", description: "Test description", significance: "Test significance",
-            events: [{ date: "18-11-2026", description: "Test event" }, { date: "2026-10", description: "Earlier event" }],
+            events: [{ date: "18-11-2026", time: "09:05", description: "Test event" }, { date: "2026-10", description: "Earlier event" }],
             position: { x: 70, y: 120 }, publish: false,
             sources: [{ title: "Test source", author: "Test organisation", publicationDate: "11-2026",
                 reference: "https://example.test/article", supports: "Supports the test event." }]
@@ -153,6 +153,13 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             assert.equal(invalid.status, 400, invalidDate);
             assert.match((await invalid.json()).error, /MM-YYYY or DD-MM-YYYY/);
         }
+        for (const [date, time] of [["18-11-2026", "24:00"], ["18-11-2026", "09:60"],
+            ["18-11-2026", "9:05"], ["11-2026", "09:05"]]) {
+            const invalid = await call("manage/clouds", {
+                method: "POST", body: { ...body, events: [{ date, time, description: "Invalid" }] }
+            });
+            assert.equal(invalid.status, 400, `${date} ${time}`);
+        }
         const created = await call("manage/clouds", { method: "POST", body });
         assert.equal(created.status, 201);
         const { id } = await created.json();
@@ -160,6 +167,8 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         const cloudDraft = find(await list("manage/clouds"));
         assert.equal(cloudDraft.publishedAt, null);
         assert.deepEqual(cloudDraft.events.map((event) => event.date), ["2026-11-18", "2026-10"]);
+        assert.equal(cloudDraft.events[0].time, "09:05");
+        assert.equal(cloudDraft.events[1].time, undefined, "Legacy month-only events have no invented time");
         assert.equal(cloudDraft.sources[0].publicationDate, "2026-11");
         assert.ok(cloudDraft.sources[0].addedAt);
         assert.deepEqual(await list("clouds", true), []);
@@ -179,6 +188,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal(published.sources[0].id, cloudDraft.sources[0].id);
         assert.equal(published.sources[0].addedAt, cloudDraft.sources[0].addedAt);
         assert.equal(published.sources[0].url, "https://example.test/article");
+        assert.deepEqual(published.events, cloudDraft.events, "Event times and legacy events survive publication and restart");
         assert.doesNotMatch(JSON.stringify(published), /teacher@test\.invalid/);
         assert.equal((await call(`manage/clouds/${id}`, { method: "PUT", body: { ...published, publish: false, sources: [] } })).status, 400);
         assert.equal((await list("clouds", true))[0].sources.length, 1);
@@ -187,7 +197,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         const draftBody = {
             intent: "draft", title: "", description: "", significance: "", connection: "",
             originalCloudId: firstPublished.id, sources: [{ title: "Researching this source" }],
-            connectionSources: [], events: [{ date: "", description: "" }]
+            connectionSources: [], events: [{ date: "10-2025", time: "23:59", description: "" }]
         };
         const draftResponse = await call("proposals", { student: true, method: "POST", body: draftBody });
         assert.equal(draftResponse.status, 201);
@@ -202,7 +212,8 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal(draft.revision, 1);
         assert.equal(draft.contributor, "Test Student One");
         assert.equal(draft.sources[0].title, "Researching this source");
-        assert.deepEqual(draft.events, [{ date: "", description: "" }]);
+        assert.deepEqual(draft.events, [{ date: "2025-10", time: "23:59", description: "" }],
+            "An unfinished proposal can retain a time while the student researches the exact day");
         assert.ok(!JSON.stringify(draft).includes("contributorEmail"));
         assert.deepEqual((await (await call("proposals", { account: "student-two@test.invalid" })).json()).proposals, []);
         const secondStudentDraftResponse = await call("proposals", { account: "student-two@test.invalid", method: "POST", body: {
@@ -243,8 +254,18 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             significance: "This topic belongs in computing history.",
             connection: "The events share an underlying relationship described by the cited evidence.",
             sources: [cloudSource], connectionSources: [connectionSource],
-            events: [{ date: "12-10-2025", description: "A significant historical milestone." }]
+            events: [{ date: "12-10-2025", time: "00:00", description: "A significant historical milestone." }]
         };
+        for (const invalidEvent of [
+            { date: "10-2025", time: "12:00", description: "No recorded day" },
+            { date: "12-10-2025", time: "25:00", description: "Invalid time" },
+            { date: "", time: "12:00", description: "No date" }
+        ]) {
+            const invalid = await call(`proposals/${draft.id}`, {
+                student: true, method: "PUT", body: { ...submission, events: [invalidEvent], duplicatesAcknowledged: true }
+            });
+            assert.equal(invalid.status, 400);
+        }
         const duplicateGuard = await call(`proposals/${draft.id}`, { student: true, method: "PUT", body: submission });
         assert.equal(duplicateGuard.status, 409);
         assert.ok((await duplicateGuard.json()).duplicates.some((match) => match.id === id));
@@ -260,6 +281,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal(submitted.sources[0].publicationDate, "2024-02-29");
         assert.equal(submitted.connectionSources[0].publicationDate, "2024-02");
         assert.equal(submitted.events[0].date, "2025-10-12");
+        assert.equal(submitted.events[0].time, "00:00");
         assert.ok(submitted.submittedAt);
         const reviewerList = (await (await call("manage/proposals")).json()).proposals;
         assert.equal(reviewerList.length, 1);
@@ -309,6 +331,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal(approvedCloud.description, "Revised factual description, with an added source explanation.");
         assert.equal(approvedCloud.contributor, "Test Student One");
         assert.equal(approvedCloud.sources[0].supports, cloudSource.supports);
+        assert.deepEqual(approvedCloud.events, submitted.events, "Proposal event time survives review and cloud publication");
         assert.equal((await list("clouds", false)).length, 2, "Another eligible student can see the approved cloud");
         assert.equal(await pool.query("SELECT to_regclass('knowledge_web_kites') AS name").then((result) => result.rows[0].name),
             null, "Phase 2 preserves a draft connection and does not create live kites");
