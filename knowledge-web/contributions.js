@@ -555,25 +555,52 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             }, balloon.idea != null ? `Principle: ${snippet(balloon.principle)}` : snippet(balloon.principleExplanation)));
     }
 
+    let history = [];
+    function renderHistory() {
+        const category = node("history-filter").value;
+        const matches = category ? history.filter(({ kind }) => kind === category) : history;
+        node("history-filter-label").hidden = !history.length;
+        node("history-status").textContent = !history.length
+            ? "No contributions yet. Explore the shared web and add a kite, balloon or connection to get started."
+            : !matches.length ? "No contributions of this type yet."
+                : `${matches.length} ${matches.length === 1 ? "contribution" : "contributions"} · Most recently updated first`;
+        const cards = matches.map((item) => {
+            const row = element("li");
+            const link = element("a");
+            link.className = "kw-history-card";
+            link.href = exploreUrl({ [item.subject || "kite"]: item.subjectId || item.kiteId, item: item.id });
+            const badge = element("span", labels[item.kind]);
+            badge.className = `kw-type kw-type-${item.kind}`;
+            const preview = element("span", item.summary.length > 200 ? `${item.summary.slice(0, 197)}…` : item.summary);
+            preview.className = "kw-history-preview";
+            const date = element("span", `Updated ${formatDate(item.updatedAt)}`);
+            date.className = "kw-history-date";
+            const affordance = element("span", "Open in web →");
+            affordance.className = "kw-history-open";
+            affordance.setAttribute("aria-hidden", "true");
+            const footer = element("span");
+            footer.className = "kw-history-card-footer";
+            footer.append(date, affordance);
+            link.append(badge, preview, footer);
+            row.append(link);
+            return row;
+        });
+        node("contribution-list").replaceChildren(...cards);
+    }
+
+    if (historyPage) node("history-filter").addEventListener("change", renderHistory);
+
     async function refresh() {
         const seq = ++refreshSequence, revision = state.revision;
+        if (historyPage && !history.length) node("history-status").textContent = "Loading your contributions...";
         try {
             const result = historyPage ? await request("contributions") :
                 await Promise.all([request("kites"), request("connections"), request("balloons")]);
             if (revision !== state.revision || seq !== refreshSequence) return;
             if (historyPage) {
-                node("history-status").textContent = "";
                 converted = new Set(result.convertedProposalIds);
-                const host = node("contribution-list");
-                host.replaceChildren();
-                if (!result.contributions.length) host.append(empty());
-                for (const item of result.contributions) {
-                    const row = element("div");
-                    const link = element("a", `${labels[item.kind]}: ${snippet(item.summary)}`);
-                    link.href = exploreUrl({ [item.subject || "kite"]: item.subjectId || item.kiteId, item: item.id });
-                    row.append(link, element("small", ` Updated ${formatDate(item.updatedAt)}`));
-                    host.append(row);
-                }
+                history = result.contributions;
+                renderHistory();
                 if (state.canPropose) onProposalsChanged();
             } else {
                 kites = result[0].kites;
@@ -833,6 +860,9 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         converted: (id) => converted.has(id),
         reset() {
             kites = []; balloons = []; connections = []; converted = new Set(); closeKite();
+            history = [];
+            node("history-filter").value = "";
+            node("history-filter-label").hidden = true;
             mapLocations.clear(); connectionLocations.clear();
             for (const id of ["kite-editor", "kite-status", "kite-map-note", "contribution-list", "history-status", "report-list", "report-status"]) node(id).replaceChildren();
             node("kite-editor").hidden = true;

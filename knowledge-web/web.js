@@ -1049,8 +1049,6 @@
         proposalForm.inert = false;
         node("proposal").hidden = true;
         node("my-proposals").hidden = true;
-        node("export-actions").hidden = true;
-        node("drive-help").hidden = true;
         node("drive-status").textContent = "";
         node("export-pdf").disabled = false;
         node("export-status").textContent = "";
@@ -1088,8 +1086,6 @@
                 if (historyPage) {
                     node("explore-link").hidden = false;
                     node("my-proposals").hidden = !state.canContribute;
-                    node("export-actions").hidden = !state.canContribute;
-                    node("drive-help").hidden = !state.canContribute;
                     node("own-cloud-proposals").hidden = !state.canPropose;
                     if (state.canContribute) void contributions.refresh();
                 } else {

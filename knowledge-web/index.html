@@ -8,7 +8,7 @@
     <title>Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=20">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=21">
 </head>
 <body>
     <div class="page-shell">
@@ -151,26 +151,53 @@
                     </form>
                 </section>
             </section>
-            <section id="web-my-proposals" class="kw-panel" aria-label="My Contributions" hidden>
-                <div id="web-export-actions" class="kw-toolbar-group" hidden>
-                    <button id="web-export-pdf" type="button">Download my contributions PDF</button>
-                    <button id="web-play-replay" class="kw-primary" type="button" aria-expanded="false" aria-controls="web-replay">Replay My Thinking</button>
-                    <button id="web-export-replay" type="button">Download replay HTML</button>
-                    <button id="web-save-drive" type="button" aria-describedby="web-drive-help">Save both to Google Drive</button>
+            <section id="web-my-proposals" class="kw-history" aria-label="My Contributions" hidden>
+                <div id="web-export-actions" class="kw-history-tools">
+                    <section class="kw-panel kw-history-replay" aria-labelledby="web-replay-heading">
+                        <h2 id="web-replay-heading">Watch your web grow</h2>
+                        <p>See how your contributions built up over time, one step at a time.</p>
+                        <button id="web-play-replay" class="kw-primary" type="button" aria-expanded="false" aria-controls="web-replay">Replay My Thinking</button>
+                        <p id="web-replay-status" role="status"></p>
+                    </section>
+                    <section class="kw-panel" aria-labelledby="web-exports-heading">
+                        <h2 id="web-exports-heading">Take your work with you</h2>
+                        <p>Download a copy or save both files to your connected WHS-DTECH folder.</p>
+                        <div class="kw-toolbar-group">
+                            <button id="web-export-pdf" type="button">Download my contributions PDF</button>
+                            <button id="web-export-replay" type="button">Download replay HTML</button>
+                            <button id="web-save-drive" type="button" aria-describedby="web-drive-help">Save both to Google Drive</button>
+                        </div>
+                        <p id="web-drive-help">People with access to your WHS-DTECH folder may be able to view the saved files.</p>
+                        <p id="web-drive-status" role="status"></p>
+                        <p id="web-export-status" role="status"></p>
+                    </section>
                 </div>
-                <p id="web-drive-help" hidden>Saves a new PDF and replay HTML in your connected WHS-DTECH folder. People with access to that folder may be able to view the files.</p>
-                <p id="web-drive-status" role="status"></p>
-                <p id="web-export-status" role="status"></p>
-                <p id="web-replay-status" role="status"></p>
                 <iframe id="web-replay" title="Replay My Thinking player" sandbox="allow-scripts" hidden></iframe>
-                <p id="web-history-status" role="status"></p>
-                <div id="web-own-cloud-proposals" hidden>
-                    <h2>My cloud proposals</h2>
+                <section class="kw-panel" aria-labelledby="web-history-heading">
+                    <div class="kw-history-heading">
+                        <div>
+                            <h2 id="web-history-heading">Your contributions</h2>
+                            <p>Open any card to see your work in the Knowledge Web.</p>
+                        </div>
+                        <label for="web-history-filter" hidden id="web-history-filter-label">Show
+                            <select id="web-history-filter" aria-controls="web-contribution-list">
+                                <option value="">All contributions</option>
+                                <option value="kite">Kites</option>
+                                <option value="balloon">Balloons</option>
+                                <option value="connection">Connections</option>
+                                <option value="comment">Comments</option>
+                                <option value="evidence">Evidence</option>
+                            </select>
+                        </label>
+                    </div>
+                    <p id="web-history-status" role="status"></p>
+                    <ul id="web-contribution-list" class="kw-history-list" aria-label="Contributions, most recently updated first"></ul>
+                </section>
+                <section id="web-own-cloud-proposals" class="kw-panel" aria-labelledby="web-proposals-heading" hidden>
+                    <h2 id="web-proposals-heading">My cloud proposals</h2>
                     <p>Your private drafts, proposal statuses and any teacher revision notes appear here.</p>
                     <div id="web-proposal-list"></div>
-                </div>
-                <h2>My kites, comments and evidence</h2>
-                <div id="web-contribution-list"></div>
+                </section>
             </section>
             <section id="web-manage" aria-label="Manage Knowledge Web" hidden>
                 <p>Drafts are private to teachers. Check the historical details and sources before publishing a cloud to students.</p>
@@ -227,8 +254,8 @@
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="/script.js?v=knowledge-web-2"></script>
-    <script src="/knowledge-web/contributions.js?v=12"></script>
+    <script src="/knowledge-web/contributions.js?v=13"></script>
     <script src="/knowledge-web/layout.js?v=4"></script>
-    <script src="/knowledge-web/web.js?v=27"></script>
+    <script src="/knowledge-web/web.js?v=28"></script>
 </body>
 </html>
