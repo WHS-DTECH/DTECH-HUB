@@ -1,6 +1,7 @@
 "use strict";
 
 const { randomUUID } = require("node:crypto");
+const { buildContributionSets, renderContributionsPdf } = require("./.contributions-pdf");
 
 const kiteSchema = `
 CREATE TABLE IF NOT EXISTS knowledge_web_kites (
@@ -411,21 +412,63 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
     }, teacher));
     }
 
-    function historySql({ root, from, visible, tables }) {
+    function historySql({ root, from, visible, tables }, full = false) {
         const key = `${root}_id`;
+        const content = {
+            kite: "jsonb_build_object('argument',k.argument)",
+            connection: "jsonb_build_object('explanation',k.argument)",
+            balloon: "jsonb_build_object('idea',k.argument,'principle',k.principle,'principleExplanation',k.principle_explanation,'explanation',k.explanation)"
+        };
+        const fields = (expr) => full ? `,${expr} AS content` : "";
         return `SELECT k.id,k.id AS "subjectId",'${root}' AS subject,'${root}' AS kind,${root === "balloon" ? "COALESCE(k.argument,k.principle)" : "k.argument"} AS summary,
-            k.created_at AS "createdAt",k.updated_at AS "updatedAt" ${from} WHERE ${visible} AND k.contributor_email=$1
-            UNION ALL SELECT c.id,k.id,'${root}','comment',c.body,c.created_at,c.updated_at
+            k.created_at AS "createdAt",k.updated_at AS "updatedAt"${fields(content[root])}
+            ${from} WHERE ${visible} AND k.contributor_email=$1
+            UNION ALL SELECT c.id,k.id,'${root}','comment',c.body,c.created_at,c.updated_at${fields("jsonb_build_object('body',c.body,'replyTo',c.reply_to)")}
             ${from} JOIN ${tables.comment} c ON c.${key}=k.id WHERE ${visible} AND c.hidden_at IS NULL AND c.contributor_email=$1
-            UNION ALL SELECT e.id,k.id,'${root}','evidence',e.title,e.created_at,e.updated_at
+            UNION ALL SELECT e.id,k.id,'${root}','evidence',e.title,e.created_at,e.updated_at${fields(`jsonb_build_object(
+                'title',e.title,'reference',e.reference,'author',e.author,'publicationDate',e.publication_date,'supports',e.supports,'stance',e.stance)`)}
             ${from} JOIN ${tables.evidence} e ON e.${key}=k.id WHERE ${visible} AND e.hidden_at IS NULL AND e.contributor_email=$1`;
     }
     app.get(`${base}/contributions`, handler(async (_req, res, { email }) => {
-        const { rows } = await pool.query(`${contributionFamilies.map(historySql).join(" UNION ALL ")} ORDER BY "updatedAt" DESC,id`, [email]);
+        const { rows } = await pool.query(`${contributionFamilies.map((family) => historySql(family)).join(" UNION ALL ")} ORDER BY "updatedAt" DESC,id`, [email]);
         const { rows: converted } = await pool.query("SELECT proposal_id AS id FROM knowledge_web_kites WHERE contributor_email=$1 AND proposal_id IS NOT NULL", [email]);
         res.json({ contributions: rows.map((row) => row.subject === "kite" ? { ...row, kiteId: row.subjectId } : row),
             convertedProposalIds: converted.map(({ id }) => id) });
     }));
+
+    app.get(`${base}/contributions/pdf`, handler(async (req, res, access) => {
+        const name = await nameFor(req, access);
+        // Use one database snapshot for both owned records and their visible relationship context.
+        const { rows: [report] } = await pool.query(`WITH RECURSIVE history AS MATERIALIZED (
+            ${contributionFamilies.map((family) => historySql(family, true)).join(" UNION ALL ")}
+        ), refs(type,id) AS (
+            SELECT subject,"subjectId" FROM history
+            UNION
+            SELECT target.type,target.id FROM refs r
+            LEFT JOIN knowledge_web_kites k ON r.type='kite' AND k.id=r.id
+            LEFT JOIN knowledge_web_balloons b ON r.type='balloon' AND b.id=r.id
+            LEFT JOIN knowledge_web_connections c ON r.type='connection' AND c.id=r.id
+            CROSS JOIN LATERAL (VALUES
+                ('cloud',k.cloud_a),('cloud',k.cloud_b),('cloud',b.origin_cloud),('kite',b.origin_kite),
+                ('cloud',c.first_cloud),('kite',c.first_kite),('balloon',c.first_balloon),
+                ('cloud',c.second_cloud),('kite',c.second_kite),('balloon',c.second_balloon)
+            ) target(type,id) WHERE target.id IS NOT NULL
+        ), context AS (
+            SELECT r.type,r.id,cloud.title,COALESCE(k.contributor_name,b.contributor_name,c.contributor_name) AS contributor,
+                array_remove(ARRAY[k.cloud_a,k.cloud_b,b.origin_cloud,c.first_cloud,c.second_cloud],NULL) AS clouds,
+                array_remove(ARRAY[b.origin_kite,c.first_kite,c.second_kite],NULL) AS kites,
+                array_remove(ARRAY[c.first_balloon,c.second_balloon],NULL) AS balloons
+            FROM refs r
+            LEFT JOIN knowledge_web_clouds cloud ON r.type='cloud' AND cloud.id=r.id
+            LEFT JOIN knowledge_web_kites k ON r.type='kite' AND k.id=r.id
+            LEFT JOIN knowledge_web_balloons b ON r.type='balloon' AND b.id=r.id
+            LEFT JOIN knowledge_web_connections c ON r.type='connection' AND c.id=r.id
+        )
+        SELECT COALESCE((SELECT jsonb_agg(history ORDER BY "createdAt",id) FROM history),'[]') AS records,
+            COALESCE((SELECT jsonb_agg(context ORDER BY type,id) FROM context),'[]') AS context`, [access.email]);
+        const pdf = await renderContributionsPdf({ name, sets: buildContributionSets(report.records, report.context) });
+        res.attachment("knowledge-web-my-contributions.pdf").send(pdf);
+    }, student));
 
     app.get(`${base}/manage/reports`, handler(async (_req, res) => {
         const queries = families.map(({ root, tables, reports }) => {

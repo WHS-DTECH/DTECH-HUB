@@ -795,5 +795,95 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal((await call(`connections/${mixedString}`, { account: studentB })).status, 404);
         assert.deepEqual((await get("connections")).connections.map(({ id }) => id), [opposing]);
         assert.equal((await pool.query("SELECT id FROM knowledge_web_connections WHERE first_balloon IS NULL AND second_balloon IS NULL")).rowCount, 5);
+        await t.test("Authenticated A4 PDFs group only authored records and retain necessary cloud context", async () => {
+            const { PDFParse } = require("pdf-parse");
+            const account = "export-fixture@test.invalid";
+            const foreign = "student-two@test.invalid";
+            const save = async (uri, body, owner = account) => {
+                const res = await post(uri, body, owner);
+                assert.equal(res.status, 201, `${uri} must publish`);
+                return (await res.json()).id;
+            };
+            const exportPdf = async (owner = account) => {
+                const res = await call("contributions/pdf?email=student-two@test.invalid", { account: owner });
+                assert.equal(res.status, 200);
+                assert.match(res.headers.get("content-type"), /^application\/pdf/);
+                assert.match(res.headers.get("content-disposition"), /attachment;.*my-contributions\.pdf/);
+                assert.equal(res.headers.get("cache-control"), "private, no-store");
+                const data = Buffer.from(await res.arrayBuffer());
+                assert.match(data.toString("latin1"), /\/MediaBox \[0 0 595\.28 841\.89\]/);
+                const parser = new PDFParse({ data, verbosity: 0 });
+                try {
+                    const parsed = await parser.getText();
+                    return { text: parsed.text.replace(/-- \d+ of \d+ --/g, "").replace(/\s+/g, " "), pages: parsed.total };
+                } finally {
+                    await parser.destroy();
+                }
+            };
+            const sets = (text) => (text.match(/Contribution set \d+/g) || []).length;
+            assert.equal((await call("contributions/pdf", { account: " " })).status, 401);
+            assert.equal((await call("contributions/pdf", { account: teacher })).status, 403);
+            assert.equal((await call("contributions/pdf", { account: "junior@test.invalid" })).status, 403);
+            assert.equal((await fetch(`${host}/knowledge-web/%2econtributions-pdf.js`)).status, 404);
+            const empty = await exportPdf();
+            assert.match(empty.text, /no visible authored contributions/);
+            assert.equal(sets(empty.text), 0);
+
+            const original = await save("kites", { originCloudId: id, argument: "My first kite in full." });
+            const single = await exportPdf();
+            assert.equal(single.pages, 1);
+            assert.equal(sets(single.text), 1);
+            for (const phrase of [authorName, "Exported", "Created", body.title, "Original attachment", "My first kite in full."]) {
+                assert.ok(single.text.includes(phrase), phrase);
+            }
+
+            const loneBalloon = await save("balloons", balloonBody, "balloon-only@test.invalid");
+            const balloonOnly = await exportPdf("balloon-only@test.invalid");
+            assert.equal(sets(balloonOnly.text), 1);
+            for (const phrase of [body.title, balloonBody.principle, balloonBody.principleExplanation, balloonBody.explanation]) {
+                assert.ok(balloonOnly.text.includes(phrase), phrase);
+            }
+            assert.doesNotMatch(balloonOnly.text, /first kite/);
+            await save("connections", { ...cloudPair, explanation: "My complete two-cloud explanation." }, "connection-only@test.invalid");
+            const connectionOnly = await exportPdf("connection-only@test.invalid");
+            assert.equal(sets(connectionOnly.text), 1);
+            assert.ok(connectionOnly.text.includes(approvedCloud.title));
+            assert.ok(connectionOnly.text.includes(body.title));
+            assert.match(connectionOnly.text, /My complete two-cloud explanation/);
+            assert.doesNotMatch(connectionOnly.text, /Original attachment/);
+
+            const foreignKite = await save("kites", { originCloudId: approvedCloud.id, argument: "Foreign kite must never be copied." }, foreign);
+            const parent = await save(`kites/${foreignKite}/comments`, { body: "Foreign comment must not appear." }, foreign);
+            await save(`kites/${foreignKite}/comments`, { body: "My discussion-only answer.", replyTo: parent }, "discussion-only@test.invalid");
+            const discussionOnly = await exportPdf("discussion-only@test.invalid");
+            assert.equal(sets(discussionOnly.text), 1);
+            assert.match(discussionOnly.text, /Discussion reply.*My discussion-only answer/);
+            assert.match(discussionOnly.text, /Context only: Test Student Two/);
+            assert.doesNotMatch(discussionOnly.text, /Foreign (?:kite|comment)/);
+
+            const long = `${"Preserve this line and its complete wording. ".repeat(80)}Finish with this final sentence.`;
+            await save("kites", { originCloudId: id, argument: long });
+            const ownedBalloon = await save("balloons", balloonBody);
+            await save("balloons", { ...balloonBody, principle: "Second independent principle" });
+            const caught = await save("balloons", { ...balloonBody, origin: kiteNode(foreignKite), principle: "My caught balloon" });
+            await save(`balloons/${caught}/evidence`, { title: "My source", reference: "Written reference",
+                supports: "My complete evidence explanation." });
+            assert.equal(sets((await exportPdf()).text), 5, "A shared cloud does not group independent objects");
+            const linked = await save("connections", connectionBody(kiteNode(original), balloonNode(ownedBalloon), "My actual illustrated link."));
+            const mixed = await exportPdf();
+            assert.equal(sets(mixed.text), 4, "An owned link joins its two owned endpoints into one set");
+            assert.ok(mixed.pages > 1);
+            for (const phrase of [long.trim(), approvedCloud.title, "Context only: Test Student Two", "My caught balloon",
+                "My actual illustrated link.", "My source", "Written reference", "My complete evidence explanation."]) {
+                assert.ok(mixed.text.includes(phrase), phrase.slice(0, 100));
+            }
+            assert.equal((mixed.text.match(/My first kite in full\./g) || []).length, 1);
+            assert.doesNotMatch(mixed.text, /Foreign (?:kite|comment)/);
+            assert.ok((await get("contributions", account)).contributions.some(({ id }) => id === linked), "Export does not mutate contributions");
+            await pool.query("UPDATE knowledge_web_balloons SET hidden_at=NOW() WHERE id=ANY($1::uuid[])", [[ownedBalloon, loneBalloon]]);
+            const moderatedPdf = await exportPdf();
+            assert.doesNotMatch(moderatedPdf.text, /My actual illustrated link/);
+            assert.match((await exportPdf("balloon-only@test.invalid")).text, /no visible authored contributions/);
+        });
         assert.equal((await pool.query("SELECT id FROM knowledge_web_connection_moderation_actions WHERE report_id=$1", [stringReportId])).rowCount, 1);
     });

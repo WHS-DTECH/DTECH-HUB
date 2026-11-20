@@ -67,6 +67,39 @@
         return body;
     }
 
+    async function downloadContributions() {
+        const control = node("export-pdf");
+        const status = node("export-status");
+        const revision = state.revision;
+        control.disabled = true;
+        status.textContent = "Preparing your PDF...";
+        try {
+            const response = await fetch("/api/knowledge-web/contributions/pdf", {
+                headers: withHubAuthHeaders({ Accept: "application/pdf" }, undefined, true),
+                cache: "no-store", signal: AbortSignal.timeout(60000)
+            });
+            if (!response.ok || !response.headers.get("Content-Type")?.startsWith("application/pdf")) {
+                const error = response.headers.get("Content-Type")?.includes("application/json") ? await response.json() : null;
+                throw new Error(error?.error || `Could not download the PDF (${response.status}).`);
+            }
+            const pdf = await response.blob();
+            if (state.revision !== revision) return;
+            const url = URL.createObjectURL(pdf);
+            const link = element("a");
+            link.href = url;
+            link.download = "knowledge-web-my-contributions.pdf";
+            document.body.append(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 30000);
+            status.textContent = "Your PDF is ready.";
+        } catch (error) {
+            if (state.revision === revision) status.textContent = `PDF download failed: ${error.message}`;
+        } finally {
+            if (state.revision === revision) control.disabled = false;
+        }
+    }
+
     function updatePressed() {
         node("results").querySelectorAll("button[data-cloud-id]").forEach((el) =>
             el.setAttribute("aria-pressed", String(el.dataset.cloudId === state.selected)));
@@ -922,6 +955,9 @@
         proposalForm.inert = false;
         node("proposal").hidden = true;
         node("my-proposals").hidden = true;
+        node("export-pdf").hidden = true;
+        node("export-pdf").disabled = false;
+        node("export-status").textContent = "";
         for (const id of ["manage", "explore", "manage-link", "explore-link", "contributions-link", "retry"]) node(id).hidden = true;
         node("status").textContent = token ? "Loading the Knowledge Web..." : "Sign in with your school Google account to open the Knowledge Web.";
         if (!token) return;
@@ -953,6 +989,7 @@
                 if (historyPage) {
                     node("explore-link").hidden = false;
                     node("my-proposals").hidden = !state.canContribute;
+                    node("export-pdf").hidden = !state.canContribute || state.canManage;
                     node("own-cloud-proposals").hidden = !state.canPropose;
                     if (state.canContribute) void contributions.refresh();
                 } else {
@@ -1004,6 +1041,7 @@
         renderSearch();
     });
     node("browse").addEventListener("click", () => showResults(node("search-results").hidden));
+    node("export-pdf").addEventListener("click", downloadContributions);
     node("search").closest(".kw-explore").addEventListener("keydown", (event) => {
         if (event.key !== "Escape" || node("search-results").hidden) return;
         event.preventDefault();
