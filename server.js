@@ -5572,7 +5572,7 @@ function addSearchKitPenguinMission(content) {
 }
 
 function normalizePracticalSkillsKitContentForStorage(kitId, content) {
-  const safeContent = ActivityBlocks.withFilesFoldersLinks(withUnityHubLicence(withShortLoginKit(kitId, withLearningSitesActivity(kitId, withLoginAppsActivity(kitId, withLoginIdentityActivity(kitId, withPasswordProblemsActivity(kitId, content && typeof content === "object" ? content : {})))))));
+  const safeContent = ActivityBlocks.withFilesFoldersLinks(withUnityHubLicence(withShortLoginKit(kitId, withLearningSitesActivity(kitId, withLoginAppsActivity(kitId, withLoginIdentityActivity(kitId, withPasswordProblemsActivity(kitId, content && typeof content === "object" ? content : {})))))), kitId);
   if (String(kitId || "").trim() !== "kit-login") {
     return safeContent;
   }
@@ -5657,7 +5657,7 @@ async function getStoredPracticalSkillsKitContent(kitId) {
       content = addSearchKitPenguinMission(content);
       if (stored) memoryPracticalSkillsKitContent.set(safeKitId, content);
     }
-    return ActivityBlocks.withFilesFoldersLinks(withUnityHubLicence(withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content)))))));
+    return ActivityBlocks.withFilesFoldersLinks(withUnityHubLicence(withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content)))))), safeKitId);
   }
 
   await ensurePracticalSkillsKitContentSchema();
@@ -5666,7 +5666,7 @@ async function getStoredPracticalSkillsKitContent(kitId) {
   const defaults = getDefaultPracticalSkillsKitContent(safeKitId);
   if (!stored || !Object.keys(stored).length) {
     const content = safeKitId === "kit-google-search" ? addSearchKitPenguinMission(defaults) : defaults;
-    return ActivityBlocks.withFilesFoldersLinks(withUnityHubLicence(withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content)))))));
+    return ActivityBlocks.withFilesFoldersLinks(withUnityHubLicence(withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content)))))), safeKitId);
   }
 
   let merged = { ...defaults, ...stored };
@@ -5683,7 +5683,7 @@ async function getStoredPracticalSkillsKitContent(kitId) {
       );
     }
   }
-  const unityContent = ActivityBlocks.withFilesFoldersLinks(withUnityHubLicence(merged));
+  const unityContent = ActivityBlocks.withFilesFoldersLinks(withUnityHubLicence(merged), safeKitId);
   if (unityContent !== merged) {
     merged = unityContent;
     await pool.query(
@@ -15390,7 +15390,11 @@ async function getTeacherKitClassData() {
 }
 require("./practical-skills/teacher-results-store").registerTeacherResults(app, {
   pool, requireAdminAccess, schoolDomain: SCHOOL_EMAIL_DOMAIN, getDefaultPracticalSkillsKitContent,
-  getClassData: getTeacherKitClassData
+  getClassData: getTeacherKitClassData,
+  blueprintReview: {
+    loadContent: (kitId) => documentVerification.loadContent(kitId),
+    withoutUnreviewedBlueprintTicks: (row, content) => documentVerification.withoutUnreviewedBlueprintTicks(row, content)
+  }
 });
 
 app.get("/api/admin/practical-skills/preview-users", requireAdminAccess, async (_req, res) => {
@@ -15488,8 +15492,9 @@ async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = n
   if (kitId === "kit-google-search") row = await recoverSearchKitCompletion(studentEmail, kitId, kitContent, row);
   for (const index of indexes) {
     const explicitDocumentCheck = index === String(recheckDocumentIndex);
-    if (row.certificate_revoked_at && !row.completed && !explicitDocumentCheck) continue;
     const activity = kitContent.activities?.[Number(index)];
+    const blueprint = activity?.documentCheck && activity.documentCheck === ActivityBlocks.BLUEPRINT_REVIEW_POLICY;
+    if (row.certificate_revoked_at && !row.completed && !explicitDocumentCheck && !blueprint) continue;
     if (activity?.completionMode !== "auto" || ActivityBlocks.specialised(activity)) continue;
     const documents = {};
     for (const block of (activity.blocks || []).filter((b) => b.kind === "document" && b.required)) {
@@ -15500,7 +15505,8 @@ async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = n
     const grade = ActivityBlocks.grade(activity, ActivityBlocks.savedAnswers(activity, index, row.responses), documents,
       { content: kitContent, index, responses: row.responses, documentVerification: verification });
     if (grade.passed !== Boolean(row.completed_activities?.[index])) {
-      row = await setPracticalSkillsActivityCompletion(studentEmail, kitId, Number(index), grade.passed, { passive: !explicitDocumentCheck });
+      row = await setPracticalSkillsActivityCompletion(studentEmail, kitId, Number(index), grade.passed,
+        { passive: !explicitDocumentCheck && !(blueprint && !grade.passed) });
     }
   }
   if (!indexes.length) return row;
@@ -15610,10 +15616,14 @@ app.get("/api/practical-skills/my-progress", async (req, res) => {
         await Promise.all(definitions.slice(index, index + 4).map((kit) => syncPracticalSkillsKitCompletion(studentEmail, kit.id)));
       }
     }
-    const [rows, name] = await Promise.all([
+    let [rows, name] = await Promise.all([
       getAllPracticalSkillsProgressRows(studentEmail),
       getPracticalSkillsStudentName(req)
     ]);
+    if (deferred && hasDatabase) {
+      rows = await Promise.all(rows.map((row) => row.completed && row.kit_id === MINECRAFT_BUILDER_KIT
+        ? documentVerification.withoutUnreviewedBlueprintTicks(row) : row));
+    }
     res.json({ ...await buildPracticalSkillsLicenceSnapshot(rows, visibleKits, manager),
       minecraftAccess: minecraftAccess && rows.some((row) => row.kit_id === MINECRAFT_PLAYER_KIT && row.completed === true)
         ? { builderLocked: false, hubPaused: false } : minecraftAccess,
@@ -15719,6 +15729,12 @@ async function sendKitCertificateEmail(studentEmail, kitId, certificate) {
     ? (await pool.query("SELECT completed, completed_at FROM practical_skills_progress WHERE student_email=$1 AND kit_id=$2", [studentEmail, kitId])).rows[0]
     : memoryPracticalSkillsProgress.get(`${normalizeEmail(studentEmail)}:${kitId}`);
   if (!current?.completed || !current.completed_at) throw Object.assign(new Error("This kit completion has been reset. No certificate was sent."), { status: 409 });
+  if (kitId === "kit-minecraft-builder-kit") {
+    const refreshed = await getPracticalSkillsCertificate({}, kitId, studentEmail);
+    if (!refreshed || refreshed.completedAt !== certificate.completedAt) {
+      throw Object.assign(new Error("The Blueprint Mission needs a current teacher-reviewed completion. No certificate was sent."), { status: 409 });
+    }
+  }
   if (new Date(current.completed_at).getTime() !== Date.parse(certificate.completedAt)) {
     throw Object.assign(new Error("This certificate has been replaced. No old certificate was sent."), { status: 409 });
   }
@@ -16441,7 +16457,7 @@ app.get("/api/practical-skills/kit-content/:kitId", async (req, res) => {
 });
 
 // Emails DTECH-HUB Lead Teachers a Teacher Review link when a student submits a teacher-ticked activity.
-async function notifyKitSubmission({ studentEmail, kitId, url, subject }) {
+async function notifyKitSubmission({ studentEmail, kitId, url, subject, blueprint = false }) {
   if (!smtpTransporter || !SMTP_FROM) return false;
   const recipients = (await getPracticalSkillsCertificateTeacherRecipients()).filter((email) => email !== normalizeEmail(studentEmail));
   if (!recipients.length) return false;
@@ -16453,7 +16469,7 @@ async function notifyKitSubmission({ studentEmail, kitId, url, subject }) {
   await sendConfiguredHubEmail({
     to: recipients,
     subject: `${String(subject).replace(/[\r\n]+/g, " ")} - ${String(name).replace(/[\r\n]+/g, " ")}`,
-    html: `<div style="font-family:Arial,sans-serif;color:#173858;"><p><strong>${safe(name)}</strong> (${safe(studentEmail)}) submitted <strong>${safe(subject)}</strong>.</p><p><a href="${safe(url)}">Open the submitted drawing</a></p><p><a href="${safe(review)}">Open Teacher Review</a> to tick Completed in the Class Kit Completion submissions list.</p></div>`,
+    html: `<div style="font-family:Arial,sans-serif;color:#173858;"><p><strong>${safe(name)}</strong> (${safe(studentEmail)}) submitted <strong>${safe(subject)}</strong>.</p><p><a href="${safe(url)}">Open the submitted ${blueprint ? "slideshow" : "drawing"}</a></p><p><a href="${safe(review)}">Open Teacher Review</a> to tick Completed in the Class Kit Completion submissions list.</p></div>`,
         emailType: "kit_submission"
       });
       return true;

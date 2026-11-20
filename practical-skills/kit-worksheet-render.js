@@ -831,6 +831,8 @@
                     : content.completionMode === "auto"
                         ? content.documentCheck === "google-drawing-teacher-v1"
                             ? "Teacher-Completed: save your Google Drawing's sharing link, then press Submit. Your teacher is emailed the link, reviews your drawing and ticks Completed. Use a different drawing for each activity."
+                            : content.documentCheck === "blueprint-slideshow-teacher-v1"
+                            ? "Teacher-Completed: save your slideshow sharing link and select Submit to Teacher. The activity is complete only after your teacher reviews it and ticks Completed."
                             : content.shareLinkCompletion
                             ? "Auto-Completed: paste your finished drawing's HTTPS Share Link. The link saves automatically and earns your activity tick. Drawing contents and sharing permissions are not checked."
                             : content.documentCheck

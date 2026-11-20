@@ -209,18 +209,21 @@
         const selfMarking = Boolean(activity?.assessment || activity?.identityLessonVersion ||
             activity?.questionAutoMarkAssessmentId || activity?.researchReport || siteQuestions);
         const autoBlocks = activity?.completionMode === "auto" && !window.ActivityBlocks.specialised(activity);
-        const teacherReview = activity?.documentCheck === "google-drawing-teacher-v1";
-        const linkBlock = teacherReview ? activity.blocks?.find((block) => block.kind === "studentlink") : null;
+        const blueprint = activity?.documentCheck === "blueprint-slideshow-teacher-v1";
+        const teacherReview = blueprint || activity?.documentCheck === "google-drawing-teacher-v1";
+        const linkBlock = teacherReview ? (blueprint ? window.ActivityBlocks.reviewLinkBlock(activity) : activity.blocks?.find((block) => block.kind === "studentlink")) : null;
         const currentKey = linkBlock ? window.ActivityBlocks.documentLinkKey(
             window.ActivityBlocks.savedAnswers(activity, index, state.responses)[linkBlock.id]) : "";
         const submitted = !preview && Boolean(currentKey) && state.submissions?.[index]?.documentKey === currentKey;
-        const filed = state.drawingFiling?.[currentKey]?.filed === true;
-        const drawingStatus = filed ? "Submitted - synced" : "Saved - sync needed";
+        const filed = !blueprint && state.drawingFiling?.[currentKey]?.filed === true;
+        const received = blueprint ? submitted : filed;
+        const submissionStatus = blueprint ? (submitted ? "Awaiting teacher review" : "Saved - not submitted")
+            : filed ? "Submitted - synced" : "Saved - sync needed";
         pill.textContent = completed ? autoBlocks && !teacherReview ? "Auto-Completed" : "Completed"
-            : teacherReview && currentKey ? drawingStatus : "Not Completed";
+            : teacherReview && currentKey ? submissionStatus : "Not Completed";
         pill.classList.toggle("is-complete", completed);
-        pill.classList.toggle("is-submitted", !completed && teacherReview && filed);
-        pill.classList.toggle("is-saved", !completed && teacherReview && Boolean(currentKey) && !filed);
+        pill.classList.toggle("is-submitted", !completed && teacherReview && received);
+        pill.classList.toggle("is-saved", !completed && teacherReview && Boolean(currentKey) && !received);
         if (completed) {
             pill.setAttribute("href", `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}`);
             pill.setAttribute("aria-label", "Completed - return to kit activity menu");
@@ -230,9 +233,11 @@
             pill.removeAttribute("aria-label");
             pill.removeAttribute("title");
         }
-        button.textContent = teacherReview ? filed ? "Submitted - synced" : submitted || completed ? "Sync drawing" : "Submit" : activity?.documentCheck ? "Check my document" : activity?.unityTestProjectVersion ? "Completed" : autoBlocks ? "Check & Save Activity" : completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
+        button.textContent = blueprint ? completed ? "Completed" : submitted ? "Submitted to Teacher" : "Submit to Teacher"
+            : teacherReview ? filed ? "Submitted - synced" : submitted || completed ? "Sync drawing" : "Submit" : activity?.documentCheck ? "Check my document" : activity?.unityTestProjectVersion ? "Completed" : autoBlocks ? "Check & Save Activity" : completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
         button.classList.toggle("is-submit", teacherReview);
-        button.disabled = preview || !state.progressLoaded || Boolean(state.documentCheckInProgress) || (teacherReview && filed);
+        button.disabled = preview || !state.progressLoaded || Boolean(state.documentCheckInProgress) ||
+            (blueprint ? submitted || completed || !currentKey : teacherReview && filed);
         button.hidden = !preview && selfMarking && !siteQuestions && !completed;
     }
 
@@ -276,7 +281,9 @@
         showStatusMessage("Saving activity answers...");
         const documentStatus = document.getElementById("worksheet-document-check-status");
         if (documentStatus) documentStatus.textContent = isTeacherReview(activity)
-            ? "Answers changed. If you changed your Share Link, press Submit again so your teacher sees the new drawing."
+            ? activity.documentCheck === "blueprint-slideshow-teacher-v1"
+                ? "If you changed the slideshow link, select Submit to Teacher again."
+                : "Answers changed. If you changed your Share Link, press Submit again so your teacher sees the new drawing."
             : "Answers changed. Save them and check the current document before relying on an earlier result.";
         state.blockSaveTimerId = window.setTimeout(() => {
             checkBlockAnswers(index).catch((error) => showStatusMessage(error.message, true));
@@ -287,6 +294,13 @@
         const host = document.getElementById("worksheet-document-check-status");
         if (!host) return;
         const when = (value) => new Date(value).toLocaleString("en-NZ");
+        if (state.content?.activities?.[getCurrentActivityIndex()]?.documentCheck === "blueprint-slideshow-teacher-v1") {
+            host.textContent = (verification?.feedback?.message || (submission
+                ? `Submitted ${when(submission.submittedAt)}. Your teacher will review the slideshow and tick Completed.`
+                : "Paste your slideshow sharing link and select Submit to Teacher.")) +
+                (teacherComment ? ` Teacher feedback: ${teacherComment}` : "");
+            return;
+        }
         if (isTeacherReview(state.content?.activities?.[getCurrentActivityIndex()])) {
             const index = getCurrentActivityIndex();
             const activity = state.content.activities[index];
@@ -314,6 +328,7 @@
         if (preview || !state.progressLoaded) throw new Error("Open the live activity after your progress has loaded.");
         if (state.documentCheckInProgress) throw new Error("Your submission is already being sent. Please wait.");
         const email = state.email;
+        const blueprint = state.content?.activities?.[index]?.documentCheck === "blueprint-slideshow-teacher-v1";
         window.clearTimeout(state.blockSaveTimerId);
         window.clearTimeout(state.saveTimerId);
         state.documentCheckInProgress = true;
@@ -321,12 +336,12 @@
         updateActivityCompleteBar();
         try {
             // Started before other awaits so the Google permission popup keeps the Submit click's user gesture.
-            const driveAccessToken = await getResearchReportDriveToken();
+            const driveAccessToken = blueprint ? "" : await getResearchReportDriveToken();
             await checkBlockAnswers(index);
             const revision = state.blockRevision;
             return await queueProgressWrite(async () => {
                 if (getSignedInEmail() !== email || revision !== state.blockRevision) throw new Error("Your account or answers changed. Press Submit again.");
-                showStatusMessage("Submitting your drawing to your teacher...");
+                showStatusMessage(blueprint ? "Submitting your slideshow to your teacher..." : "Submitting your drawing to your teacher...");
                 const result = await loadJson(`${blockPath(index)}/submit`, {
                     method: "POST", headers: withAuthHeaders({ "Content-Type": "application/json" }, true),
                     body: JSON.stringify(driveAccessToken ? { driveAccessToken } : {})
@@ -336,6 +351,10 @@
                 if (result.filing?.documentKey) state.drawingFiling[result.filing.documentKey] = result.filing;
                 updateActivityCompleteBar();
                 showDocumentVerification(result.verification, result.submission, result.teacherComment);
+                if (blueprint) {
+                    showStatusMessage("Slideshow submitted. Your teacher will review it and mark the activity Completed.");
+                    return result;
+                }
                 const filing = result.filing || {};
                 const filed = filing.filed ? Array.isArray(filing.path) ? ` Your drawing is filed in ${filing.path.join(" > ")}.` : " Your drawing is filed in your DTECH folder."
                     : filing.reason === "not-owner" ? " This drawing belongs to someone else, so it wasn't moved to your folder."
@@ -404,22 +423,25 @@
     }
 
     function isTeacherReview(activity) {
-        return activity?.documentCheck === "google-drawing-teacher-v1";
+        return activity?.documentCheck === "google-drawing-teacher-v1" || activity?.documentCheck === "blueprint-slideshow-teacher-v1";
     }
 
     function renderDocumentCheck(host, index) {
         const section = document.createElement("section");
         section.className = "sites-card";
-        const drawing = isTeacherReview(state.content.activities[index]);
+        const activity = state.content.activities[index];
+        const teacherReview = isTeacherReview(activity);
+        const blueprint = activity.documentCheck === "blueprint-slideshow-teacher-v1";
+        const drawing = teacherReview && !blueprint;
         const title = document.createElement("h3");
-        title.textContent = drawing ? "Submit your Google Drawing"
+        title.textContent = blueprint ? "Submit your Blueprint Mission slideshow" : drawing ? "Submit your Google Drawing"
             : `Finish your ${state.content.worksheets?.[index]?.activity || "typed"} document`;
         const help = document.createElement("p");
-        help.textContent = drawing
+        help.textContent = blueprint ? "Paste the slideshow sharing link and select Submit to Teacher. Saving the link alone does not complete the activity. Your teacher will open the slideshow and tick Completed." : drawing
             ? "Save your Google Drawing's sharing link, then press Submit below and allow Google permission. Saved means sync is still needed; Submitted means your drawing has been filed in your DTECH folder. Your teacher receives your link and ticks Completed separately."
             : "Save your document and its sharing link, then use Check my document below. Google Docs and Word (.docx) files in Google Drive can be checked automatically. For other file types or OneDrive, ask your teacher to open the link and approve the completed text in Teacher Review.";
         const note = document.createElement("p");
-        note.textContent = drawing
+        note.textContent = blueprint ? "Set sharing so your teacher can open the slideshow. If you replace the link, submit the new slideshow for review." : drawing
             ? "Set sharing so your teacher can open the drawing. If you change to a different drawing link, press Submit again."
             : "This checks that the expected passage is substantially present. It cannot prove you typed it yourself, check formatting, or confirm your teacher's sharing access. A saved result is a check at that time, not continuous monitoring. After editing the document, check again.";
         const status = document.createElement("p");
@@ -428,14 +450,14 @@
         section.append(title, help, note, status);
         host.append(section);
         if (preview || !state.email || !state.progressLoaded) {
-            status.textContent = drawing ? "Submitting is available only in the live activity after signing in." : "Document checking is available only in the live activity after signing in.";
+            status.textContent = teacherReview ? "Submitting is available only in the live activity after signing in." : "Document checking is available only in the live activity after signing in.";
             return;
         }
         const email = state.email, revision = state.blockRevision;
-        loadJson(`${blockPath(index)}/document-check`, { headers: withAuthHeaders({}, drawing), cache: "no-store" })
+        loadJson(`${blockPath(index)}/document-check`, { headers: withAuthHeaders({}, teacherReview), cache: "no-store" })
             .then((result) => {
                 if (!status.isConnected || email !== getSignedInEmail() || revision !== state.blockRevision) return;
-                if (drawing) {
+                if (teacherReview) {
                     if (result.filing) state.drawingFiling[result.filing.documentKey] = result.filing;
                     if (result.submission) state.submissions[index] = result.submission;
                     else delete state.submissions[index];
@@ -981,7 +1003,7 @@
                 window.clearTimeout(state.saveTimerId);
                 window.clearTimeout(state.blockSaveTimerId);
                 const activity = state.content?.activities?.[index];
-                if (activity?.documentCheck === "google-drawing-teacher-v1") {
+                if (isTeacherReview(activity)) {
                     await submitForReview(index);
                     return;
                 }

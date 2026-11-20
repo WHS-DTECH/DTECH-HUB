@@ -776,7 +776,7 @@ test("class review keeps whānau and timetable homerooms separate and combines f
 test("submissions list follows the class filters, links drawings and saves teacher Completed ticks", async () => {
     const reviewHtml = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "teacher-results.html"), "utf8");
     assert.match(reviewHtml, /<select id="class-submission-status-filter" aria-describedby="class-submission-status-filter-help">/);
-    assert.match(reviewHtml, /<option value="saved">Saved - sync needed<\/option>/);
+    assert.match(reviewHtml, /<option value="saved">Saved - not submitted or sync needed<\/option>/);
     assert.match(reviewHtml, /<option value="awaiting-completion">Submitted - not ticked Completed<\/option>/);
     function element() {
         return {
@@ -902,6 +902,31 @@ test("submissions list follows the class filters, links drawings and saves teach
     el("class-kit-filter").value = "kit-login";
     el("class-kit-filter").events.change();
     assert.equal(host.children.length, 0, "Submissions follow the kit filter");
+    const builder = "kit-minecraft-builder-kit";
+    kits.push({ id: builder, title: "Minecraft Builder Kit" });
+    const slides = "https://docs.google.com/presentation/d/synthetic-slideshow/edit";
+    submissions.kits.push({
+        id: builder, activities: [{ index: 0, title: "The Blueprint Mission", submissionType: "slideshow" }],
+        students: {
+            "ana@school.nz": { 0: { url: slides, documentKey: "google-file:synthetic-slideshow", submittedAt: "2026-05-04T00:00:00Z", filed: false } },
+            "ben@school.nz": { 0: { url: slides, documentKey: "google-file:synthetic-slideshow", submittedAt: null, filed: false } }
+        }
+    });
+    await el("class-progress-refresh").events.click();
+    el("class-kit-filter").value = builder;
+    el("class-kit-filter").events.change();
+    assert.equal(rows()[0].children[2].children[0].href, slides);
+    assert.match(rows()[0].children[2].children[1].textContent, /^Submitted to Teacher /);
+    assert.equal(rows()[1].children[3].children[0].children[0].disabled, true, "A saved slideshow cannot be approved");
+    el("class-submission-status-filter").value = "awaiting-completion";
+    el("class-submission-status-filter").events.change();
+    assert.deepEqual(rows().map((row) => row.children[0].textContent), ["Ana"], "Slideshow review does not depend on Drive filing");
+    const blueprintTick = rows()[0].children[3].children[0].children[0];
+    blueprintTick.checked = true;
+    await blueprintTick.events.change();
+    assert.deepEqual(puts.at(-1), { url: `/api/admin/kit-document-review/${builder}/0`,
+        body: { email: "ana@school.nz", documentKey: "google-file:synthetic-slideshow", approved: true } });
+    assert.match(el("submission-status").textContent, /Ticked Completed for Ana - The Blueprint Mission/);
 });
 
 test("read-only review suppresses the shared sidebar's mutating progress fetch", async () => {

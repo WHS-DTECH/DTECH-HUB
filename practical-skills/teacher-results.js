@@ -203,7 +203,7 @@
         const data = classData;
         if (pendingSubmissions.size) {
             submissionStatus.classList.add("is-error");
-            submissionStatus.textContent = "Wait for the current drawing review to finish saving.";
+            submissionStatus.textContent = "Wait for the current submission review to finish saving.";
             return;
         }
         const key = `${student.email}:${kit.id}:${activity.index}`;
@@ -221,6 +221,7 @@
             if (!response.ok) throw new Error(saved.error || `Could not save Completed (${response.status}).`);
             if (classData !== data) return;
             entry.completed = saved.verification?.passed === true;
+            if (activity.submissionType === "slideshow" && !checked) entry.submittedAt = null;
             submissionStatus.textContent = saved.kitCompleted && entry.completed
                 ? `Ticked Completed for ${student.name} - ${activity.title}. All activities are complete: the kit is marked complete and the certificate is emailed as normal.`
                 : `${entry.completed ? "Ticked" : "Removed"} Completed for ${student.name} - ${activity.title}. Refresh the list to update kit completion.`;
@@ -237,7 +238,7 @@
         const data = classData;
         if (pendingSubmissions.size) {
             submissionStatus.classList.add("is-error");
-            submissionStatus.textContent = "Wait for the current drawing review to finish saving.";
+            submissionStatus.textContent = "Wait for the current submission review to finish saving.";
             return;
         }
         const key = `${student.email}:${kit.id}:${activity.index}`;
@@ -281,8 +282,9 @@
                 kit.activities.some((activity) => {
                     const entry = kit.students?.[String(student.email || "").toLowerCase()]?.[activity.index];
                     if (!entry?.url) return false;
-                    if (selectedSubmissionStatus === "saved") return entry.filed !== true;
-                    if (selectedSubmissionStatus === "awaiting-completion") return entry.filed === true && entry.completed !== true;
+                    const received = activity.submissionType === "slideshow" ? Boolean(entry.submittedAt) : entry.filed === true;
+                    if (selectedSubmissionStatus === "saved") return !received;
+                    if (selectedSubmissionStatus === "awaiting-completion") return received && entry.completed !== true;
                     return true;
                 })) : students;
             if (!kitStudents.length) {
@@ -303,14 +305,18 @@
                 node("td", student.homeroom || "Not recorded", row);
                 for (const activity of kit.activities) {
                     const entry = kit.students?.[String(student.email || "").toLowerCase()]?.[activity.index];
+                    const slideshow = activity.submissionType === "slideshow";
+                    const received = slideshow ? Boolean(entry?.submittedAt) : entry?.filed === true;
                     const linkCell = node("td", undefined, row);
                     if (entry?.url) {
                         const link = node("a", `Open ${activity.title}`, linkCell);
                         link.href = entry.url;
                         link.target = "_blank";
                         link.rel = "noopener noreferrer";
-                        node("div", `${entry.filed === true ? "Submitted - synced" : "Saved - sync needed"}${entry.submittedAt ? ` ${date(entry.submittedAt)}` : ""}`, linkCell,
-                            entry.filed === true ? "submission-submitted" : "submission-saved");
+                        const state = slideshow ? (received ? "Submitted to Teacher" : "Saved - not submitted")
+                            : (received ? "Submitted - synced" : "Saved - sync needed");
+                        node("div", `${state}${entry.submittedAt ? ` ${date(entry.submittedAt)}` : ""}`, linkCell,
+                            received ? "submission-submitted" : "submission-saved");
                     } else node("span", "No link", linkCell, "submission-note");
                     if (entry?.documentKey) {
                         const commentLabel = node("label", "Teacher feedback", linkCell);
@@ -329,7 +335,7 @@
                     const checkbox = node("input", undefined, label);
                     checkbox.type = "checkbox";
                     checkbox.checked = entry?.completed === true;
-                    checkbox.disabled = !entry?.documentKey || pendingSubmissions.size > 0;
+                    checkbox.disabled = !entry?.documentKey || (slideshow && !received) || pendingSubmissions.size > 0;
                     checkbox.setAttribute("aria-label", `Completed for ${student.name} - ${activity.title}`);
                     node("span", checkbox.checked ? " Completed" : " No", label);
                     checkbox.addEventListener("change", () => saveSubmissionCompleted(student, { id: kit.id }, activity, entry, checkbox.checked));
@@ -842,7 +848,9 @@
                 const section = node("section", undefined, card, "results-activity");
                 node("h3", `${index + 1}. ${worksheet.activity}`, section);
                 const tick = node("p", `Tick: ${date(progress.completed_activities?.[index])} | Completion rule: ${activity?.completionMode === "auto" ? "Automatic" : "Manual / specialised activity"}`, section);
-                if (activity?.documentCheck === "google-drawing-teacher-v1") {
+                if (activity?.documentCheck === "blueprint-slideshow-teacher-v1") {
+                    node("p", "Open the slideshow and tick Completed under Submissions in Class Kit Progress.", section);
+                } else if (activity?.documentCheck === "google-drawing-teacher-v1") {
                     renderDocumentReview(section, data.kitId, index, student.email, tick, true);
                 } else if (activity?.documentCheck) {
                     renderDocumentReview(section, data.kitId, index, student.email, tick, false, worksheet.activity || "Typed");

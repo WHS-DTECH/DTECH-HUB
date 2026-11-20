@@ -38,7 +38,7 @@
         <div class="class-progress-heading">
           <div>
             <h2>Class Kit Completion</h2>
-            <p>See which active Licence Kits students have completed. Tick Chocolate when given; unchecked means No. Changes save automatically. Submitted drawings are listed under the table: open each link and tick Completed when the work is done. If Google verification has expired, allow the Google sign-in window to renew it; keep the same school account selected.</p>
+            <p>See which active Licence Kits students have completed. Tick Chocolate when given; unchecked means No. Changes save automatically. Submitted drawings and Blueprint Mission slideshows are listed under the table: open each link and tick Completed when the work is done. If Google verification has expired, allow the Google sign-in window to renew it; keep the same school account selected.</p>
           </div>
           <button id="class-progress-refresh" class="button button-primary" type="button">Refresh list</button>
         </div>
@@ -121,17 +121,18 @@
           <div id="class-typing-table-host" class="class-progress-table-host" tabindex="0" role="region" aria-label="Typing kit weekly results table"></div>
         </section>
         <p>Drawing links: Saved - sync needed means the link is saved but filing is not confirmed. Submitted - synced means DTECH-HUB successfully filed the drawing in the student's DTECH folder. Completed is the separate teacher review tick. Syncing does not change Google sharing permissions.</p>
-        <p>Enter feedback beside each drawing and select Save feedback. The student sees it in that drawing's activity. Feedback is separate from the Completed tick and is linked to the current drawing; save or clear it before refreshing the page.</p>
+        <p>Blueprint Mission: Saved - not submitted means the student still needs to select Submit to Teacher. The slideshow stays in its current location.</p>
+        <p>Enter feedback beside a link and select Save feedback. The student sees it in the activity. Feedback is separate from the Completed tick and is linked to the current submission; save or clear it before refreshing the page.</p>
         <div class="class-progress-filters">
           <label class="sites-field">Submission status
             <select id="class-submission-status-filter" aria-describedby="class-submission-status-filter-help">
               <option value="">All submissions</option>
-              <option value="saved">Saved - sync needed</option>
+              <option value="saved">Saved - not submitted or sync needed</option>
               <option value="awaiting-completion">Submitted - not ticked Completed</option>
             </select>
           </label>
         </div>
-        <p id="class-submission-status-filter-help">A student is shown when any drawing in a kit matches the selected status.</p>
+        <p id="class-submission-status-filter-help">A student is shown when any submission in a kit matches the selected status.</p>
         <p id="submission-status" role="status" aria-live="polite"></p>
         <div id="class-submissions-host" class="class-submissions-host"></div>
       </div>
@@ -149,6 +150,6 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="../script.js?v=teacher-review-refresh-1"></script>
   <script src="./typing-week-labels.js?v=1"></script>
-  <script src="./teacher-results.js?v=27"></script>
+  <script src="./teacher-results.js?v=28"></script>
 </body>
 </html>

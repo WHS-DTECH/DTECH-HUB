@@ -3,9 +3,10 @@ const B = require("./activity-blocks");
 const { PASSAGES, checkPassage } = require("./passage-check");
 const mammoth = require("mammoth");
 const DRAWING_POLICY = B.GOOGLE_DRAWING_POLICY;
-const POLICIES = new Set([...Object.keys(PASSAGES), DRAWING_POLICY]);
+const BLUEPRINT_POLICY = B.BLUEPRINT_REVIEW_POLICY;
+const POLICIES = new Set([...Object.keys(PASSAGES), DRAWING_POLICY, BLUEPRINT_POLICY]);
 // Policies that only a teacher can pass; students Submit instead of running an automatic check.
-const TEACHER_ONLY = new Set([DRAWING_POLICY]);
+const TEACHER_ONLY = new Set([DRAWING_POLICY, BLUEPRINT_POLICY]);
 
 function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
     syncCompletion, getRequestUserEmail, normalizeEmail, schoolDomain, verifyDriveTokenForStudent,
@@ -83,7 +84,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
         for (const row of saved) {
             const kit = await content(row.kit_id);
             (kit?.activities || []).forEach((activity, index) => {
-                if (!TEACHER_ONLY.has(activity?.documentCheck)) return;
+                if (activity?.documentCheck !== DRAWING_POLICY) return;
                 const { documentKey } = submission(activity, index, row.responses || {});
                 if (documentKey) candidates.push({ kitId: row.kit_id, index, documentKey });
             });
@@ -95,7 +96,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             const kit = await content(item.kitId);
             const worksheet = kit?.worksheets?.[item.index];
             if (!worksheet || worksheet.hidden || worksheet.mergedInto !== undefined ||
-                !TEACHER_ONLY.has(kit.activities?.[item.index]?.documentCheck)) continue;
+                kit.activities?.[item.index]?.documentCheck !== DRAWING_POLICY) continue;
             seen.add(item.documentKey);
             pending.push({ kitId: item.kitId, index: item.index, documentKey: item.documentKey, title: worksheet.activity || `Activity ${item.index + 1}` });
         }
@@ -120,7 +121,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
         return row ? { documentKey: row.document_key, submittedAt: row.submitted_at } : null;
     }
     function submission(activity, index, responses) {
-        const block = activity.blocks.find((block) => block.kind === "studentlink");
+        const block = B.reviewLinkBlock(activity);
         const url = B.savedAnswers(activity, index, responses)[block?.id];
         return { url, documentKey: B.documentLinkKey(url) };
     }
@@ -136,6 +137,10 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             AND checked_at >= COALESCE((SELECT started_at FROM practical_skills_progress
                 WHERE student_email = $1 AND kit_id = $2), '-infinity'::timestamptz)`, [student, kit, index, documentKey, policy]);
         const row = result.rows[0];
+        if (row && policy === BLUEPRINT_POLICY) {
+            const submitted = await getSubmission(student, kit, index, documentKey);
+            if (!submitted || new Date(row.checked_at) < new Date(submitted.submittedAt)) return null;
+        }
         return row ? { documentKey: row.document_key, policy: row.policy, passed: row.passed,
             method: row.method, feedback: row.feedback, reviewedBy: row.reviewed_by, checkedAt: row.checked_at } : null;
     }
@@ -151,7 +156,21 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
     }
     async function loadContent(kit) {
         const stored = await pool.query("SELECT content FROM practical_skills_kit_content WHERE kit_id = $1", [kit]);
-        return B.withFilesFoldersLinks(stored.rows[0]?.content || getDefaultPracticalSkillsKitContent(kit));
+        return B.withFilesFoldersLinks(stored.rows[0]?.content || getDefaultPracticalSkillsKitContent(kit), kit);
+    }
+    async function withoutUnreviewedBlueprintTicks(row, content) {
+        if (row.kit_id !== "kit-minecraft-builder-kit") return row;
+        const definition = content || await loadContent(row.kit_id);
+        const ticks = { ...row.completed_activities };
+        let pending = false;
+        for (const [index, activity] of (definition.activities || []).entries()) {
+            if (activity?.documentCheck !== BLUEPRINT_POLICY || (!row.completed && !ticks[index])) continue;
+            const review = await get(row.student_email, row.kit_id, index, activity, row.responses || {});
+            if (review?.passed) continue;
+            delete ticks[index];
+            pending = true;
+        }
+        return pending ? { ...row, completed: false, completed_at: null, completed_activities: ticks } : row;
     }
     async function load(req, student) {
         const kit = String(req.params.kitId || "");
@@ -215,7 +234,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             try {
                 const item = await load(req, email);
                 res.json({ verification: await get(email, item.kit, item.index, item.activity, item.row.responses),
-                    filing: TEACHER_ONLY.has(item.policy) ? await getDrawingFiling(email, item.documentKey) : null,
+                    filing: item.policy === DRAWING_POLICY ? await getDrawingFiling(email, item.documentKey) : null,
                     submission: TEACHER_ONLY.has(item.policy) ? await getSubmission(email, item.kit, item.index, item.documentKey) : null,
                     teacherComment: TEACHER_ONLY.has(item.policy) ? await getComment(email, item.kit, item.index, item.documentKey) : "" });
             } catch (error) { failure(res, error); }
@@ -227,26 +246,29 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             try {
                 const item = await load(req, email);
                 if (!TEACHER_ONLY.has(item.policy)) throw Object.assign(new Error("This activity uses its own completion check."), { status: 404 });
+                const blueprint = item.policy === BLUEPRINT_POLICY;
                 const answers = B.savedAnswers(item.activity, item.index, item.row.responses);
                 // A stand-in teacher receipt checks everything except the teacher's tick (valid link, other blocks, different file).
                 const ready = B.grade(item.activity, answers, {}, { content: item.content, index: item.index, responses: item.row.responses,
                     documentVerification: { passed: true, policy: item.policy, documentKey: item.documentKey } });
                 if (!item.documentKey || !ready.passed) {
                     throw Object.assign(new Error(ready.results.find((result) => !result.passed && result.message)?.message ||
-                        "Save a valid HTTPS sharing link to your Google Drawing before submitting."), { status: 422 });
+                        `Save a valid HTTPS sharing link to your ${blueprint ? "slideshow" : "Google Drawing"} before submitting.`), { status: 422 });
                 }
+                if (blueprint) await syncCompletion(email, item.kit, item.content);
                 await ensureSubmissionSchema();
                 await ensureCommentSchema();
-                const previous = (await pool.query(`SELECT notified_document_key FROM practical_skills_submissions
-                    WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3`, [email, item.kit, item.index])).rows[0];
-                await pool.query(`INSERT INTO practical_skills_submissions (student_email, kit_id, activity_index, document_key, url)
+                const existing = blueprint ? await getSubmission(email, item.kit, item.index, item.documentKey) : null;
+                const previous = (!blueprint || existing) ? (await pool.query(`SELECT notified_document_key FROM practical_skills_submissions
+                    WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3`, [email, item.kit, item.index])).rows[0] : null;
+                if (!existing) await pool.query(`INSERT INTO practical_skills_submissions (student_email, kit_id, activity_index, document_key, url)
                     VALUES ($1,$2,$3,$4,$5) ON CONFLICT (student_email, kit_id, activity_index)
                     DO UPDATE SET document_key = EXCLUDED.document_key, url = EXCLUDED.url, submitted_at = NOW()`,
                 [email, item.kit, item.index, item.documentKey, item.url]);
                 const activityTitle = item.content.worksheets[item.index].activity || `Activity ${item.index + 1}`;
                 let filing = { filed: false, reason: "no-permission" };
                 const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
-                if (driveAccessToken) {
+                if (!blueprint && driveAccessToken) {
                     try {
                         filing = await fileSubmission({ studentEmail: email, documentKey: item.documentKey, activityTitle, driveAccessToken });
                         await markFiled(email, item.kit, item.index, item.documentKey, filing);
@@ -259,7 +281,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                 if (previous?.notified_document_key !== item.documentKey) {
                     try {
                         emailed = await notifySubmission({ studentEmail: email, kitId: item.kit, index: item.index, url: item.url,
-                            subject: item.activity.submissionSubject || activityTitle });
+                            subject: item.activity.submissionSubject || activityTitle, ...(blueprint ? { blueprint } : {}) });
                         if (emailed) await pool.query(`UPDATE practical_skills_submissions SET notified_document_key = $4
                             WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3`, [email, item.kit, item.index, item.documentKey]);
                     } catch (error) {
@@ -267,7 +289,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                     }
                 }
                 res.json({ submission: await getSubmission(email, item.kit, item.index, item.documentKey), emailed,
-                    filing: { ...filing, ...await getDrawingFiling(email, item.documentKey), reason: filing.reason || "" },
+                    filing: blueprint ? null : { ...filing, ...await getDrawingFiling(email, item.documentKey), reason: filing.reason || "" },
                     verification: await get(email, item.kit, item.index, item.activity, item.row.responses),
                     teacherComment: await getComment(email, item.kit, item.index, item.documentKey) });
             } catch (error) { failure(res, error); }
@@ -339,12 +361,18 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                             const mine = (list) => list.find((entry) => current(entry, email, row.started_at) &&
                                 Number(entry.activity_index) === index && entry.document_key === documentKey && documentKey);
                             const check = mine(checks.filter((entry) => entry.policy === activity.documentCheck));
-                            return [index, { url: documentKey ? url : "", documentKey, submittedAt: mine(submissions)?.submitted_at || null,
-                                filed: filedDrawings.some((entry) => normalizeEmail(entry.student_email) === email && entry.document_key === documentKey && entry.synced === true),
-                                completed: check?.passed === true, teacherComment: mine(comments)?.comment || "" }];
+                            const submittedAt = mine(submissions)?.submitted_at || null;
+                            const blueprint = activity.documentCheck === BLUEPRINT_POLICY;
+                            return [index, { url: documentKey ? url : "", documentKey, submittedAt,
+                                filed: !blueprint && filedDrawings.some((entry) => normalizeEmail(entry.student_email) === email && entry.document_key === documentKey && entry.synced === true),
+                                completed: check?.passed === true && (!blueprint || Boolean(submittedAt && new Date(check.checked_at) >= new Date(submittedAt))),
+                                teacherComment: mine(comments)?.comment || "" }];
                         }));
                     }
-                    result.push({ id: kit, activities: activities.map(({ worksheet, index }) => ({ index, title: worksheet.activity || `Activity ${index + 1}` })), students });
+                    result.push({ id: kit, activities: activities.map(({ worksheet, index, activity }) => ({
+                        index, title: worksheet.activity || `Activity ${index + 1}`,
+                        ...(activity.documentCheck === BLUEPRINT_POLICY ? { submissionType: "slideshow" } : {})
+                    })), students });
                 }
                 res.json({ kits: result });
             } catch (error) {
@@ -423,8 +451,9 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                 const item = await load(req, email);
                 if (!item.documentKey || req.body.documentKey !== item.documentKey) throw Object.assign(new Error("The submitted link changed. Reload the review before approving."), { status: 409 });
                 const drawing = item.policy === DRAWING_POLICY;
+                const blueprint = item.policy === BLUEPRINT_POLICY;
                 if (commentOnly) {
-                    if (!drawing) throw Object.assign(new Error("Comments are only available for drawing reviews."), { status: 400 });
+                    if (!TEACHER_ONLY.has(item.policy)) throw Object.assign(new Error("Comments are only available for teacher-reviewed submissions."), { status: 400 });
                     await ensureCommentSchema();
                     const comment = req.body.comment.trim();
                     await pool.query(`INSERT INTO practical_skills_drawing_comments (student_email, kit_id, activity_index, document_key, comment)
@@ -433,10 +462,16 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                     [email, item.kit, item.index, item.documentKey, comment]);
                     return res.json({ teacherComment: comment });
                 }
+                if (blueprint && req.body.approved &&
+                    !await getSubmission(email, item.kit, item.index, item.documentKey)) {
+                    throw Object.assign(new Error("The student needs to submit this slideshow before it can be marked Completed."), { status: 409 });
+                }
                 await save(email, item.kit, item.index, item.documentKey, item.policy, req.body.approved, "teacher",
                     { message: req.body.approved
-                        ? drawing ? "Teacher reviewed the drawing and marked it Completed." : "Teacher reviewed the document and approved text completion."
-                        : drawing ? "Teacher removed the Completed tick. Update your drawing and press Submit again." : "Teacher approval removed. Check the document again or request another review." },
+                        ? blueprint ? "Teacher reviewed the slideshow and marked it Completed."
+                            : drawing ? "Teacher reviewed the drawing and marked it Completed." : "Teacher reviewed the document and approved text completion."
+                        : blueprint ? "Teacher removed the Completed tick. Update your slideshow and select Submit to Teacher again."
+                            : drawing ? "Teacher removed the Completed tick. Update your drawing and press Submit again." : "Teacher approval removed. Check the document again or request another review." },
                     normalizeEmail(getRequestUserEmail(req)));
                 if (TEACHER_ONLY.has(item.policy) && !req.body.approved) {
                     // Lets the student Submit the same link again once fixed, which re-emails the teacher.
@@ -451,7 +486,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             } catch (error) { failure(res, error); }
         });
     }
-    return { get, register };
+    return { get, register, loadContent, withoutUnreviewedBlueprintTicks };
 }
 
 module.exports = { createDocumentVerification };

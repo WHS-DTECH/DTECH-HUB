@@ -154,6 +154,14 @@ empty activity list. Reset requires a warning/confirmation on both the worksheet
 and Licence page; Search reset requests also require explicit confirmation on
 the server. Intentional resets still retain answers and Drive files.
 
+For **The Blueprint Mission** in Minecraft Builder Kit, students paste a
+slideshow sharing link, make sure their teacher can open it, and select
+**Submit to Teacher**. Teachers open the link under **Licence Teacher Review →
+Class Kit Progress → Minecraft Builder Kit → Submissions** and tick **Completed**
+after reviewing it. Saving a link alone no longer earns credit, including for
+students with old automatic ticks. Saved work is retained; slideshows are not
+moved or re-shared by the Hub. Replacing the slideshow requires a new submission.
+
 To revoke a certificate, open **Licence Teacher Review → Class Kit Progress**,
 select the kit, and choose **Revoke certificate** beside the student's completed
 record. The action is also available on completed records in **Student Review**.

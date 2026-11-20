@@ -1,5 +1,7 @@
 "use strict";
 
+const ActivityBlocks = require("./activity-blocks");
+
 function getTeacherKitCourse(profile) {
     const courseIds = Array.isArray(profile?.courseIds) ? profile.courseIds : [];
     if (courseIds.some((id) => /^(?:7|8)DTECH$/.test(id))) return "JuniorDTECH";
@@ -20,7 +22,7 @@ async function ensureTeacherKitChocolateSchema(pool) {
     `);
 }
 
-function registerTeacherResults(app, { pool, requireAdminAccess, schoolDomain, getDefaultPracticalSkillsKitContent, getClassData }) {
+function registerTeacherResults(app, { pool, requireAdminAccess, schoolDomain, getDefaultPracticalSkillsKitContent, getClassData, blueprintReview }) {
     if (getClassData) {
         app.put("/api/admin/kit-chocolate/:kitId", requireAdminAccess, async (req, res) => {
             res.set("Cache-Control", "private, no-store");
@@ -57,7 +59,9 @@ function registerTeacherResults(app, { pool, requireAdminAccess, schoolDomain, g
                     return res.json({ reviewedAt: new Date().toISOString(), students, kits });
                 }
                 const progress = await pool.query(
-                    "SELECT student_email, kit_id, started_at, completed, completed_at FROM practical_skills_progress WHERE student_email = ANY($1::text[]) AND kit_id = ANY($2::text[])",
+                    `SELECT student_email, kit_id, started_at, completed, completed_at,
+                        CASE WHEN kit_id = 'kit-minecraft-builder-kit' AND completed THEN responses END AS responses
+                     FROM practical_skills_progress WHERE student_email = ANY($1::text[]) AND kit_id = ANY($2::text[])`,
                     [emails, kitIds]);
                 const chocolate = await pool.query(
                     "SELECT student_email, kit_id, chocolate FROM practical_skills_chocolate WHERE student_email = ANY($1::text[]) AND kit_id = ANY($2::text[])",
@@ -69,7 +73,12 @@ function registerTeacherResults(app, { pool, requireAdminAccess, schoolDomain, g
                     chocolateByStudent.get(email)[row.kit_id] = row.chocolate === true;
                 }
                 const progressByStudent = new Map();
-                for (const row of progress.rows) {
+                const builderContent = blueprintReview && progress.rows.some((row) => row.kit_id === "kit-minecraft-builder-kit" && row.completed)
+                    ? await blueprintReview.loadContent("kit-minecraft-builder-kit") : null;
+                for (let row of progress.rows) {
+                    if (builderContent && row.completed && row.kit_id === "kit-minecraft-builder-kit") {
+                        row = await blueprintReview.withoutUnreviewedBlueprintTicks(row, builderContent);
+                    }
                     const email = String(row.student_email || "").toLowerCase();
                     if (!progressByStudent.has(email)) progressByStudent.set(email, {});
                     progressByStudent.get(email)[row.kit_id] = {
@@ -105,7 +114,8 @@ function registerTeacherResults(app, { pool, requireAdminAccess, schoolDomain, g
         try {
             // SELECT-only: student progress routes can change completion and send certificates.
             const stored = await pool.query("SELECT content FROM practical_skills_kit_content WHERE kit_id = $1", [kitId]);
-            const content = stored.rows[0]?.content || getDefaultPracticalSkillsKitContent(kitId);
+            const raw = stored.rows[0]?.content || getDefaultPracticalSkillsKitContent(kitId);
+            const content = kitId === "kit-minecraft-builder-kit" ? ActivityBlocks.withFilesFoldersLinks(raw, kitId) : raw;
             if (!content?.worksheets?.length) return res.status(404).json({ error: "No saved worksheets were found for this kit." });
             const progress = await pool.query(
                 "SELECT student_email, started_at, completed, completed_at, updated_at, responses, completed_activities, certificate_emailed_at FROM practical_skills_progress WHERE kit_id = $1 AND student_email = ANY($2::text[])",
@@ -117,9 +127,13 @@ function registerTeacherResults(app, { pool, requireAdminAccess, schoolDomain, g
             res.json({
                 kitId, content, reviewedAt: new Date().toISOString(),
                 warnings: schema.rows[0]?.documents_table ? [] : ["Document receipt storage has not been created; no receipt records can be reviewed."],
-                students: emails.map((email) => ({
-                    email, progress: progress.rows.find((row) => row.student_email === email) || null,
-                    documents: documents.filter((row) => row.student_email === email)
+                students: await Promise.all(emails.map(async (email) => {
+                    const row = progress.rows.find((entry) => entry.student_email === email);
+                    return {
+                        email, progress: row && blueprintReview && kitId === "kit-minecraft-builder-kit"
+                            ? await blueprintReview.withoutUnreviewedBlueprintTicks({ ...row, kit_id: kitId }, content) : row || null,
+                        documents: documents.filter((entry) => entry.student_email === email)
+                    };
                 }))
             });
         } catch (error) {

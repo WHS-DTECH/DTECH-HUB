@@ -63,8 +63,8 @@
         const host = new URL(safe).hostname.toLowerCase();
         return /(^|\.)(google\.com|googleusercontent\.com)$/.test(host) || host === "goo.gl";
     }
-    function withFilesFoldersLinks(content) {
-        content = withGoogleDrawingsLinks(content);
+    function withFilesFoldersLinks(content, kitId) {
+        content = withBlueprintReview(withGoogleDrawingsLinks(content), kitId);
         if (!/files\s*(?:&|and)\s*folders/i.test(String(content?.identity?.name || content?.bannerTitle || ""))) return content;
         let changed = false;
         const activities = [...(content.activities || [])];
@@ -92,6 +92,33 @@
     }
     // Teacher-ticked: students Submit a link; only a teacher approval receipt earns the tick.
     const GOOGLE_DRAWING_POLICY = "google-drawing-teacher-v1";
+    const BLUEPRINT_REVIEW_POLICY = "blueprint-slideshow-teacher-v1";
+    const BLUEPRINT_LINK_ID = "blueprint-slideshow-link";
+    function withBlueprintReview(content, kitId) {
+        if (kitId !== "kit-minecraft-builder-kit") return content;
+        const activities = [...(content?.activities || [])];
+        let changed = false;
+        (content?.worksheets || []).forEach((worksheet, index) => {
+            const activity = activities[index];
+            if (!worksheet || worksheet.hidden || worksheet.mergedInto !== undefined ||
+                !activity?.blocks?.some((block) => block.kind === "studentlink" && block.id === BLUEPRINT_LINK_ID)) return;
+            const text = "Share your slideshow so your teacher can open it. Paste the sharing link here, then select Submit to Teacher. Your teacher will mark this activity Completed after review.";
+            const blocks = activity.blocks.map((block) => block.id === BLUEPRINT_LINK_ID && (!block.required || block.text !== text)
+                ? { ...block, text, required: true } : block);
+            if (activity.documentCheck === BLUEPRINT_REVIEW_POLICY && activity.completionMode === "auto" &&
+                activity.submissionSubject === "The Blueprint Mission" && activity.shareLinkCompletion === undefined &&
+                blocks.every((block, i) => block === activity.blocks[i])) return;
+            const { shareLinkCompletion: _linkOnly, ...rest } = activity;
+            activities[index] = { ...rest, blocks, completionMode: "auto", documentCheck: BLUEPRINT_REVIEW_POLICY,
+                submissionSubject: "The Blueprint Mission" };
+            changed = true;
+        });
+        return changed ? { ...content, activities } : content;
+    }
+    function reviewLinkBlock(activity) {
+        return activity?.blocks?.find((block) => block.kind === "studentlink" &&
+            (activity.documentCheck !== BLUEPRINT_REVIEW_POLICY || block.id === BLUEPRINT_LINK_ID));
+    }
     const asset = (name) => `https://dtech-hub2.onrender.com/practical-skills/images/${name}`;
     const drawingGuides = {
         ship: { flag: "shipShapesReferenceVersion", subject: "ship", similar: "a sailing ship with a hull, masts and sails",
@@ -329,13 +356,15 @@
                 }
             }
             if (b.kind === "studentlink" && passed && activity.documentCheck &&
-                b === activity.blocks.find((block) => block.kind === "studentlink")) {
+                b === reviewLinkBlock(activity)) {
                 const receipt = context.documentVerification;
                 passed = receipt?.passed === true && receipt.policy === activity.documentCheck &&
                     receipt.documentKey === documentLinkKey(value);
                 if (!passed) message = receipt?.feedback?.message ||
                     (activity.documentCheck === GOOGLE_DRAWING_POLICY
                         ? "Link saved. Press Submit so your teacher can review your drawing and mark it Completed."
+                        : activity.documentCheck === BLUEPRINT_REVIEW_POLICY
+                            ? "Link saved. Select Submit to Teacher so your slideshow can be reviewed and marked Completed."
                         : "Link saved. Use Check my document to check your typed text, or ask your teacher to review it.");
             }
             if (b.kind === "checkbox") passed = value === true;
@@ -370,5 +399,6 @@
         return { passed: required.length > 0 && results.every((r) => r.passed), results };
     }
     return { types, interactive, escape, safeUrl, studentUrl, specialised, initialBlocks, savedAnswers, publicActivity, entries, puzzle, validate, grade,
-        withFilesFoldersLinks, withGoogleDrawingsLinks, documentLinkKey, isGoogleLink, GOOGLE_LINK_MESSAGE, GOOGLE_DRAWING_POLICY };
+        withFilesFoldersLinks, withGoogleDrawingsLinks, documentLinkKey, reviewLinkBlock, isGoogleLink, GOOGLE_LINK_MESSAGE,
+        GOOGLE_DRAWING_POLICY, BLUEPRINT_REVIEW_POLICY };
 });
