@@ -882,7 +882,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             assert.ok((await get("contributions", account)).contributions.some(({ id }) => id === linked), "Export does not mutate contributions");
             const replayPath = "contributions/replay";
             assert.equal((await call(replayPath, { account: " " })).status, 401);
-            assert.equal((await call(replayPath, { account: teacher })).status, 403);
+            assert.equal((await call(replayPath, { account: "junior@test.invalid" })).status, 403);
             assert.equal((await fetch(`${host}/knowledge-web/%2ereplay.html`)).status, 404);
             const readReplay = async (owner = account) => {
                 const res = await call(`${replayPath}?email=${foreign}`, { account: owner });
@@ -896,6 +896,13 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             const reply = await save(`balloons/${caught}/comments`, { body: marker });
             await pool.query("UPDATE knowledge_web_balloon_comments SET created_at='2018-01-01' WHERE id=$1", [reply]);
             const { page: replayPage, data: replay } = await readReplay();
+            const { data: teacherReplay } = await readReplay(teacher);
+            assert.equal(teacherReplay.name, "Test Teacher");
+            assert.ok(teacherReplay.records.some(({ subjectId, kind, content }) =>
+                subjectId === teacherKiteId && kind === "kite" && content.argument === "Updated teacher argument."));
+            assert.deepEqual(teacherReplay.records.map(({ subjectId, kind }) => `${subjectId}:${kind}`).sort(),
+                (await get("contributions", teacher)).contributions.map(({ subjectId, kind }) => `${subjectId}:${kind}`).sort(),
+                "Teacher replay uses their own visible contribution history, regardless of the requested account");
             assert.equal(replay.name, authorName);
             assert.equal(replay.records[0].content.body, marker, "Replay uses creation order, not edit order");
             assert.ok(!replayPage.includes(marker), "HTML-shaped text is serialized without markup");

@@ -1049,7 +1049,8 @@
                 if (historyPage) {
                     node("explore-link").hidden = false;
                     node("my-proposals").hidden = !state.canContribute;
-                    node("export-actions").hidden = !state.canContribute || state.canManage;
+                    node("export-actions").hidden = !state.canContribute;
+                    node("export-pdf").hidden = state.canManage;
                     node("own-cloud-proposals").hidden = !state.canPropose;
                     if (state.canContribute) void contributions.refresh();
                 } else {

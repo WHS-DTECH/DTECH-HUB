@@ -497,7 +497,7 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
         }));
         const payload = JSON.stringify({ name, records: replayRecords, groups }).replace(/</g, "\\u003c");
         res.attachment("knowledge-web-replay.html").send(replayTemplate.replace("<!--REPLAY_DATA-->", () => payload));
-    }, student));
+    }));
 
     app.get(`${base}/manage/reports`, handler(async (_req, res) => {
         const queries = families.map(({ root, tables, reports }) => {
