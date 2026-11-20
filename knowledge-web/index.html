@@ -153,10 +153,13 @@
             </section>
             <section id="web-my-proposals" class="kw-panel" aria-label="My Contributions" hidden>
                 <div id="web-export-actions" class="kw-toolbar-group" hidden>
-                    <button id="web-export-pdf" type="button" hidden>Download my contributions PDF</button>
+                    <button id="web-export-pdf" type="button">Download my contributions PDF</button>
                     <button id="web-play-replay" class="kw-primary" type="button" aria-expanded="false" aria-controls="web-replay">Replay My Thinking</button>
                     <button id="web-export-replay" type="button">Download replay HTML</button>
+                    <button id="web-save-drive" type="button" aria-describedby="web-drive-help">Save both to Google Drive</button>
                 </div>
+                <p id="web-drive-help" hidden>Saves a new PDF and replay HTML in your connected WHS-DTECH folder. People with access to that folder may be able to view the files.</p>
+                <p id="web-drive-status" role="status"></p>
                 <p id="web-export-status" role="status"></p>
                 <p id="web-replay-status" role="status"></p>
                 <iframe id="web-replay" title="Replay My Thinking player" sandbox="allow-scripts" hidden></iframe>
@@ -226,6 +229,6 @@
     <script src="/script.js?v=knowledge-web-2"></script>
     <script src="/knowledge-web/contributions.js?v=12"></script>
     <script src="/knowledge-web/layout.js?v=4"></script>
-    <script src="/knowledge-web/web.js?v=26"></script>
+    <script src="/knowledge-web/web.js?v=27"></script>
 </body>
 </html>

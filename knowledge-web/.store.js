@@ -148,7 +148,7 @@ function titleSimilarity(first, second) {
     return 2 * [...a].filter((part) => b.has(part)).length / (a.size + b.size || 1);
 }
 
-function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStudentProfile, getContributorName, notifyReport }) {
+function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStudentProfile, getContributorName, notifyReport, contributionDrive }) {
     const base = "/api/knowledge-web";
     let schema;
 
@@ -571,7 +571,7 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
     });
     app.post(`${base}/manage/clouds`, save);
     app.put(`${base}/manage/clouds/:id`, save);
-    registerContributions(app, { base, pool, route, ensureSchema, transaction, getContributorName, notifyReport, UUID, problem, text, date });
+    registerContributions(app, { base, pool, route, ensureSchema, transaction, getContributorName, notifyReport, contributionDrive, UUID, problem, text, date });
     registerLayout(app, { base, pool, route, ensureSchema, UUID, problem });
 }
 

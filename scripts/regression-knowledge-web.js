@@ -41,6 +41,10 @@ test("Replay and PDF use the same verified Google sign-in as My Contributions", 
         assert.equal((await identity(route, "")).verified, false, route);
         assert.equal((await identity(route, "current-oauth", "POST")).verified, false, route);
     }
+    const drive = "/api/knowledge-web/contributions/drive";
+    assert.equal((await identity(drive, "current-oauth", "POST")).source, "google_access_token");
+    assert.equal((await identity(drive, "expired-oauth", "POST")).verified, false);
+    assert.equal((await identity(drive, "current-oauth")).verified, false);
 });
 
 test("Timeline includes dated source publications alongside events without inventing dates or times", () => {
@@ -195,6 +199,8 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             await admin.end();
         });
         const notifications = [];
+        const driveUploads = [];
+        let failReplayUpload = false;
         let authorYear = 10;
         let authorName = "Test Student One";
         async function startApp() {
@@ -205,6 +211,17 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
                 canManage: async (account) => account === "teacher@test.invalid",
                 getStudentProfile: async (account) => ({ available: true, year: account.startsWith("junior") ? 8 : account.startsWith("student-two") ? 13 : authorYear }),
                 notifyReport: async (...args) => { notifications.push(args); },
+                contributionDrive: {
+                    async folderFor(email, token) {
+                        if (email !== token) throw Object.assign(new Error("Wrong Drive account"), { status: 403 });
+                        return email === "teacher@test.invalid" ? "teacher-whs-folder" : "student-whs-folder";
+                    },
+                    async upload(file) {
+                        if (failReplayUpload && file.mimeType === "text/html") throw new Error("Fixture upload failure");
+                        driveUploads.push(file);
+                        return { id: `upload-${driveUploads.length}` };
+                    }
+                },
                 getContributorName: async (_req, account) => account === "teacher@test.invalid" ? "Test Teacher"
                     : account.startsWith("student-two") ? "Test Student Two" : account.startsWith("student-three") ? "Test Student Three"
                         : account.startsWith("student-four") ? "Test Student Four" : authorName
@@ -849,7 +866,6 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             };
             const sets = (text) => (text.match(/Contribution set \d+/g) || []).length;
             assert.equal((await call("contributions/pdf", { account: " " })).status, 401);
-            assert.equal((await call("contributions/pdf", { account: teacher })).status, 403);
             assert.equal((await call("contributions/pdf", { account: "junior@test.invalid" })).status, 403);
             assert.equal((await fetch(`${host}/knowledge-web/%2econtributions-pdf.js`)).status, 404);
             const empty = await exportPdf();
@@ -924,6 +940,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             await pool.query("UPDATE knowledge_web_balloon_comments SET created_at='2018-01-01' WHERE id=$1", [reply]);
             const { page: replayPage, data: replay } = await readReplay();
             const { data: teacherReplay } = await readReplay(teacher);
+            assert.match((await exportPdf(teacher)).text, /Updated teacher argument/);
             assert.equal(teacherReplay.name, "Test Teacher");
             assert.ok(teacherReplay.records.some(({ subjectId, kind, content }) =>
                 subjectId === teacherKiteId && kind === "kite" && content.argument === "Updated teacher argument."));
@@ -941,6 +958,38 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             assert.equal(commentOnly.records[0].content.replyTo, true);
             assert.ok(commentOnly.groups[0].some(({ title }) => title === approvedCloud.title));
             assert.deepEqual((await readReplay("no-replay@test.invalid")).data.records, []);
+            const saveDrive = (owner, token) => post("contributions/drive", {
+                driveAccessToken: token, folderId: "ignored-client-folder"
+            }, owner);
+            assert.equal((await saveDrive(" ", account)).status, 401);
+            assert.equal((await saveDrive(account, foreign)).status, 403);
+            assert.equal((await saveDrive(account, "")).status, 400);
+            assert.equal(driveUploads.length, 0);
+            for (const [owner, folder, marker] of [
+                [account, "student-whs-folder", "My actual illustrated link."],
+                [teacher, "teacher-whs-folder", "Updated teacher argument."]
+            ]) {
+                const res = await saveDrive(owner, owner);
+                assert.equal(res.status, 201);
+                const result = await res.json();
+                assert.equal(result.folderUrl, `https://drive.google.com/drive/folders/${folder}`);
+                assert.equal(result.saved.length, 2);
+                const [pdf, html] = driveUploads.slice(-2);
+                assert.equal(pdf.folderId, folder);
+                assert.equal(html.folderId, folder);
+                assert.equal(pdf.mimeType, "application/pdf");
+                assert.equal(html.mimeType, "text/html");
+                assert.match(pdf.buffer.toString("ascii", 0, 4), /^%PDF/);
+                assert.ok(html.buffer.toString().includes(marker));
+                assert.doesNotMatch(html.buffer.toString(), /Foreign kite must never be copied/);
+                assert.equal(pdf.fileName.match(/\d{4}-.*(?=\.pdf)/)[0], html.fileName.match(/\d{4}-.*(?=\.html)/)[0]);
+            }
+            failReplayUpload = true;
+            const partial = await saveDrive(account, account);
+            assert.equal(partial.status, 502);
+            const result = await partial.json();
+            assert.equal(result.saved.length, 1);
+            assert.match(result.failed[0], /\.html$/);
             await pool.query("UPDATE knowledge_web_balloons SET hidden_at=NOW() WHERE id=ANY($1::uuid[])", [[ownedBalloon, loneBalloon]]);
             const moderatedPdf = await exportPdf();
             assert.doesNotMatch(moderatedPdf.text, /My actual illustrated link/);

@@ -6234,6 +6234,7 @@ app.use(async (req, _res, next) => {
     (/^\/api\/knowledge-web\/(?:access|clouds|proposals(?:\/duplicates)?|manage\/clouds|manage\/proposals)\/?$/i.test(req.path) && req.method === "GET") ||
     (/^\/api\/knowledge-web\/(?:proposals|manage\/proposals\/[^/]+\/decision|manage\/clouds|manage\/source-metadata)\/?$/i.test(req.path) && req.method === "POST") ||
     (/^\/api\/knowledge-web\/(?:proposals|manage\/clouds)\/[^/]+\/?$/i.test(req.path) && req.method === "PUT") ||
+    (req.method === "POST" && /^\/api\/knowledge-web\/contributions\/drive\/?$/i.test(req.path)) ||
     (req.method === "GET" && /^\/api\/knowledge-web\/(?:(?:kites|connections|balloons)(?:\/[a-f0-9-]+)?|layout|contributions(?:\/(?:pdf|replay))?|manage\/reports)\/?$/i.test(req.path)) ||
     (req.method === "DELETE" && /^\/api\/knowledge-web\/layout\/?$/i.test(req.path)) ||
     (req.method === "PUT" && /^\/api\/knowledge-web\/(?:layout|manage\/default-layout)\/(?:cloud|kite|balloon)\/[a-f0-9-]+\/?$/i.test(req.path)) ||
@@ -6315,6 +6316,18 @@ require("./knowledge-web/.store").registerKnowledgeWeb(app, {
   pool, canManage: canManagePracticalSchedule, getStudentProfile: getLearningSitesStudentProfile,
   getVerifiedEmail: (req) => req.auth_identity?.verified && isSchoolEmail(req.auth_identity.email) ? req.auth_identity.email : "",
   getContributorName: getPracticalSkillsStudentName,
+  contributionDrive: {
+    async folderFor(email, accessToken) {
+      await verifyDriveTokenForStudent(accessToken, email);
+      const setup = await getStudentLoginDriveSetup(email);
+      const folder = await driveGetLiveFile(setup?.folder_id, accessToken);
+      if (folder?.name !== "WHS-DTECH" || folder.mimeType !== "application/vnd.google-apps.folder") {
+        throw Object.assign(new Error("Connect your WHS-DTECH folder with Drive Ready, then try again."), { status: 409 });
+      }
+      return folder.id;
+    },
+    upload: driveUploadBinaryFile
+  },
   notifyReport: async () => {
     if (!smtpTransporter || !SMTP_FROM) return;
     const candidates = await getPracticalSkillsCertificateTeacherRecipients();

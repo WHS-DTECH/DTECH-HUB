@@ -104,6 +104,43 @@
         }
     }
 
+    let savingToDrive = false;
+    async function saveContributionsToDrive() {
+        if (savingToDrive) return;
+        const account = getActiveHubEmail();
+        const control = node("save-drive");
+        const status = node("drive-status");
+        savingToDrive = control.disabled = true;
+        status.textContent = "Preparing your PDF and replay...";
+        try {
+            const token = await requestHubDriveAccessToken();
+            if (getActiveHubEmail() !== account) return;
+            if (!token?.access_token) throw new Error(token?.error || "Google Drive permission is required.");
+            status.textContent = "Saving your PDF and replay...";
+            const response = await fetch("/api/knowledge-web/contributions/drive", {
+                method: "POST",
+                headers: withHubAuthHeaders({ "Content-Type": "application/json" }, undefined, true),
+                body: JSON.stringify({ driveAccessToken: token.access_token }),
+                cache: "no-store", signal: AbortSignal.timeout(60000)
+            });
+            const result = await response.json();
+            if (getActiveHubEmail() !== account) return;
+            if (!Array.isArray(result.saved)) throw new Error(result.error || `Could not save your exports (${response.status}).`);
+            status.textContent = response.ok ? "Both files saved. "
+                : result.saved.length ? "Only one file saved. Check the folder before trying again. "
+                    : "Neither file could be saved. Check your Drive access and try again. ";
+            const link = element("a", "Open WHS-DTECH in Google Drive");
+            link.href = result.folderUrl;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            status.append(link);
+        } catch (error) {
+            if (getActiveHubEmail() === account) status.textContent = `Drive save failed: ${error.message}`;
+        } finally {
+            savingToDrive = control.disabled = false;
+        }
+    }
+
     let replayUrl;
     function closeReplay() {
         const frame = node("replay");
@@ -1013,6 +1050,8 @@
         node("proposal").hidden = true;
         node("my-proposals").hidden = true;
         node("export-actions").hidden = true;
+        node("drive-help").hidden = true;
+        node("drive-status").textContent = "";
         node("export-pdf").disabled = false;
         node("export-status").textContent = "";
         closeReplay();
@@ -1050,7 +1089,7 @@
                     node("explore-link").hidden = false;
                     node("my-proposals").hidden = !state.canContribute;
                     node("export-actions").hidden = !state.canContribute;
-                    node("export-pdf").hidden = state.canManage;
+                    node("drive-help").hidden = !state.canContribute;
                     node("own-cloud-proposals").hidden = !state.canPropose;
                     if (state.canContribute) void contributions.refresh();
                 } else {
@@ -1105,6 +1144,7 @@
     node("export-pdf").addEventListener("click", downloadContributions);
     node("play-replay").addEventListener("click", () => loadReplay(false));
     node("export-replay").addEventListener("click", () => loadReplay(true));
+    node("save-drive").addEventListener("click", saveContributionsToDrive);
     node("search").closest(".kw-explore").addEventListener("keydown", (event) => {
         if (event.key !== "Escape" || node("search-results").hidden) return;
         event.preventDefault();

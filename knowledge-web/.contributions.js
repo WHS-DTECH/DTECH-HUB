@@ -135,7 +135,7 @@ const contributionFamilies = [
     { ...families[2], from: balloonFrom, fields: balloonFields, visible: balloonVisible }
 ];
 
-function registerContributions(app, { base, pool, route, ensureSchema, transaction, getContributorName, notifyReport, UUID, problem, text, date }) {
+function registerContributions(app, { base, pool, route, ensureSchema, transaction, getContributorName, notifyReport, contributionDrive, UUID, problem, text, date }) {
     const handler = (callback, { staffOnly = false, studentOnly = false } = {}) => route({ staffOnly }, async (req, res, access) => {
         if (studentOnly && access.staff) throw problem(403, "This action is available to students.");
         await ensureSchema();
@@ -476,11 +476,9 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
         const { sets } = await contributionExport(access.email);
         const pdf = await renderContributionsPdf({ name, sets });
         res.attachment("knowledge-web-my-contributions.pdf").send(pdf);
-    }, student));
+    }));
 
-    app.get(`${base}/contributions/replay`, handler(async (req, res, access) => {
-        const name = await nameFor(req, access);
-        const { records, sets } = await contributionExport(access.email);
+    function renderReplay(name, { records, sets }) {
         const steps = new Map(records.map((record, index) => [record.id, index]));
         const groups = sets.map(({ objects, records: groupRecords }, group) => {
             for (const record of groupRecords) record.group = group;
@@ -496,7 +494,39 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
             content: kind === "comment" ? { body: content.body, replyTo: Boolean(content.replyTo) } : content
         }));
         const payload = JSON.stringify({ name, records: replayRecords, groups }).replace(/</g, "\\u003c");
-        res.attachment("knowledge-web-replay.html").send(replayTemplate.replace("<!--REPLAY_DATA-->", () => payload));
+        return replayTemplate.replace("<!--REPLAY_DATA-->", () => payload);
+    }
+
+    app.get(`${base}/contributions/replay`, handler(async (req, res, access) => {
+        const name = await nameFor(req, access);
+        res.attachment("knowledge-web-replay.html").send(renderReplay(name, await contributionExport(access.email)));
+    }));
+
+    app.post(`${base}/contributions/drive`, handler(async (req, res, { email, staff }) => {
+        const accessToken = typeof req.body?.driveAccessToken === "string" ? req.body.driveAccessToken.trim() : "";
+        if (!accessToken) throw problem(400, "Google Drive permission is required.");
+        if (!contributionDrive) throw problem(503, "Google Drive saving is unavailable.");
+        const folderId = await contributionDrive.folderFor(email, accessToken);
+        const name = await nameFor(req, { email, staff });
+        const snapshot = await contributionExport(email);
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const files = [
+            { fileName: `knowledge-web-my-contributions-${stamp}.pdf`, mimeType: "application/pdf",
+                buffer: await renderContributionsPdf({ name, sets: snapshot.sets }) },
+            { fileName: `knowledge-web-replay-${stamp}.html`, mimeType: "text/html",
+                buffer: Buffer.from(renderReplay(name, snapshot)) }
+        ];
+        const results = await Promise.allSettled(files.map(async (file) => {
+            const uploaded = await contributionDrive.upload({ accessToken, folderId, ...file });
+            if (!uploaded?.id) throw new Error("Missing Drive file ID");
+            return { name: file.fileName, url: `https://drive.google.com/open?id=${encodeURIComponent(uploaded.id)}` };
+        }));
+        const saved = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+        const failed = files.filter((_, index) => results[index].status === "rejected").map(({ fileName }) => fileName);
+        if (failed.length) console.error("[knowledge-web] Drive export failed:", failed.join(", "));
+        res.status(failed.length ? 502 : 201).json({
+            saved, failed, folderUrl: `https://drive.google.com/drive/folders/${encodeURIComponent(folderId)}`
+        });
     }));
 
     app.get(`${base}/manage/reports`, handler(async (_req, res) => {
