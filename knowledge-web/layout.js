@@ -6,13 +6,10 @@ function createKnowledgeLayout({ node, request, state, redraw }) {
     const keyOf = ({ type, id }) => `${type}:${id}`;
     const toMap = (rows) => new Map(rows.map((item) => [keyOf(item), { x: item.x, y: item.y }]));
     const status = (message) => { node("layout-status").textContent = message; };
-    const clamp = (number, min) => Math.round(Math.min(6000, Math.max(min, number)));
-    const bounded = ({ type, named }, x, y) => ({
-        x: clamp(x, named ? 55 : type === "balloon" ? 34 : type === "kite" ? 23 : 0),
-        y: clamp(y, named ? 60 : type === "balloon" ? 38 : type === "kite" ? 23 : 0)
-    });
+    const clamp = (number) => Math.round(Math.min(6000, Math.max(0, number)));
+    const bounded = (x, y) => ({ x: clamp(x), y: clamp(y) });
     const boardItem = (target) => target.closest?.("button[data-layout-type]");
-    const fromItem = (item) => ({ type: item.dataset.layoutType, id: item.dataset.layoutId, named: item.classList.contains("kw-balloon-named") });
+    const fromItem = (item) => ({ type: item.dataset.layoutType, id: item.dataset.layoutId });
     const currentPoint = (item) => ({ x: parseFloat(item.style.left), y: parseFloat(item.style.top) });
     const pointerPosition = (event) => {
         const rect = board.getBoundingClientRect();
@@ -96,7 +93,7 @@ function createKnowledgeLayout({ node, request, state, redraw }) {
             board.classList.add("kw-dragging");
         }
         const pointer = pointerPosition(event);
-        preview = { key: keyOf(gesture.item), point: bounded(gesture.item, pointer.x + gesture.dx, pointer.y + gesture.dy) };
+        preview = { key: keyOf(gesture.item), point: bounded(pointer.x + gesture.dx, pointer.y + gesture.dy) };
         redraw();
     });
     window.addEventListener("pointerup", (event) => {
@@ -128,7 +125,7 @@ function createKnowledgeLayout({ node, request, state, redraw }) {
         event.stopImmediatePropagation();
         if (!ready || saving || gesture) return;
         const target = fromItem(item), point = currentPoint(item);
-        void save(target, bounded(target, point.x + 24 * direction[0], point.y + 24 * direction[1]), true);
+        void save(target, bounded(point.x + 24 * direction[0], point.y + 24 * direction[1]), true);
     });
 
     node("edit-default").addEventListener("click", () => {

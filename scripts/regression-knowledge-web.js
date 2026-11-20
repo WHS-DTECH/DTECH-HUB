@@ -66,7 +66,7 @@ test("Canvas separates overlapping clouds without changing saved positions", () 
     for (let i = 0; i < rectangles.length; i++) {
         for (let j = i + 1; j < rectangles.length; j++) {
             const a = rectangles[i], b = rectangles[j];
-            assert.ok(a.x + 190 <= b.x || b.x + 190 <= a.x || a.y + 100 <= b.y || b.y + 100 <= a.y,
+            assert.ok(a.x + 296 <= b.x || b.x + 296 <= a.x || a.y + 162 <= b.y || b.y + 162 <= a.y,
                 `Clouds ${i} and ${j} overlap`);
         }
     }

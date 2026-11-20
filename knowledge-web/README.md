@@ -51,6 +51,8 @@ The solid attachment string stays tied to the original item. **Connect Ideas** a
 
 The existing transactional PostgreSQL setup adds a separate principle explanation field without reinterpreting earlier idea-based balloons. Earlier balloons keep their original wording, editing fields, attachments, connections, and layouts. Hiding a balloon (or its origin) makes its dependent connections unavailable without deleting them. Hiding a connection on its own does not hide either endpoint.
 
+The map uses larger cloud titles, kite previews, and balloon envelopes and baskets. Pan, zoom, or use search to reach objects beyond the current view. Saved coordinates are unchanged: larger shapes may overlap in an older layout, so move them manually or use **Reset Layout** to restore the teacher's default arrangement. Open an object to read anything truncated in its canvas preview.
+
 ### Stage 3 (planned): Upgrade to Cloud
 
 **Upgrade to Cloud** starts a separate historical cloud draft; it does not convert the kite or approve its interpretation. Only staff authorised to manage Knowledge Web clouds can start the draft or publish it. The draft stays private until explicitly published.

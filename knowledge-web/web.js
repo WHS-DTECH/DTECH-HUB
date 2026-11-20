@@ -25,7 +25,7 @@
     const layout = createKnowledgeLayout({ node, request, state, redraw: redrawLayout });
     const contributions = createKnowledgeContributions({
         node, request, element, button, state, showCloud, resizeTextareas, formatDate, historyPage, exploreUrl,
-        onProposalsChanged: renderStudentProposals, onKitesChanged: renderSearch, layoutPosition: layout.position, searchResult
+        onProposalsChanged: renderStudentProposals, onKitesChanged: renderSearch, layoutPosition: layout.position, searchResult, centreMap
     });
     const formatHistoricalDate = (value) => {
         const match = String(value || "").match(/^(\d{4})-(\d{2})(?:-(\d{2}))?$/);
@@ -218,11 +218,16 @@
         if (state.canPropose) detail.append(button("Propose a new cloud connected to this one", () => beginProposal(cloud)));
         updatePressed();
         if (centre) {
-            const viewport = node("viewport");
             const position = state.positions.get(cloud.id);
-            viewport.scrollTo((position.x + CLOUD_WIDTH / 2) * state.zoom - viewport.clientWidth / 2,
-                (position.y + CLOUD_HEIGHT / 2) * state.zoom - viewport.clientHeight / 2);
+            centreMap({ x: position.x + CLOUD_WIDTH / 2, y: position.y + CLOUD_HEIGHT / 2 });
         }
+    }
+
+    function centreMap({ x, y }) {
+        const viewport = node("viewport"), board = node("board").getBoundingClientRect();
+        const frame = viewport.getBoundingClientRect();
+        viewport.scrollTo(viewport.scrollLeft + board.left - frame.left - viewport.clientLeft + x * state.zoom - viewport.clientWidth / 2,
+            viewport.scrollTop + board.top - frame.top - viewport.clientTop + y * state.zoom - viewport.clientHeight / 2);
     }
 
     function showResults(open) {
@@ -286,9 +291,9 @@
         node("zoom-in").disabled = state.zoom === 1.75;
     }
 
-    const CLOUD_WIDTH = 190;
-    const CLOUD_HEIGHT = 100;
-    const CLOUD_GAP = 16;
+    const CLOUD_WIDTH = 296;
+    const CLOUD_HEIGHT = 162;
+    const CLOUD_GAP = 36;
 
     function layoutClouds(clouds) {
         const positions = new Map();

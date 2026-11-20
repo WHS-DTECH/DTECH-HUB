@@ -1,5 +1,5 @@
 function createKnowledgeContributions({ node, request, element, button, state, showCloud, resizeTextareas, formatDate,
-    historyPage, exploreUrl, onProposalsChanged, onKitesChanged, layoutPosition, searchResult }) {
+    historyPage, exploreUrl, onProposalsChanged, onKitesChanged, layoutPosition, searchResult, centreMap }) {
     let kites = [], balloons = [], connections = [], converted = new Set(), active = null, activeType = null, detailSequence = 0, refreshSequence = 0, reportSequence = 0;
     const empty = () => element("p", "Nothing to show yet.");
     const linkTitle = (kite) => kite.titleB ? `${kite.titleA} ↔ ${kite.titleB}` : kite.titleA;
@@ -161,12 +161,12 @@ function createKnowledgeContributions({ node, request, element, button, state, s
 
     function balloonFields(fields, current = {}) {
         const legacy = current.idea != null;
-        const idea = legacy ? field(fields, "Idea", 4000, current.idea, { multiline: true }) : null;
-        const principle = field(fields, legacy ? "Theoretical principle" : "Theoretical principle (basket)", 4000, current.principle, { multiline: true });
+        const idea = legacy ? field(fields, "Original idea (earlier balloon)", 4000, current.idea, { multiline: true }) : null;
+        const principle = field(fields, "Theoretical Principle", 4000, current.principle, { multiline: true });
         if (!legacy) fields.append(element("p", "Name a specific principle, such as data minimisation, rather than a broad area such as privacy."));
-        const meaning = legacy ? null : field(fields, "Principle explanation (balloon)", 4000, current.principleExplanation, { multiline: true });
-        const explanation = field(fields, legacy ? "How does the principle relate to the idea?" :
-            "Why does this principle relate to the originating item? (string)", 4000, current.explanation, { multiline: true });
+        const meaning = legacy ? null : field(fields, "Explanation of the Principle", 4000, current.principleExplanation, { multiline: true });
+        const explanation = field(fields, legacy ? "Original explanation linking the idea and principle" :
+            "How does this principle relate to the originating cloud or kite?", 4000, current.explanation, { multiline: true });
         return () => ({ ...(legacy ? { idea: idea.value } : { principleExplanation: meaning.value }),
             principle: principle.value, explanation: explanation.value });
     }
@@ -274,9 +274,37 @@ function createKnowledgeContributions({ node, request, element, button, state, s
 
     let mapLocations = new Map(), connectionLocations = new Map();
     function locate(position) {
-        if (!position) return;
-        const viewport = node("viewport");
-        viewport.scrollTo(position.x * state.zoom - viewport.clientWidth / 2, position.y * state.zoom - viewport.clientHeight / 2);
+        if (position) centreMap(position);
+    }
+
+    const kiteSize = { width: 184, height: 190 };
+    const balloonSize = { width: 224, height: 266, basketAnchor: 70 };
+
+    function placeObject(occupied, target, size) {
+        const { width, height } = size;
+        const gap = 30;
+        const x = Math.max(width / 2, Math.round(target.x)), y = Math.max(height / 2, Math.round(target.y));
+        const rect = (cx, cy) => ({ x: cx - width / 2, y: cy - height / 2, width, height });
+        const free = (cx, cy) => {
+            const box = rect(cx, cy);
+            return box.x >= 0 && box.y >= 0 && occupied.every((other) =>
+                box.x + width + gap <= other.x || other.x + other.width + gap <= box.x ||
+                box.y + height + gap <= other.y || other.y + other.height + gap <= box.y);
+        };
+        for (let ring = 0; ring <= 5; ring++) {
+            for (let row = -ring; row <= ring; row++) {
+                for (let col = -ring; col <= ring; col++) {
+                    if (Math.max(Math.abs(row), Math.abs(col)) !== ring) continue;
+                    const cx = x + col * (width + gap), cy = y + row * (height + gap);
+                    if (!free(cx, cy)) continue;
+                    occupied.push(rect(cx, cy));
+                    return { x: cx, y: cy };
+                }
+            }
+        }
+        const cx = occupied.reduce((edge, box) => Math.max(edge, box.x + box.width), 0) + gap + width / 2;
+        occupied.push(rect(cx, y));
+        return { x: cx, y };
     }
 
     function drawMap() {
@@ -301,8 +329,12 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         const originalClouds = [...state.basePositions.values()];
         const boardWidth = Math.max(390, ...originalClouds.map(({ x }) => x + width + 22));
         const boardHeight = Math.max(260, ...originalClouds.map(({ y }) => y + height + 68));
-        const placed = [];
+        const occupied = originalClouds.map((point) => ({ ...point, width, height }));
         const baseKites = new Map();
+        for (const [type, size] of [["kite", kiteSize], ["balloon", balloonSize]]) {
+            board.style.setProperty(`--kw-${type}-width`, `${size.width}px`);
+            board.style.setProperty(`--kw-${type}-height`, `${size.height}px`);
+        }
         let extentX = boardWidth, extentY = boardHeight;
         const grow = (x, y) => { extentX = Math.max(extentX, x); extentY = Math.max(extentY, y); };
         for (const { x, y } of state.positions.values()) grow(x + width + 100, y + height + 100);
@@ -319,35 +351,15 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             const x2 = b ? b.x + width / 2 : x1, y2 = b ? b.y + height / 2 : y1;
             const length = Math.hypot(x2 - x1, y2 - y1) || 1;
             for (const [index, kite] of pair.entries()) {
-                const offset = (index - (pair.length - 1) / 2) * 55;
+                const offset = (index - (pair.length - 1) / 2) * (kiteSize.width + 30);
                 const midpoint = b
                     ? { x: (x1 + x2) / 2 - (y2 - y1) / length * offset, y: (y1 + y2) / 2 + (x2 - x1) / length * offset }
-                    : { x: x1 + offset, y: a.y + height + 42 };
-                const free = (x, y) => x >= 23 && y >= 23 && x <= boardWidth - 23 && y <= boardHeight - 23 &&
-                    !originalClouds.some((cloud) => x > cloud.x - 20 && x < cloud.x + width + 20 && y > cloud.y - 20 && y < cloud.y + height + 20) &&
-                    !placed.some((other) => Math.abs(x - other.x) < 46 && Math.abs(y - other.y) < 46);
-                let position = free(midpoint.x, midpoint.y) ? midpoint : null;
-                if (!position) {
-                    let best = Infinity;
-                    for (let y = 24; y <= boardHeight - 23; y += 46) {
-                        for (let x = 24; x <= boardWidth - 23; x += 46) {
-                            const distance = (x - midpoint.x) ** 2 + (y - midpoint.y) ** 2;
-                            if (distance < best && free(x, y)) { best = distance; position = { x, y }; }
-                        }
-                    }
-                }
-                if (!position && origins.has(kite.id)) position = { x: boardWidth + 32, y: 30 + baseKites.size * 48 };
-                if (position) {
-                    placed.push(position);
-                    baseKites.set(kite.id, position);
-                }
-                position = layoutPosition("kite", kite.id) || position;
-                if (!position) {
-                    count.textContent = "Some kites do not fit on this map. All kites and connections are searchable.";
-                    continue;
-                }
+                    : { x: x1 + offset, y: a.y + height + kiteSize.height / 2 + 40 };
+                const base = placeObject(occupied, midpoint, kiteSize);
+                baseKites.set(kite.id, base);
+                const position = layoutPosition("kite", kite.id) || base;
                 const { x, y } = position;
-                grow(x + 100, y + 100);
+                grow(x + kiteSize.width / 2 + 90, y + kiteSize.height / 2 + 90);
                 mapLocations.set(`kite:${kite.id}`, position);
                 const string = document.createElementNS(svg.namespaceURI, "polyline");
                 string.dataset.kite = kite.id;
@@ -364,10 +376,13 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                 item.style.top = `${y}px`;
                 item.setAttribute("aria-label", `Kite: ${linkTitle(kite)} — ${kite.contributor}: ${snippet(kite.argument)}`);
                 item.title = `${kite.contributor}: ${snippet(kite.argument)}`;
+                const preview = element("span", snippet(kite.argument));
+                preview.className = "kw-kite-preview";
+                preview.setAttribute("aria-hidden", "true");
+                item.append(preview);
                 layer.append(item);
             }
         }
-        const originCounts = new Map();
         const attachmentHits = [];
         for (const balloon of balloons) {
             const key = endpointKey(balloon.origin), anchor = mapLocations.get(key);
@@ -375,24 +390,19 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             const base = balloon.origin.type === "kite" ? baseKites.get(balloon.origin.id) :
                 state.basePositions.get(balloon.origin.id);
             const named = balloon.principleExplanation != null;
-            const countKey = `${key}:${named}`;
-            const index = originCounts.get(countKey) || 0;
-            originCounts.set(countKey, index + 1);
-            const start = balloon.origin.type === "cloud" ? width : 60;
-            const point = layoutPosition("balloon", balloon.id) || (named ? {
-                x: Math.max(55, base.x + start + 35 + index % 4 * 116),
-                y: Math.max(60, base.y + 105 + Math.floor(index / 4) * 128)
-            } : {
-                x: Math.max(34, base.x + start + index % 4 * 72),
-                y: Math.max(38, base.y + Math.floor(index / 4) * 86)
-            });
+            const isCloud = balloon.origin.type === "cloud";
+            const nearby = placeObject(occupied, {
+                x: base.x + (isCloud ? width : kiteSize.width / 2) + balloonSize.width / 2 + 45,
+                y: base.y + (isCloud ? height / 2 : 0)
+            }, balloonSize);
+            const point = layoutPosition("balloon", balloon.id) || nearby;
             const { x, y } = point;
-            grow(x + 100, y + 100);
-            mapLocations.set(`balloon:${balloon.id}`, point);
+            grow(x + balloonSize.width / 2 + 90, y + balloonSize.height / 2 + 90);
+            mapLocations.set(`balloon:${balloon.id}`, { x, y: y - 45 });
             const string = document.createElementNS(svg.namespaceURI, "polyline");
             string.dataset.balloon = balloon.id;
             string.dataset.origin = key;
-            const points = `${anchor.x},${anchor.y} ${x},${y + (named ? 45 : 28)}`;
+            const points = `${anchor.x},${anchor.y} ${x},${y + balloonSize.basketAnchor}`;
             string.setAttribute("points", points);
             if (named) attachmentHits.push({ balloon, points });
             svg.append(string);
@@ -405,16 +415,14 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             item.setAttribute("aria-keyshortcuts", "Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight");
             item.title = named ? `${balloon.principle}: ${snippet(balloon.principleExplanation)}` :
                 `${snippet(balloon.idea)} · Principle: ${snippet(balloon.principle)}`;
-            if (named) {
-                item.classList.add("kw-balloon-named");
-                const preview = element("span", snippet(balloon.principleExplanation));
-                const basket = element("span", balloon.principle);
-                preview.className = "kw-balloon-preview";
-                basket.className = "kw-balloon-basket";
-                preview.setAttribute("aria-hidden", "true");
-                basket.setAttribute("aria-hidden", "true");
-                item.append(preview, basket);
-            }
+            const preview = element("span", snippet(balloon.principleExplanation ?? balloon.idea));
+            const basket = element("span"), basketName = element("span", balloon.principle);
+            preview.className = "kw-balloon-preview";
+            basket.className = "kw-balloon-basket";
+            preview.setAttribute("aria-hidden", "true");
+            basket.setAttribute("aria-hidden", "true");
+            basket.append(basketName);
+            item.append(preview, basket);
             item.style.left = `${x}px`;
             item.style.top = `${y}px`;
             layer.append(item);
@@ -700,12 +708,12 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         }
         host.replaceChildren(top, element("h2", isBalloon ? "Hot-Air Balloon" : isConnection ? "Connection" : linkTitle(kite)), meta(kite));
         if (isBalloon && kite.idea != null) {
-            host.append(element("h3", "Idea"), element("p", kite.idea),
-                element("h3", "Theoretical principle"), element("p", kite.principle),
-                element("h3", "How the contributor relates them"), element("p", kite.explanation));
+            host.append(element("h3", "Theoretical Principle"), element("p", kite.principle),
+                element("h3", "Original idea (earlier balloon)"), element("p", kite.idea),
+                element("h3", "Original explanation linking the idea and principle"), element("p", kite.explanation));
         } else if (isBalloon) {
-            host.append(element("h3", "Theoretical principle"), element("p", kite.principle),
-                element("h3", "Principle explanation"), element("p", kite.principleExplanation));
+            host.append(element("h3", "Theoretical Principle"), element("p", kite.principle),
+                element("h3", "Explanation of the Principle"), element("p", kite.principleExplanation));
         } else host.append(element("p", isConnection ? kite.explanation : kite.argument));
         const endpoints = isBalloon ? [kite.origin] : isConnection ? [kite.first, kite.second] :
             [{ type: "cloud", id: kite.cloudA, label: kite.titleA }, ...(kite.cloudB ? [{ type: "cloud", id: kite.cloudB, label: kite.titleB }] : [])];
@@ -727,7 +735,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         host.append(element("h3", isBalloon ? "Originally connected to" : "Linked items"), links);
         if (isBalloon) {
             if (kite.principleExplanation != null) {
-                const relationship = element("h3", "Original relationship explanation");
+                const relationship = element("h3", "Relationship to the Originating Cloud or Kite");
                 relationship.id = "kw-contribution-original-relationship";
                 relationship.tabIndex = -1;
                 host.append(relationship, element("p", kite.explanation));
