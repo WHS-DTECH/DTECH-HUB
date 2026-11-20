@@ -2,6 +2,7 @@
 
 const { randomUUID } = require("node:crypto");
 const { getSourceMetadata } = require("./.source-metadata");
+const { registerContributions, schema: contributionSchema } = require("./.contributions");
 
 const FIRST_CLOUD = "77b0456a-d3f0-4a2d-a045-6690868331b3";
 const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
@@ -145,7 +146,7 @@ function titleSimilarity(first, second) {
     return 2 * [...a].filter((part) => b.has(part)).length / (a.size + b.size || 1);
 }
 
-function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStudentProfile, getContributorName }) {
+function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStudentProfile, getContributorName, notifyReport }) {
     const base = "/api/knowledge-web";
     let schema;
 
@@ -220,6 +221,7 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
                 comment TEXT NOT NULL DEFAULT '', snapshot JSONB NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );`);
+            await db.query(contributionSchema);
             const seeded = await db.query(`INSERT INTO knowledge_web_clouds (id, title, description, significance, events, contributor_name)
                 VALUES ($1, $2, $3, $4, $5, 'DTECH teaching team') ON CONFLICT (id) DO NOTHING RETURNING id`, [
                 FIRST_CLOUD, "2026 NCEA Digital Examination Disruptions",
@@ -566,6 +568,7 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
     });
     app.post(`${base}/manage/clouds`, save);
     app.put(`${base}/manage/clouds/:id`, save);
+    registerContributions(app, { base, pool, route, ensureSchema, transaction, getContributorName, notifyReport, UUID, problem, text, date });
 }
 
 module.exports = { registerKnowledgeWeb };

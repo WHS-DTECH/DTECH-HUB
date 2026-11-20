@@ -11,6 +11,10 @@
         timelineView: "year", timelineYear: "", timelineDay: ""
     };
     const formatDate = (value) => value ? new Date(value).toLocaleDateString("en-NZ", { timeZone: "Pacific/Auckland" }) : "";
+    const contributions = createKnowledgeContributions({
+        node, request, element, button, state, showCloud, resizeTextareas, formatDate,
+        onProposalsChanged: renderStudentProposals
+    });
     const formatHistoricalDate = (value) => {
         const match = String(value || "").match(/^(\d{4})-(\d{2})(?:-(\d{2}))?$/);
         return match ? [match[3], match[2], match[1]].filter(Boolean).join("-") : value || "";
@@ -53,7 +57,7 @@
 
     function updatePressed() {
         for (const host of [node("results"), node("board")]) {
-            host.querySelectorAll("button").forEach((el) => el.setAttribute("aria-pressed", String(el.dataset.cloudId === state.selected)));
+            host.querySelectorAll("button[data-cloud-id]").forEach((el) => el.setAttribute("aria-pressed", String(el.dataset.cloudId === state.selected)));
         }
     }
 
@@ -195,6 +199,7 @@
             element("small", `Contributed by ${cloud.contributor} · Added ${formatDate(cloud.createdAt)} · Updated ${formatDate(cloud.updatedAt)}`));
         if (state.canPropose) detail.append(button("Propose a new cloud connected to this one", () => beginProposal(cloud)));
         updatePressed();
+        contributions.drawMap();
         if (centre) {
             const viewport = node("viewport");
             const position = state.positions.get(cloud.id);
@@ -253,6 +258,7 @@
     function renderExplore() {
         node("empty").hidden = state.clouds.length !== 0;
         node("clouds").hidden = state.clouds.length === 0;
+        node("connect").hidden = !state.canPropose || state.clouds.length < 2;
         renderTimeline();
         if (!state.clouds.length) return;
         const board = node("board");
@@ -273,6 +279,7 @@
             board.append(item);
         }
         renderSearch();
+        contributions.drawMap();
         node("detail").replaceChildren(element("h2", "Explore a cloud"),
             element("p", "Select a cloud on the canvas or in the title list to read more."));
     }
@@ -488,6 +495,9 @@
                     element("p", "The cloud is published. This relationship has been preserved as a draft kite; it has not been published."),
                     element("p", proposal.connection));
                 sourceList(card, proposal.connectionSources);
+                if (!contributions.converted(proposal.id)) {
+                    card.append(button("Publish as Kite", () => contributions.openEditor(proposal)));
+                } else card.append(element("p", "You already published a kite from this proposal."));
             } else if (["Draft", "Returned for Revision"].includes(proposal.status)) {
                 card.append(button(proposal.status === "Draft" ? "Continue draft" : "Revise and resubmit",
                     () => beginProposal(null, proposal)));
@@ -736,6 +746,7 @@
         for (const id of ["sources", "events", "drafts", "board", "results", "detail", "reviews", "proposal-list",
             "proposal-sources", "connection-sources", "proposal-events"]) node(id).replaceChildren();
         state.proposals = [];
+        contributions.reset();
         state.proposalDirty = false;
         proposalForm.reset();
         proposalForm.inert = false;
@@ -760,7 +771,9 @@
                 node("explore-link").hidden = false;
                 renderManagement();
                 renderReviews();
+                void contributions.reports();
                 if (state.clouds.length) editCloud(state.clouds.find((cloud) => !cloud.publishedAt) || state.clouds[0], false);
+                if (location.hash === "#web-moderation") node("moderation").scrollIntoView();
             } else {
                 node("explore").hidden = false;
                 node("manage-link").hidden = !result.canManage;
@@ -768,6 +781,7 @@
                 node("my-proposals").hidden = !state.canPropose;
                 renderStudentProposals();
                 renderExplore();
+                void contributions.refresh();
             }
         } catch (error) {
             if (revision !== state.revision) return;
@@ -816,6 +830,8 @@
     window.addEventListener("resize", () => {
         resizeTextareas(form);
         resizeTextareas(proposalForm);
+        resizeTextareas(node("explore"));
+        resizeTextareas(node("moderation"));
     });
     document.fonts?.ready.then(() => {
         resizeTextareas(form);

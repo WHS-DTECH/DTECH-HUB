@@ -8,7 +8,7 @@
     <title>Computing History Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=7">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=8">
 </head>
 <body>
     <div class="page-shell">
@@ -23,7 +23,7 @@
             </nav>
         </header>
         <main class="knowledge-web">
-            <p class="section-kicker">KNOW MODE &middot; YEARS 9&ndash;10</p>
+            <p class="section-kicker">KNOW MODE &middot; YEARS 9&ndash;13</p>
             <h1 id="web-title">Computing History Knowledge Web</h1>
             <p>One shared computing history web for MiddleDTECH (Years 9–10) and SeniorDTECH (Years 11–13). Explore the evidence in any order.</p>
             <div class="kw-actions">
@@ -57,12 +57,26 @@
                         <input id="web-search" type="search" autocomplete="off">
                         <ul id="web-results" aria-label="Clouds by title"></ul>
                         <div class="kw-actions" aria-label="Canvas controls">
+                            <button type="button" id="web-connect" hidden>Connect Clouds</button>
                             <button type="button" id="web-zoom-out" aria-label="Zoom out">−</button>
                             <button type="button" id="web-zoom-in" aria-label="Zoom in">+</button>
                             <button type="button" id="web-reset">Reset view</button>
                             <output id="web-zoom" aria-live="polite">100%</output>
                         </div>
+                        <section id="web-kites" class="kw-panel kw-contribution-panel" aria-label="Kite arguments">
+                            <h2>Kite arguments</h2>
+                            <label>Find an argument <input id="web-kite-search" type="search" autocomplete="off"></label>
+                            <div class="kw-actions">
+                                <button id="web-refresh-kites" type="button">Refresh kites</button>
+                                <button id="web-kite-more" type="button" hidden>Show more arguments</button>
+                            </div>
+                            <p id="web-kite-status" role="status"></p>
+                            <ul id="web-kite-list" aria-label="Arguments by cloud, author or text"></ul>
+                            <div id="web-kite-editor" hidden></div>
+                            <article id="web-kite-detail" aria-label="Selected argument" tabindex="-1" hidden></article>
+                        </section>
                         <p id="web-pan-help">Scroll or use the arrow keys in the map to pan. You can also explore from the cloud list.</p>
+                        <p id="web-kite-map-note"></p>
                         <div id="web-viewport" class="kw-viewport" tabindex="0" role="region" aria-label="Knowledge Web canvas" aria-describedby="web-pan-help">
                             <div id="web-board"></div>
                         </div>
@@ -104,13 +118,16 @@
                         <ul id="web-duplicates" aria-label="Possible matching clouds" hidden></ul>
                     </form>
                 </section>
-                <section id="web-my-proposals" class="kw-panel" aria-label="My cloud proposals" hidden>
-                    <h2>My cloud proposals</h2>
+                <section id="web-my-proposals" class="kw-panel" aria-labelledby="web-my-contributions-title" hidden>
+                    <h2 id="web-my-contributions-title">My Contributions</h2>
+                    <h3>My cloud proposals</h3>
                     <p>Your private drafts, proposal statuses and any teacher revision notes appear here.</p>
                     <div id="web-proposal-list"></div>
+                    <h3>My kites, comments and evidence</h3>
+                    <div id="web-contribution-list"></div>
                 </section>
             </section>
-            <section id="web-manage" aria-label="Manage clouds" hidden>
+            <section id="web-manage" aria-label="Manage Knowledge Web" hidden>
                 <p>Drafts are private to teachers. Check the historical details and sources before publishing a cloud to students.</p>
                 <p id="web-save-status" role="status" aria-live="polite"></p>
                 <div class="kw-columns">
@@ -153,11 +170,19 @@
                     <p>Review the factual basis for proposed historical clouds. The connection is preserved for the student; approving a cloud does not create or publish a kite.</p>
                     <div id="web-reviews"></div>
                 </section>
+                <section class="kw-panel" id="web-moderation" aria-label="Private content reports">
+                    <h2>Private content reports</h2>
+                    <p>Only reported content appears here. Disagreement alone is not a reason to moderate.</p>
+                    <button id="web-refresh-reports" type="button">Refresh reports</button>
+                    <p id="web-report-status" role="status"></p>
+                    <div id="web-report-list"></div>
+                </section>
             </section>
         </main>
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="/script.js?v=knowledge-web-2"></script>
-    <script src="/knowledge-web/web.js?v=10"></script>
+    <script src="/knowledge-web/contributions.js?v=1"></script>
+    <script src="/knowledge-web/web.js?v=11"></script>
 </body>
 </html>

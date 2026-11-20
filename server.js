@@ -6234,6 +6234,9 @@ app.use(async (req, _res, next) => {
     (/^\/api\/knowledge-web\/(?:access|clouds|proposals(?:\/duplicates)?|manage\/clouds|manage\/proposals)\/?$/i.test(req.path) && req.method === "GET") ||
     (/^\/api\/knowledge-web\/(?:proposals|manage\/proposals\/[^/]+\/decision|manage\/clouds|manage\/source-metadata)\/?$/i.test(req.path) && req.method === "POST") ||
     (/^\/api\/knowledge-web\/(?:proposals|manage\/clouds)\/[^/]+\/?$/i.test(req.path) && req.method === "PUT") ||
+    (req.method === "GET" && /^\/api\/knowledge-web\/(?:kites(?:\/[a-f0-9-]+)?|contributions|manage\/reports)\/?$/i.test(req.path)) ||
+    (req.method === "POST" && /^\/api\/knowledge-web\/(?:kites(?:\/[a-f0-9-]+\/(?:comments|evidence|reports))?|manage\/reports\/[a-f0-9-]+)\/?$/i.test(req.path)) ||
+    (req.method === "PUT" && /^\/api\/knowledge-web\/kites\/[a-f0-9-]+\/contributions\/(?:kite|comment|evidence)\/[a-f0-9-]+\/?$/i.test(req.path)) ||
     (req.method === "GET" && /^(?:\/practical-skills\/library\.json|\/api\/practical-skills\/(?:library|my-progress|minecraft-access|typing-kit|(?:kit-content|progress)\/[^/]+))\/?$/i.test(req.path)) ||
     (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/licences\/[a-zA-Z0-9_-]+$/.test(req.path)) ||
     (["GET", "POST"].includes(req.method) && req.path === "/api/practical-skills/drawing-filing") ||
@@ -6309,7 +6312,22 @@ kitPublication.register(app, requireAdminAccess);
 require("./knowledge-web/.store").registerKnowledgeWeb(app, {
   pool, canManage: canManagePracticalSchedule, getStudentProfile: getLearningSitesStudentProfile,
   getVerifiedEmail: (req) => req.auth_identity?.verified && isSchoolEmail(req.auth_identity.email) ? req.auth_identity.email : "",
-  getContributorName: getPracticalSkillsStudentName
+  getContributorName: getPracticalSkillsStudentName,
+  notifyReport: async () => {
+    if (!smtpTransporter || !SMTP_FROM) return;
+    const candidates = await getPracticalSkillsCertificateTeacherRecipients();
+    const authorised = await Promise.all(candidates.map(async (email) => isSchoolEmail(email) && await canManagePracticalSchedule(email)));
+    const teachers = candidates.filter((_email, index) => authorised[index]);
+    if (!teachers.length) return;
+    const url = new URL("/knowledge-web/?manage=1#web-moderation", process.env.HUB_PUBLIC_URL || "https://dtech-hub2.onrender.com");
+    if (!["https:", "http:"].includes(url.protocol)) throw new Error("HUB_PUBLIC_URL must use HTTP(S).");
+    const link = url.href.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    await sendConfiguredHubEmail({
+      to: teachers, subject: "[DTECH HUB] Knowledge Web content report",
+      html: `<p>A student submitted a private content report.</p><p><a href="${link}">Open Knowledge Web moderation</a>.</p>`,
+      emailType: "knowledge_web_report"
+    });
+  }
 });
 app.use("/images/activities", express.static(path.join(__dirname, "public", "images", "activities")));
 app.get("/practical-skills/library.json", kitPublication.requireLibraryAccess, async (_req, res) => {

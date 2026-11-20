@@ -156,6 +156,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             await admin.query(`DROP SCHEMA ${schemaName} CASCADE`);
             await admin.end();
         });
+        const notifications = [];
         let authorYear = 10;
         let authorName = "Test Student One";
         async function startApp() {
@@ -165,8 +166,10 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
                 pool, getVerifiedEmail: (req) => req.headers["x-verified-test-account"] || "",
                 canManage: async (account) => account === "teacher@test.invalid",
                 getStudentProfile: async (account) => ({ available: true, year: account.startsWith("student-two") ? 13 : authorYear }),
+                notifyReport: async (...args) => { notifications.push(args); },
                 getContributorName: async (_req, account) => account === "teacher@test.invalid" ? "Test Teacher"
-                    : account.startsWith("student-two") ? "Test Student Two" : authorName
+                    : account.startsWith("student-two") ? "Test Student Two" : account.startsWith("student-three") ? "Test Student Three"
+                        : account.startsWith("student-four") ? "Test Student Four" : authorName
             });
             app.use(express.static(path.resolve(__dirname, "..")));
             const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
@@ -411,8 +414,8 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.doesNotMatch(JSON.stringify(seniorClouds), /student-one@test\.invalid|contributorEmail|added_by/);
         assert.deepEqual(approvedCloud.events, submitted.events, "Proposal event time survives review and cloud publication");
         assert.equal((await list("clouds", false)).length, 2, "Another eligible student can see the approved cloud");
-        assert.equal(await pool.query("SELECT to_regclass('knowledge_web_kites') AS name").then((result) => result.rows[0].name),
-            null, "Phase 2 preserves a draft connection and does not create live kites");
+        assert.deepEqual((await (await call("kites", { student: true })).json()).kites, [],
+            "Cloud approval does not automatically publish a kite");
         const audit = await pool.query(`SELECT action,actor_email,comment FROM knowledge_web_proposal_events WHERE proposal_id=$1 ORDER BY created_at,id`, [draft.id]);
         assert.deepEqual(audit.rows.map((row) => row.action), ["Draft saved", "Submitted", "Returned for Revision", "Submitted", "Approved"]);
         assert.equal(audit.rows[2].actor_email, "teacher@test.invalid");
@@ -433,4 +436,95 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             .proposals.find((proposal) => proposal.id === declinedId);
         assert.equal(declinedStudent.status, "Declined");
         assert.equal(declinedStudent.teacherComment, "This proposal needs a stronger historical foundation.");
+
+        const studentB = "student-two@test.invalid", studentC = "student-three@test.invalid", studentD = "student-four@test.invalid";
+        const post = (uri, body, account = "student-one@test.invalid") => call(uri, { method: "POST", body, account });
+        const put = (uri, body, account = "student-one@test.invalid") => call(uri, { method: "PUT", body, account });
+        const get = async (uri, account = "student-one@test.invalid") => {
+            const response = await call(uri, { account });
+            assert.equal(response.status, 200, uri);
+            return response.json();
+        };
+        const fromProposal = { cloudA: approved.originalCloudId, cloudB: approved.publishedCloudId,
+            argument: approved.connection, evidence: approved.connectionSources, proposalId: approved.id };
+        assert.equal((await post("kites", { ...fromProposal, evidence: [] })).status, 400);
+        assert.equal((await post("kites", { ...fromProposal, cloudB: fromProposal.cloudA })).status, 400);
+        assert.equal((await post("kites", { ...fromProposal, proposalId: undefined, cloudB: seed.id })).status, 404);
+        assert.equal((await post("kites", fromProposal, studentB)).status, 404);
+        const firstKite = await post("kites", fromProposal);
+        assert.equal(firstKite.status, 201);
+        const { id: kiteA } = await firstKite.json();
+        assert.equal((await post("kites", fromProposal)).status, 409);
+        const originalKite = await get(`kites/${kiteA}`, studentB);
+        assert.equal(originalKite.kite.argument, fromProposal.argument);
+        assert.equal(originalKite.evidence[0].supports, fromProposal.evidence[0].supports);
+        assert.equal(originalKite.kite.contributor, "Changed Display Name");
+        assert.equal(originalKite.kite.mine, false);
+        assert.doesNotMatch(JSON.stringify(originalKite), /@test\.invalid|contributor_email|proposalId/);
+        const opponent = await post("kites", { ...fromProposal, cloudA: fromProposal.cloudB, cloudB: fromProposal.cloudA,
+            proposalId: undefined, argument: "An alternative interpretation of the same two events." }, studentB);
+        assert.equal(opponent.status, 201);
+        const { id: kiteB } = await opponent.json();
+        const grouped = (await get("kites", studentB)).kites;
+        assert.deepEqual(new Set(grouped.map(({ id }) => id)), new Set([kiteA, kiteB]));
+        assert.deepEqual(grouped.map(({ cloudA, cloudB }) => [cloudA, cloudB]), Array(2).fill([originalKite.kite.cloudA, originalKite.kite.cloudB]));
+        assert.equal((await put(`kites/${kiteA}/contributions/kite/${kiteA}`, { argument: "Unauthorised edit" }, studentB)).status, 403);
+        assert.equal((await put(`kites/${kiteA}/contributions/kite/${kiteA}`, { argument: "An updated argument." })).status, 200);
+        const comment = await post(`kites/${kiteA}/comments`, { body: "How do you explain the timing?" }, studentC);
+        assert.equal(comment.status, 201, "Ordinary comments need no citation");
+        const { id: commentId } = await comment.json();
+        assert.equal((await post(`kites/${kiteB}/comments`, { body: "Cross-kite reply", replyTo: commentId }, studentC)).status, 404);
+        const reply = await post(`kites/${kiteA}/comments`, { body: "The timing may be coincidental.", replyTo: commentId }, studentB);
+        assert.equal(reply.status, 201);
+        const additional = await post(`kites/${kiteA}/evidence`, { title: "Alternative source", reference: "https://example.test/alternative",
+            supports: "Offers another explanation for the timing.", stance: "challenges" }, studentD);
+        assert.equal(additional.status, 201);
+        const { id: evidenceId } = await additional.json();
+        const expanded = await get(`kites/${kiteA}`);
+        assert.equal(expanded.kite.createdAt, originalKite.kite.createdAt);
+        assert.equal(expanded.kite.argument, "An updated argument.");
+        assert.equal(expanded.comments.find(({ id }) => id === commentId).contributor, "Test Student Three");
+        assert.equal(expanded.comments.find(({ id }) => id !== commentId).replyTo, commentId);
+        assert.deepEqual(expanded.evidence.map(({ contributor }) => contributor), ["Changed Display Name", "Test Student Four"]);
+        assert.equal(expanded.evidence[1].url, "https://example.test/alternative");
+        assert.equal(expanded.evidence[1].stance, "challenges");
+        const own = await get("contributions");
+        assert.ok(own.contributions.some((item) => item.id === kiteA && item.kind === "kite"));
+        assert.deepEqual(own.convertedProposalIds, [approved.id]);
+        assert.deepEqual((await get("contributions", studentC)).contributions.map(({ id }) => id), [commentId]);
+        assert.deepEqual((await get("contributions", studentD)).contributions.map(({ id }) => id), [evidenceId]);
+        const savedReport = await post(`kites/${kiteA}/reports`, {
+            kind: "comment", targetId: commentId, reason: "harassment", details: "Private report details"
+        }, studentB);
+        assert.equal(savedReport.status, 201);
+        const { id: reportId } = await savedReport.json();
+        const secondReport = await post(`kites/${kiteA}/reports`, {
+            kind: "comment", targetId: commentId, reason: "personal-information"
+        }, studentD);
+        assert.equal(secondReport.status, 201);
+        const secondReportId = (await secondReport.json()).id;
+        assert.deepEqual(notifications, [[]], "Only the first open report notifies staff, without private contents");
+        assert.equal((await call("manage/reports", { account: studentB })).status, 403);
+        assert.equal((await get(`kites/${kiteA}`, studentB)).comments.length, 2, "Reporting does not hide content");
+        const queue = await get("manage/reports", "teacher@test.invalid");
+        assert.equal(queue.reports.find(({ id }) => id === reportId).details, "Private report details");
+        assert.equal((await post(`manage/reports/${reportId}`, { action: "hide", note: "Not suitable." }, studentC)).status, 403);
+        assert.equal((await post(`manage/reports/${secondReportId}`, { action: "dismiss", note: "No personal details." }, "teacher@test.invalid")).status, 200);
+        assert.deepEqual((await get("manage/reports", "teacher@test.invalid")).reports.map(({ id }) => id), [reportId]);
+        assert.equal((await post(`manage/reports/${reportId}`, { action: "hide", note: "Not suitable." }, "teacher@test.invalid")).status, 200);
+        const moderated = await get(`kites/${kiteA}`, studentB);
+        assert.equal(moderated.comments.length, 1);
+        assert.equal(moderated.comments[0].replyUnavailable, true);
+        assert.doesNotMatch(JSON.stringify(moderated), /How do you explain|Private report details/);
+        assert.deepEqual((await get("contributions", studentC)).contributions, []);
+        const kiteReport = await post(`kites/${kiteA}/reports`, { kind: "kite", targetId: kiteA, reason: "spam" }, studentB);
+        assert.equal(kiteReport.status, 201);
+        assert.equal((await post(`manage/reports/${(await kiteReport.json()).id}`, { action: "hide", note: "Confirmed." }, "teacher@test.invalid")).status, 200);
+        host = await startApp();
+        assert.equal((await call(`kites/${kiteA}`, { account: studentB })).status, 404);
+        assert.deepEqual((await get("kites", studentB)).kites.map(({ id }) => id), [kiteB]);
+        assert.equal((await get(`kites/${kiteB}`, studentB)).kite.contributor, "Test Student Two");
+        assert.deepEqual((await get("contributions", studentD)).contributions, [], "Hidden kite evidence is not exposed");
+        assert.equal((await pool.query("SELECT id FROM knowledge_web_moderation_actions")).rowCount, 3);
+        assert.equal((await pool.query("SELECT id FROM knowledge_web_contribution_revisions")).rowCount, 1);
     });
