@@ -11,6 +11,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         disruption: "Deliberately disruptive content", other: "Other inappropriate behaviour" };
     const stances = { supports: "Supports the argument", challenges: "Challenges the argument", context: "Adds context" };
     const snippet = (value) => value.length > 105 ? `${value.slice(0, 102)}…` : value;
+    const balloonLabel = (balloon) => balloon.idea ?? balloon.principle;
 
     function select(options, initial, placeholder) {
         const field = element("select");
@@ -159,10 +160,15 @@ function createKnowledgeContributions({ node, request, element, button, state, s
     }
 
     function balloonFields(fields, current = {}) {
-        const idea = field(fields, "Idea", 4000, current.idea, { multiline: true });
-        const principle = field(fields, "Theoretical principle", 4000, current.principle, { multiline: true });
-        const explanation = field(fields, "How does the principle relate to the idea?", 4000, current.explanation, { multiline: true });
-        return () => ({ idea: idea.value, principle: principle.value, explanation: explanation.value });
+        const legacy = current.idea != null;
+        const idea = legacy ? field(fields, "Idea", 4000, current.idea, { multiline: true }) : null;
+        const principle = field(fields, legacy ? "Theoretical principle" : "Theoretical principle (basket)", 4000, current.principle, { multiline: true });
+        if (!legacy) fields.append(element("p", "Name a specific principle, such as data minimisation, rather than a broad area such as privacy."));
+        const meaning = legacy ? null : field(fields, "Principle explanation (balloon)", 4000, current.principleExplanation, { multiline: true });
+        const explanation = field(fields, legacy ? "How does the principle relate to the idea?" :
+            "Why does this principle relate to the originating item? (string)", 4000, current.explanation, { multiline: true });
+        return () => ({ ...(legacy ? { idea: idea.value } : { principleExplanation: meaning.value }),
+            principle: principle.value, explanation: explanation.value });
     }
 
     function optionalEvidence(fields) {
@@ -221,7 +227,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         const host = node("connection-editor");
         const choices = [
             ...itemChoices(),
-            ...balloons.map(({ id, idea }) => ({ type: "balloon", id, label: snippet(idea) }))
+            ...balloons.map((balloon) => ({ type: "balloon", id: balloon.id, label: snippet(balloonLabel(balloon)) }))
         ];
         if (choices.length < 2) {
             node("kite-status").textContent = "Two visible items are needed. Try refreshing if an item was just added.";
@@ -362,32 +368,53 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             }
         }
         const originCounts = new Map();
+        const attachmentHits = [];
         for (const balloon of balloons) {
             const key = endpointKey(balloon.origin), anchor = mapLocations.get(key);
             if (!anchor) continue;
             const base = balloon.origin.type === "kite" ? baseKites.get(balloon.origin.id) :
                 state.basePositions.get(balloon.origin.id);
-            const index = originCounts.get(key) || 0;
-            originCounts.set(key, index + 1);
-            const point = layoutPosition("balloon", balloon.id) || {
-                x: Math.max(34, base.x + (balloon.origin.type === "cloud" ? width : 60) + index % 4 * 72),
+            const named = balloon.principleExplanation != null;
+            const countKey = `${key}:${named}`;
+            const index = originCounts.get(countKey) || 0;
+            originCounts.set(countKey, index + 1);
+            const start = balloon.origin.type === "cloud" ? width : 60;
+            const point = layoutPosition("balloon", balloon.id) || (named ? {
+                x: Math.max(55, base.x + start + 35 + index % 4 * 116),
+                y: Math.max(60, base.y + 105 + Math.floor(index / 4) * 128)
+            } : {
+                x: Math.max(34, base.x + start + index % 4 * 72),
                 y: Math.max(38, base.y + Math.floor(index / 4) * 86)
-            };
+            });
             const { x, y } = point;
             grow(x + 100, y + 100);
             mapLocations.set(`balloon:${balloon.id}`, point);
             const string = document.createElementNS(svg.namespaceURI, "polyline");
             string.dataset.balloon = balloon.id;
             string.dataset.origin = key;
-            string.setAttribute("points", `${anchor.x},${anchor.y} ${x},${y + 28}`);
+            const points = `${anchor.x},${anchor.y} ${x},${y + (named ? 45 : 28)}`;
+            string.setAttribute("points", points);
+            if (named) attachmentHits.push({ balloon, points });
             svg.append(string);
             const item = button("", () => { void openBalloon(balloon.id); });
             item.className = "kw-balloon";
             item.dataset.layoutType = "balloon";
             item.dataset.layoutId = balloon.id;
-            item.setAttribute("aria-label", `Balloon: ${snippet(balloon.idea)}. Principle: ${snippet(balloon.principle)}`);
+            item.setAttribute("aria-label", named ? `Balloon: ${snippet(balloon.principle)}` :
+                `Balloon: ${snippet(balloon.idea)}. Principle: ${snippet(balloon.principle)}`);
             item.setAttribute("aria-keyshortcuts", "Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight");
-            item.title = `${snippet(balloon.idea)} · Principle: ${snippet(balloon.principle)}`;
+            item.title = named ? `${balloon.principle}: ${snippet(balloon.principleExplanation)}` :
+                `${snippet(balloon.idea)} · Principle: ${snippet(balloon.principle)}`;
+            if (named) {
+                item.classList.add("kw-balloon-named");
+                const preview = element("span", snippet(balloon.principleExplanation));
+                const basket = element("span", balloon.principle);
+                preview.className = "kw-balloon-preview";
+                basket.className = "kw-balloon-basket";
+                preview.setAttribute("aria-hidden", "true");
+                basket.setAttribute("aria-hidden", "true");
+                item.append(preview, basket);
+            }
             item.style.left = `${x}px`;
             item.style.top = `${y}px`;
             layer.append(item);
@@ -396,13 +423,35 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         board.style.width = `${extentX}px`;
         board.style.height = `${extentY}px`;
         board.prepend(layer);
-        drawConnections(board, svg.namespaceURI);
+        drawConnections(board, svg.namespaceURI, attachmentHits);
         highlightSelection();
     }
 
-    function drawConnections(board, namespace) {
+    function drawConnections(board, namespace, attachmentHits) {
         const layer = document.createElementNS(namespace, "svg");
         layer.classList.add("kw-string-layer");
+        for (const { balloon, points } of attachmentHits) {
+            const group = document.createElementNS(namespace, "g");
+            group.classList.add("kw-original-attachment");
+            group.setAttribute("role", "button");
+            group.setAttribute("tabindex", "0");
+            group.setAttribute("aria-label", `Original attachment for ${snippet(balloon.principle)}`);
+            const line = document.createElementNS(namespace, "polyline");
+            line.setAttribute("points", points);
+            line.classList.add("kw-string-hit");
+            const focusLine = line.cloneNode();
+            focusLine.setAttribute("class", "kw-attachment-focus");
+            group.append(focusLine, line);
+            const open = () => { void openBalloon(balloon.id, "original-relationship"); };
+            group.addEventListener("click", open);
+            group.addEventListener("keydown", (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    open();
+                }
+            });
+            layer.append(group);
+        }
         const pairs = new Map();
         for (const connection of connections) {
             const keys = [endpointKey(connection.first), endpointKey(connection.second)].sort();
@@ -491,10 +540,11 @@ function createKnowledgeContributions({ node, request, element, button, state, s
     }
 
     function searchBalloons(query) {
-        return balloons.filter(({ idea, principle, explanation }) => `${idea} ${principle} ${explanation}`.toLowerCase().includes(query))
-            .map((balloon) => searchResult("Balloon", snippet(balloon.idea), () => {
+        return balloons.filter(({ idea, principle, principleExplanation, explanation }) =>
+            [idea, principle, principleExplanation, explanation].filter(Boolean).join(" ").toLowerCase().includes(query))
+            .map((balloon) => searchResult("Balloon", snippet(balloonLabel(balloon)), () => {
                 locate(mapLocations.get(`balloon:${balloon.id}`)); void openBalloon(balloon.id);
-            }, `Principle: ${snippet(balloon.principle)}`));
+            }, balloon.idea != null ? `Principle: ${snippet(balloon.principle)}` : snippet(balloon.principleExplanation)));
     }
 
     async function refresh() {
@@ -649,10 +699,13 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             top.append(menu);
         }
         host.replaceChildren(top, element("h2", isBalloon ? "Hot-Air Balloon" : isConnection ? "Connection" : linkTitle(kite)), meta(kite));
-        if (isBalloon) {
+        if (isBalloon && kite.idea != null) {
             host.append(element("h3", "Idea"), element("p", kite.idea),
                 element("h3", "Theoretical principle"), element("p", kite.principle),
                 element("h3", "How the contributor relates them"), element("p", kite.explanation));
+        } else if (isBalloon) {
+            host.append(element("h3", "Theoretical principle"), element("p", kite.principle),
+                element("h3", "Principle explanation"), element("p", kite.principleExplanation));
         } else host.append(element("p", isConnection ? kite.explanation : kite.argument));
         const endpoints = isBalloon ? [kite.origin] : isConnection ? [kite.first, kite.second] :
             [{ type: "cloud", id: kite.cloudA, label: kite.titleA }, ...(kite.cloudB ? [{ type: "cloud", id: kite.cloudB, label: kite.titleB }] : [])];
@@ -671,8 +724,14 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             row.append(link);
             links.append(row);
         }
-        host.append(element("h3", isBalloon ? "Originating item" : "Linked items"), links);
+        host.append(element("h3", isBalloon ? "Originally connected to" : "Linked items"), links);
         if (isBalloon) {
+            if (kite.principleExplanation != null) {
+                const relationship = element("h3", "Original relationship explanation");
+                relationship.id = "kw-contribution-original-relationship";
+                relationship.tabIndex = -1;
+                host.append(relationship, element("p", kite.explanation));
+            }
             host.append(element("h3", "Connections"));
             const related = element("ul");
             for (const connection of result.connections) {

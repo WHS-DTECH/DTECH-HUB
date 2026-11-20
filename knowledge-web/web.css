@@ -90,8 +90,15 @@
     background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 62 74' stroke='%2375382c' stroke-width='2'%3E%3Cpath fill='%23f8ad94' d='M31 3C10 3 4 17 6 29c2 11 9 19 17 25h16c8-6 15-14 17-25C58 17 52 3 31 3Z'/%3E%3Cpath fill='none' d='M31 3c-15 0-19 30-4 51M31 3c15 0 19 30 4 51M23 54l2 9m14-9-2 9'/%3E%3Cpath fill='%23f5d490' d='M23 62h16l-2 10H25Z'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 .knowledge-web button.kw-balloon:is(:focus-visible, :hover, [aria-pressed="true"], .kw-linked) { outline: 2px solid var(--kw-accent); outline-offset: 1px; }
+.knowledge-web button.kw-balloon-named { width: 108px; height: 118px; background-size: 100% 100%; }
+.kw-balloon-preview, .kw-balloon-basket { position: absolute; inset-inline: .5rem; pointer-events: none; line-height: 1.15; overflow-wrap: anywhere; }
+.kw-balloon-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; top: 24%; inset-inline: 16%; font-size: .73rem; font-weight: 650; color: #381d17; }
+.kw-balloon-basket { bottom: 1px; padding: 2px 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .72rem; font-weight: 750; color: #381d17; background: #f5d490; border: 1px solid #75382c; border-radius: .25rem; }
+.kw-attachment-focus { fill: none; stroke: transparent; stroke-width: 4; }
+.kw-original-attachment:is(:focus-visible, :hover) .kw-attachment-focus { stroke: var(--kw-accent); }
 @media (forced-colors: active) {
     .knowledge-web button.kw-balloon { forced-color-adjust: none; outline: 1px solid ButtonText; }
+    .kw-original-attachment:is(:focus-visible, :hover) .kw-attachment-focus { stroke: LinkText; }
 }
 @media (forced-colors: active) {
     .kw-string-line { stroke: LinkText; }

@@ -662,18 +662,35 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal((await call(`connections/${cloudString}`, { student: true })).status, 404);
         assert.equal((await showString(opposing)).connection.id, opposing);
 
-        // Recreate the two Stage 2 constraints before opening a fresh app instance.
+        // Recreate the earlier constraints and seed an old-format balloon before restarting.
+        const legacyBalloon = randomUUID();
         await pool.query(`ALTER TABLE knowledge_web_connections DROP CONSTRAINT knowledge_web_connections_endpoint_types,
             DROP COLUMN first_balloon, DROP COLUMN second_balloon,
             ADD CHECK (num_nonnulls(first_cloud,first_kite)=1 AND num_nonnulls(second_cloud,second_kite)=1);
             ALTER TABLE knowledge_web_layout_positions DROP CONSTRAINT knowledge_web_layout_item_types,
-            ADD CHECK (item_type IN ('cloud','kite'));`);
+            ADD CHECK (item_type IN ('cloud','kite'));
+            ALTER TABLE knowledge_web_balloons DROP CONSTRAINT knowledge_web_balloon_content_format,
+            DROP COLUMN principle_explanation, ALTER COLUMN argument SET NOT NULL;`);
+        await pool.query(`INSERT INTO knowledge_web_balloons
+            (id,origin_cloud,argument,principle,explanation,contributor_email,contributor_name)
+            VALUES ($1,$2,'Make settings easier to find','Usability','The interface feels crowded.',
+                'student-one@test.invalid','Original Author')`, [legacyBalloon, id]);
         host = await startApp();
         assert.equal((await showString(opposing)).connection.first.id, cloudPair.second.id);
         assert.deepEqual(await get("layout", studentB), secondLayout);
-        const balloonBody = { origin: cloudNode(id), idea: "Make cancellation easy", principle: "Informed consent",
-            explanation: "Users need a clear way to withdraw consent." };
-        for (const field of ["idea", "principle", "explanation"]) {
+        const legacyDetail = (await get(`balloons/${legacyBalloon}`)).balloon;
+        assert.deepEqual([legacyDetail.idea, legacyDetail.principle, legacyDetail.principleExplanation, legacyDetail.explanation, legacyDetail.contributor],
+            ["Make settings easier to find", "Usability", null, "The interface feels crowded.", "Original Author"]);
+        assert.equal((await put(`balloons/${legacyBalloon}/contributions/balloon/${legacyBalloon}`, {
+            ...legacyDetail, idea: "Make controls easy to find", principleExplanation: "Do not convert this record."
+        })).status, 200);
+        const editedLegacy = (await get(`balloons/${legacyBalloon}`)).balloon;
+        assert.equal(editedLegacy.idea, "Make controls easy to find");
+        assert.equal(editedLegacy.principleExplanation, null);
+        const balloonBody = { origin: cloudNode(id), principle: "Informed consent",
+            principleExplanation: "People need enough information and a genuine choice.",
+            explanation: "The cancellation interface makes it hard to withdraw consent." };
+        for (const field of ["principleExplanation", "principle", "explanation"]) {
             assert.equal((await post("balloons", { ...balloonBody, [field]: " " })).status, 400);
         }
         assert.equal((await post("balloons", balloonBody, "junior@test.invalid")).status, 403);
@@ -694,12 +711,16 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.doesNotMatch(JSON.stringify(originalBalloon), /@test\.invalid/);
         assert.equal(originalBalloon.origin.id, id);
         assert.equal(originalBalloon.principle, balloonBody.principle);
+        assert.equal(originalBalloon.principleExplanation, balloonBody.principleExplanation);
+        assert.equal(originalBalloon.explanation, balloonBody.explanation);
+        assert.equal(originalBalloon.idea, null);
         const teacherBalloonDetail = await get(`balloons/${teacherBalloon}`);
         assert.equal(teacherBalloonDetail.balloon.origin.type, "kite");
         assert.equal(teacherBalloonDetail.balloon.contributor, "Test Teacher");
         assert.equal(teacherBalloonDetail.evidence.length, 1);
         assert.equal((await post("balloons", { ...balloonBody, origin: balloonNode(balloon) })).status, 400);
         const mixedBalloon = await publishConnection(connectionBody(cloudNode(id), balloonNode(balloon)));
+        assert.equal((await showString(mixedBalloon)).connection.second.label, balloonBody.principle);
         const kiteBalloon = await publishConnection(connectionBody(balloonNode(balloon), kiteNode(anchoredId)), studentB);
         const otherBalloon = await publishConnection(connectionBody(balloonNode(teacherBalloon), balloonNode(balloon)));
         const competingBalloon = await publishConnection(connectionBody(balloonNode(balloon), cloudNode(id), "I see a different relationship."), studentB);
@@ -729,7 +750,8 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.deepEqual(updatedBalloon.balloon.origin, originalBalloon.origin);
         assert.equal(updatedBalloon.comments.length, 2);
         assert.equal(updatedBalloon.evidence[0].contributor, "Test Student Two");
-        assert.ok((await get("contributions")).contributions.some(({ id, kind }) => id === balloon && kind === "balloon"));
+        assert.ok((await get("contributions")).contributions.some(({ id, kind, summary }) =>
+            id === balloon && kind === "balloon" && summary === "Reversible consent"));
         const reportBalloonString = await post(`connections/${mixedBalloon}/reports`, {
             kind: "connection", targetId: mixedBalloon, reason: "spam"
         }, studentB);

@@ -74,7 +74,7 @@ const connectionFields = `k.id,k.argument AS explanation,
 const connectionVisible = "k.hidden_at IS NULL";
 const balloonFrom = `FROM knowledge_web_balloons k JOIN knowledge_web_balloon_origins a
     ON a.id=COALESCE(k.origin_cloud,k.origin_kite) AND a.type=CASE WHEN k.origin_cloud IS NULL THEN 'kite' ELSE 'cloud' END`;
-const balloonFields = `k.id,k.argument AS idea,k.principle,k.explanation,
+const balloonFields = `k.id,k.argument AS idea,k.principle,k.principle_explanation AS "principleExplanation",k.explanation,
     json_build_object('type',a.type,'id',a.id,'label',a.label) AS origin`;
 const balloonVisible = "k.hidden_at IS NULL AND k.published_at IS NOT NULL";
 const balloonSchema = `
@@ -85,7 +85,16 @@ CREATE TABLE IF NOT EXISTS knowledge_web_balloons (
     contributor_email TEXT NOT NULL, contributor_name TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     published_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), hidden_at TIMESTAMPTZ
-);`;
+);
+ALTER TABLE knowledge_web_balloons ADD COLUMN IF NOT EXISTS principle_explanation TEXT,
+    ALTER COLUMN argument DROP NOT NULL;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='knowledge_web_balloons'::regclass
+        AND conname='knowledge_web_balloon_content_format') THEN
+        ALTER TABLE knowledge_web_balloons ADD CONSTRAINT knowledge_web_balloon_content_format
+            CHECK (num_nonnulls(argument,principle_explanation)=1);
+    END IF;
+END $$;`;
 const connectionSchema = `
 CREATE TABLE IF NOT EXISTS knowledge_web_connections (
     id UUID PRIMARY KEY,
@@ -115,7 +124,7 @@ CREATE OR REPLACE VIEW knowledge_web_balloon_origins AS
         ${kiteFrom} WHERE ${visible};
 CREATE OR REPLACE VIEW knowledge_web_connection_endpoints AS
     SELECT type,id,label FROM knowledge_web_balloon_origins
-    UNION ALL SELECT 'balloon',k.id,left(k.argument,105) ${balloonFrom} WHERE ${balloonVisible};`;
+    UNION ALL SELECT 'balloon',k.id,left(COALESCE(k.argument,k.principle),105) ${balloonFrom} WHERE ${balloonVisible};`;
 const contributionFamilies = [
     { ...families[0], from: kiteFrom, fields: kiteFields, visible },
     { ...families[1], from: connectionFrom, fields: connectionFields, visible: connectionVisible },
@@ -197,8 +206,11 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
         res.status(201).json({ id });
     }));
 
-    const balloonContent = (body) => [text(body?.idea, "Balloon idea", 4000), text(body?.principle, "Theoretical principle", 4000),
-        text(body?.explanation, "Idea and principle explanation", 4000)];
+    const balloonContent = (body, legacy = false) => [
+        legacy ? text(body?.idea, "Balloon idea", 4000) : text(body?.principleExplanation, "Principle explanation", 4000),
+        text(body?.principle, "Theoretical principle", 4000),
+        text(body?.explanation, legacy ? "Idea and principle explanation" : "Original relationship explanation", 4000)
+    ];
     app.post(`${base}/balloons`, handler(async (req, res, access) => {
         const origin = req.body?.origin;
         if (!["cloud", "kite"].includes(origin?.type)) throw problem(400, "Choose an originating cloud or kite.");
@@ -212,7 +224,7 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
                 throw problem(404, "Choose an available originating cloud or kite.");
             }
             await db.query(`INSERT INTO knowledge_web_balloons
-                (id,origin_cloud,origin_kite,argument,principle,explanation,contributor_email,contributor_name)
+                (id,origin_cloud,origin_kite,principle_explanation,principle,explanation,contributor_email,contributor_name)
                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
             [id, origin.type === "cloud" ? originId : null, origin.type === "kite" ? originId : null, ...content, access.email, name]);
             for (const values of sources) await addEvidence(db, families[2].tables.evidence, "balloon_id", id, values, access.email, name, true);
@@ -329,9 +341,10 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
             const kite = await lockParent(db, uid(req.params.id));
             const current = await target(db, kite, kind, id);
             if (current.contributor_email !== email) throw problem(403, "You can only edit your own contributions.");
-            const fields = kind === root ? (root === "balloon" ? ["argument", "principle", "explanation"] : ["argument"]) : kind === "comment" ? ["body"]
+            const legacyBalloon = root === "balloon" && kite.principle_explanation === null;
+            const fields = kind === root ? (root === "balloon" ? [legacyBalloon ? "argument" : "principle_explanation", "principle", "explanation"] : ["argument"]) : kind === "comment" ? ["body"]
                 : ["title", "reference", "url", "author", "publication_date", "supports", "stance"];
-            const values = kind === root ? (root === "balloon" ? balloonContent(req.body) : [text(root === "connection" ? req.body?.explanation : req.body?.argument,
+            const values = kind === root ? (root === "balloon" ? balloonContent(req.body, legacyBalloon) : [text(root === "connection" ? req.body?.explanation : req.body?.argument,
                 root === "connection" ? "Connection explanation" : kite.cloud_b ? "Connection argument" : "Kite idea", 4000)])
                 : kind === "comment" ? [text(req.body?.body, "Comment", 3000)] : evidence(req.body, current.initial);
             if (fields.every((field, index) => current[field] === values[index])) return;
@@ -400,7 +413,7 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
 
     function historySql({ root, from, visible, tables }) {
         const key = `${root}_id`;
-        return `SELECT k.id,k.id AS "subjectId",'${root}' AS subject,'${root}' AS kind,k.argument AS summary,
+        return `SELECT k.id,k.id AS "subjectId",'${root}' AS subject,'${root}' AS kind,${root === "balloon" ? "COALESCE(k.argument,k.principle)" : "k.argument"} AS summary,
             k.created_at AS "createdAt",k.updated_at AS "updatedAt" ${from} WHERE ${visible} AND k.contributor_email=$1
             UNION ALL SELECT c.id,k.id,'${root}','comment',c.body,c.created_at,c.updated_at
             ${from} JOIN ${tables.comment} c ON c.${key}=k.id WHERE ${visible} AND c.hidden_at IS NULL AND c.contributor_email=$1
@@ -422,7 +435,7 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
                 r.reason,r.details,r.created_at AS "createdAt",${isKite ? "a.title" : "COALESCE(a.label,'Unavailable item')"} AS "titleA",
                 ${isKite ? "b.title" : root === "balloon" ? "NULL::text" : "COALESCE(b.label,'Unavailable item')"} AS "titleB",
                 CASE r.kind WHEN 'comment' THEN c.body WHEN 'evidence' THEN concat_ws(' — ',e.title,e.supports,e.reference)
-                    ELSE ${root === "balloon" ? "concat_ws(' / ',k.argument,k.principle,k.explanation)" : "k.argument"} END AS content,COALESCE(c.contributor_name,e.contributor_name,k.contributor_name) AS contributor
+                    ELSE ${root === "balloon" ? "concat_ws(' / ',k.argument,k.principle,k.principle_explanation,k.explanation)" : "k.argument"} END AS content,COALESCE(c.contributor_name,e.contributor_name,k.contributor_name) AS contributor
                 FROM ${reports} r JOIN ${tables[root]} k ON k.id=r.${key}
                 ${isKite ? `JOIN knowledge_web_clouds a ON a.id=k.cloud_a LEFT JOIN knowledge_web_clouds b ON b.id=k.cloud_b` :
                 root === "balloon" ? `LEFT JOIN knowledge_web_balloon_origins a ON a.id=COALESCE(k.origin_cloud,k.origin_kite)
