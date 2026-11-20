@@ -41,6 +41,17 @@ test("Timeline includes dated source publications alongside events without inven
     assert.equal(entries({ events: [], sources: [cloud.sources[2]] }).length, 0, "Date added is not a publication date");
 });
 
+test("Day timeline ends on the next calendar date even across month and year boundaries", () => {
+    const script = fs.readFileSync(path.join(__dirname, "../knowledge-web/web.js"), "utf8");
+    const start = script.indexOf("    function nextTimelineDay(");
+    const end = script.indexOf("    function appendTimelineEntry(", start);
+    assert.ok(start >= 0 && end > start, "Next-day label function is available");
+    const nextDay = vm.runInThisContext(`(() => { ${script.slice(start, end)} return nextTimelineDay; })()`);
+    assert.equal(nextDay("2024-02-28"), "29-02-2024");
+    assert.equal(nextDay("2025-02-28"), "01-03-2025");
+    assert.equal(nextDay("2026-12-31"), "01-01-2027");
+});
+
 test("Canvas separates overlapping clouds without changing saved positions", () => {
     const script = fs.readFileSync(path.join(__dirname, "../knowledge-web/web.js"), "utf8");
     const start = script.indexOf("    const CLOUD_WIDTH =");

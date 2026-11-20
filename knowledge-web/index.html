@@ -8,7 +8,7 @@
     <title>Computing History Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=17">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=18">
 </head>
 <body>
     <div class="page-shell">
@@ -101,12 +101,14 @@
                             <div class="kw-toolbar-group" role="group" aria-label="Timeline controls">
                                 <button id="web-timeline-year-view" type="button" aria-pressed="true">Year view</button>
                                 <button id="web-timeline-day-view" type="button" aria-pressed="false">Day view</button>
-                                <label for="web-timeline-year">Year <select id="web-timeline-year"></select></label>
                                 <label id="web-timeline-day-label" for="web-timeline-day" hidden>Day <select id="web-timeline-day"></select></label>
                             </div>
                             <p id="web-timeline-message" role="status"></p>
-                            <div id="web-timeline-scroll" class="kw-timeline-scroll" tabindex="0" role="region" aria-label="Timeline events">
-                                <ol id="web-timeline-events" class="kw-timeline-events"></ol>
+                            <div id="web-timeline-years" class="kw-timeline-scroll" role="group" aria-label="Recorded years"></div>
+                            <div id="web-timeline-period" class="kw-timeline-scroll" role="group"></div>
+                            <div id="web-timeline-details" class="kw-timeline-details" role="region" aria-labelledby="web-timeline-selection" hidden>
+                                <h3 id="web-timeline-selection" aria-live="polite"></h3>
+                                <div id="web-timeline-events"></div>
                             </div>
                         </details>
                         <article id="web-kite-detail" aria-label="Selected kite" tabindex="-1" hidden></article>
@@ -216,6 +218,6 @@
     <script src="/script.js?v=knowledge-web-2"></script>
     <script src="/knowledge-web/contributions.js?v=12"></script>
     <script src="/knowledge-web/layout.js?v=4"></script>
-    <script src="/knowledge-web/web.js?v=22"></script>
+    <script src="/knowledge-web/web.js?v=23"></script>
 </body>
 </html>

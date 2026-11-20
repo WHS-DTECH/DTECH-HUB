@@ -17,7 +17,7 @@
         clouds: [], positions: new Map(), basePositions: new Map(), selected: null, editing: null, editingProposal: null, proposalParentId: null,
         proposals: [], canPropose: false, canContribute: false, canManage: false, zoom: 1, token: null, revision: 0,
         dirty: false, proposalDirty: false, saving: false, duplicatesAcknowledgedTitle: "",
-        timelineView: "year", timelineYear: "", timelineDay: ""
+        timelineView: "year", timelineYear: "", timelineDay: "", timelineMarker: ""
     };
     const searchPageSize = 6;
     let searchLimit = searchPageSize;
@@ -82,6 +82,22 @@
         ];
     }
 
+    function groupTimelineEntries(entries, keyFor) {
+        const groups = new Map();
+        for (const entry of entries) {
+            const key = keyFor(entry);
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(entry);
+        }
+        return groups;
+    }
+
+    function nextTimelineDay(day) {
+        const date = new Date(`${day}T00:00:00Z`);
+        date.setUTCDate(date.getUTCDate() + 1);
+        return `${String(date.getUTCDate()).padStart(2, "0")}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${date.getUTCFullYear().toString().padStart(4, "0")}`;
+    }
+
     function appendTimelineEntry(container, entry, label) {
         container.append(element("b", `${label} · ${entry.kind === "source" ? "Source published" : "Event"}`));
         if (entry.kind === "event") {
@@ -99,86 +115,146 @@
         container.append(details, element("p", `Supports: ${entry.source.supports}`));
     }
 
+    function timelineTrack(id, type, slots, selected, select) {
+        const container = node(id);
+        const focused = container.contains(document.activeElement) ? document.activeElement.dataset.marker : undefined;
+        const track = element("div");
+        track.className = `kw-timeline-track kw-timeline-${type}`;
+        let restoreFocus;
+        for (const { key, label, name } of slots) {
+            const slot = element("div");
+            slot.className = "kw-timeline-slot";
+            if (key) {
+                const marker = button(label, () => select(key));
+                marker.className = "kw-timeline-dot";
+                marker.dataset.marker = key;
+                marker.title = name || label;
+                if (name) marker.setAttribute("aria-label", name);
+                marker.setAttribute("aria-pressed", String(key === selected));
+                marker.setAttribute("aria-controls", "web-timeline-details");
+                slot.append(marker);
+                if (key === focused) restoreFocus = marker;
+            } else {
+                slot.append(element("span", label));
+            }
+            track.append(slot);
+        }
+        container.replaceChildren(track);
+        container.hidden = false;
+        if (restoreFocus) restoreFocus.focus({ preventScroll: true });
+    }
+
+    function appendTimelineList(container, entries, labelFor) {
+        const list = element("ul");
+        for (const event of entries) {
+            const item = element("li");
+            appendTimelineEntry(item, event, labelFor(event));
+            list.append(item);
+        }
+        container.append(list);
+    }
+
     function renderTimeline() {
         const cloud = state.clouds.find((entry) => entry.id === state.selected);
         const caption = node("timeline-caption");
         const message = node("timeline-message");
         const list = node("timeline-events");
-        const scroll = node("timeline-scroll");
+        const details = node("timeline-details");
+        const heading = node("timeline-selection");
         list.replaceChildren();
-        const entries = cloud ? timelineEntries(cloud) : [];
-        const year = node("timeline-year");
+        const entries = cloud ? timelineEntries(cloud).sort((a, b) =>
+            a.date.localeCompare(b.date) || (a.time || "99:99").localeCompare(b.time || "99:99")) : [];
         const day = node("timeline-day");
         const dayView = state.timelineView === "day";
-        node("timeline-year-view").disabled = node("timeline-day-view").disabled = year.disabled = !entries.length;
+        node("timeline-year-view").disabled = node("timeline-day-view").disabled = !entries.length;
         node("timeline-year-view").setAttribute("aria-pressed", String(!dayView));
         node("timeline-day-view").setAttribute("aria-pressed", String(dayView));
-        node("timeline-day-label").hidden = true;
-        scroll.hidden = !entries.length;
-        message.textContent = "";
         caption.textContent = cloud ? `Timeline for ${cloud.title}` : "Select a cloud to see its timeline.";
-        if (!entries.length) year.replaceChildren();
-        if (!cloud) return;
         if (!entries.length) {
-            message.textContent = "This cloud has no dated events or dated sources yet.";
+            node("timeline-day-label").hidden = details.hidden = true;
+            for (const id of ["timeline-years", "timeline-period"]) {
+                const track = node(id);
+                track.hidden = true;
+                track.replaceChildren();
+            }
+            day.replaceChildren();
+            heading.textContent = "";
+            message.textContent = cloud ? "This cloud has no dated events or dated sources yet." : "";
             return;
         }
 
-        const years = [...new Set(entries.map((entry) => entry.date.slice(0, 4)))].sort();
-        if (!years.includes(state.timelineYear)) state.timelineYear = years[0];
-        year.replaceChildren(...years.map((value) => {
-            const option = element("option", value);
-            option.value = value;
-            return option;
-        }));
-        year.value = state.timelineYear;
-        const events = entries.filter((entry) => entry.date.slice(0, 4) === state.timelineYear);
-        const days = [...new Set(events.filter((entry) => entry.date.length === 10).map((entry) => entry.date))].sort();
-        if (!days.includes(state.timelineDay)) state.timelineDay = days[0] || "";
-        day.replaceChildren(...days.map((value) => {
-            const option = element("option", formatHistoricalDate(value));
-            option.value = value;
-            return option;
-        }));
-        day.value = state.timelineDay;
-        node("timeline-day-label").hidden = !dayView || !days.length;
-        list.classList.toggle("kw-timeline-day", dayView);
+        const years = groupTimelineEntries(entries, (entry) => entry.date.slice(0, 4));
+        if (!years.has(state.timelineYear)) state.timelineYear = years.keys().next().value;
+        const year = state.timelineYear;
+        timelineTrack("timeline-years", "years", [...years.keys()].map((key) => ({ key, label: key })), year, (key) => {
+            state.timelineYear = key;
+            state.timelineDay = state.timelineMarker = "";
+            renderTimeline();
+        });
+        const events = years.get(year);
+        const days = groupTimelineEntries(events.filter((entry) => entry.date.length === 10), (entry) => entry.date);
+        node("timeline-day-label").hidden = !dayView || !days.size;
+        const period = node("timeline-period");
+        const selectMarker = (key) => {
+            state.timelineMarker = state.timelineMarker === key ? "" : key;
+            renderTimeline();
+        };
 
         if (dayView) {
-            if (!days.length) {
+            if (!days.size) {
                 message.textContent = "No exact days are recorded for this year. Year-only and month-only entries are available in Year view.";
-                scroll.hidden = true;
+                period.hidden = details.hidden = true;
                 return;
             }
-            message.textContent = "Source publication dates may differ from event dates. Times are shown as recorded, without time-zone conversion; entries without a time are not placed in a time order.";
-            const sorted = events.filter((event) => event.date === state.timelineDay)
-                .sort((a, b) => (a.time || "99:99").localeCompare(b.time || "99:99"));
-            for (const event of sorted) {
-                const item = element("li");
-                appendTimelineEntry(item, event, event.time || "Time not recorded");
-                list.append(item);
+            if (!days.has(state.timelineDay)) state.timelineDay = days.keys().next().value;
+            day.replaceChildren(...[...days.keys()].map((value) => {
+                const option = element("option", formatHistoricalDate(value));
+                option.value = value;
+                return option;
+            }));
+            day.value = state.timelineDay;
+            const dateLabel = formatHistoricalDate(state.timelineDay);
+            const dayEvents = days.get(state.timelineDay);
+            const times = groupTimelineEntries(dayEvents.filter((entry) => entry.time), (entry) => entry.time);
+            message.textContent = `Source publication dates may differ from event dates. ${times.size
+                ? "Dots show recorded times in order, without time-zone conversion. Select a dot again to see the whole day."
+                : "No times are recorded for this day."}`;
+            period.setAttribute("aria-label", `Recorded times on ${dateLabel}`);
+            timelineTrack("timeline-period", "times", [
+                { label: dateLabel },
+                ...[...times.keys()].map((key) => ({ key, label: key })),
+                { label: nextTimelineDay(state.timelineDay) }
+            ], state.timelineMarker, selectMarker);
+            const time = state.timelineMarker;
+            heading.textContent = time ? `${dateLabel} · ${time}` : dateLabel;
+            details.hidden = false;
+            const timed = time ? times.get(time) : dayEvents.filter((entry) => entry.time);
+            if (timed.length) appendTimelineList(list, timed, (entry) => entry.time);
+            const untimed = dayEvents.filter((entry) => !entry.time);
+            if (!time && untimed.length) {
+                list.append(element("h4", "Time not recorded"));
+                appendTimelineList(list, untimed, () => dateLabel);
             }
             return;
         }
 
-        message.textContent = "Source publication dates may differ from event dates. Dates and times are shown only as precisely as recorded.";
-        const months = [...new Set(events.map((event) => event.date.slice(0, 7)))].sort();
-        for (const month of months) {
-            const item = element("li");
-            item.append(element("strong", formatHistoricalDate(month)));
-            const monthEvents = element("ul");
-            const sorted = events.filter((event) => event.date.slice(0, 7) === month)
-                .sort((a, b) => a.date.localeCompare(b.date) || (a.time || "99:99").localeCompare(b.time || "99:99"));
-            for (const event of sorted) {
-                const entry = element("li");
-                const label = event.date.length === 4 ? "Month and day not recorded"
-                    : event.date.length === 7 ? "Day not recorded" : formatHistoricalDate(event.date);
-                appendTimelineEntry(entry, event, `${label}${event.time ? ` · ${event.time}` : ""}`);
-                monthEvents.append(entry);
-            }
-            item.append(monthEvents);
-            list.append(item);
-        }
+        message.textContent = "Source publication dates may differ from event dates. Select a month dot to see its entries, or select the year dot to see the whole year.";
+        const months = groupTimelineEntries(events, (entry) => entry.date.slice(0, 7));
+        const names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        period.setAttribute("aria-label", `Months of ${year}`);
+        timelineTrack("timeline-period", "months", names.map((name, index) => {
+            const key = `${year}-${String(index + 1).padStart(2, "0")}`;
+            return { key: months.has(key) ? key : "", label: name.slice(0, 3), name };
+        }), state.timelineMarker, selectMarker);
+        const month = state.timelineMarker;
+        heading.textContent = month ? `${names[Number(month.slice(5)) - 1]} ${year}` : year;
+        details.hidden = false;
+        appendTimelineList(list, month ? months.get(month) : events, (event) => {
+            const date = formatHistoricalDate(event.date);
+            if (event.date.length === 4) return `${date} (month and day not recorded)`;
+            if (event.date.length === 7) return `${date} (day not recorded)`;
+            return `${date}${event.time ? ` · ${event.time}` : ""}`;
+        });
     }
 
     function showCloud(cloud, centre) {
@@ -187,6 +263,7 @@
             state.timelineView = "year";
             state.timelineYear = "";
             state.timelineDay = "";
+            state.timelineMarker = "";
         }
         state.selected = cloud.id;
         updateAddMenu();
@@ -819,7 +896,7 @@
         layout.reset();
         state.selected = null;
         state.timelineView = "year";
-        state.timelineYear = state.timelineDay = "";
+        state.timelineYear = state.timelineDay = state.timelineMarker = "";
         renderTimeline();
         state.editing = null;
         state.editingProposal = null;
@@ -979,14 +1056,19 @@
             beginProposal(cloud);
         }
     });
-    node("timeline-year-view").addEventListener("click", () => { state.timelineView = "year"; renderTimeline(); });
-    node("timeline-day-view").addEventListener("click", () => { state.timelineView = "day"; renderTimeline(); });
-    node("timeline-year").addEventListener("change", (event) => {
-        state.timelineYear = event.target.value;
-        state.timelineDay = "";
+    for (const view of ["year", "day"]) {
+        node(`timeline-${view}-view`).addEventListener("click", () => {
+            if (state.timelineView === view) return;
+            state.timelineView = view;
+            state.timelineMarker = "";
+            renderTimeline();
+        });
+    }
+    node("timeline-day").addEventListener("change", (event) => {
+        state.timelineDay = event.target.value;
+        state.timelineMarker = "";
         renderTimeline();
     });
-    node("timeline-day").addEventListener("change", (event) => { state.timelineDay = event.target.value; renderTimeline(); });
     node("zoom-out").addEventListener("click", () => zoom(state.zoom - .25));
     node("zoom-in").addEventListener("click", () => zoom(state.zoom + .25));
     node("reset").addEventListener("click", () => { zoom(1); node("viewport").scrollTo(0, 0); });
