@@ -81,14 +81,16 @@ test("Knowledge Web allows only eligible readers and verified teachers to manage
         getStudentProfile: async (account) => ({
             available: account !== "inactive@test.invalid",
             year: { "junior@test.invalid": 8, "student-one@test.invalid": 10, "student-two@test.invalid": 9,
-                "senior@test.invalid": 11, "inactive@test.invalid": 10 }[account]
+                "senior@test.invalid": 11, "year-twelve@test.invalid": 12, "year-thirteen@test.invalid": 13,
+                "inactive@test.invalid": 13 }[account]
         })
     });
     const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
     t.after(() => new Promise((resolve) => server.close(resolve)));
     const url = `http://127.0.0.1:${server.address().port}/api/knowledge-web`;
     for (const [account, expected] of [["", 401], ["junior@test.invalid", 403], ["student-one@test.invalid", 200],
-        ["student-two@test.invalid", 200], ["senior@test.invalid", 403], ["inactive@test.invalid", 403]]) {
+        ["student-two@test.invalid", 200], ["senior@test.invalid", 200], ["year-twelve@test.invalid", 200],
+        ["year-thirteen@test.invalid", 200], ["inactive@test.invalid", 403], ["unknown@test.invalid", 403]]) {
         const headers = { "x-verified-test-account": account, "x-user-role": "admin", "x-user-email": "teacher@test.invalid" };
         assert.equal((await fetch(`${url}/access`, { headers })).status, expected, account);
         assert.equal((await fetch(`${url}/manage/clouds`, { method: "POST", headers })).status, account ? 403 : 401);
@@ -154,15 +156,17 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             await admin.query(`DROP SCHEMA ${schemaName} CASCADE`);
             await admin.end();
         });
+        let authorYear = 10;
+        let authorName = "Test Student One";
         async function startApp() {
             const app = express();
             app.use(express.json());
             registerKnowledgeWeb(app, {
                 pool, getVerifiedEmail: (req) => req.headers["x-verified-test-account"] || "",
                 canManage: async (account) => account === "teacher@test.invalid",
-                getStudentProfile: async () => ({ available: true, year: 10 }),
+                getStudentProfile: async (account) => ({ available: true, year: account.startsWith("student-two") ? 13 : authorYear }),
                 getContributorName: async (_req, account) => account === "teacher@test.invalid" ? "Test Teacher"
-                    : account.startsWith("student-two") ? "Test Student Two" : "Test Student One"
+                    : account.startsWith("student-two") ? "Test Student Two" : authorName
             });
             app.use(express.static(path.resolve(__dirname, "..")));
             const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
@@ -311,7 +315,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             description: "A historical description supported by the submitted sources.",
             significance: "This topic belongs in computing history.",
             connection: "The events share an underlying relationship described by the cited evidence.",
-            sources: [cloudSource], connectionSources: [connectionSource],
+            sources: [{ ...cloudSource, id: draft.sources[0].id }], connectionSources: [connectionSource],
             events: [{ date: "12-10-2025", time: "00:00", description: "A significant historical milestone." }]
         };
         for (const invalidEvent of [
@@ -337,6 +341,9 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal(submitted.sources.length, 1);
         assert.equal(submitted.connectionSources.length, 1);
         assert.equal(submitted.sources[0].publicationDate, "2024-02-29");
+        assert.equal(submitted.sources[0].id, draft.sources[0].id);
+        assert.equal(submitted.sources[0].addedAt, draft.sources[0].addedAt);
+        assert.ok(Date.parse(submitted.sources[0].updatedAt) > Date.parse(draft.sources[0].updatedAt));
         assert.equal(submitted.connectionSources[0].publicationDate, "2024-02");
         assert.equal(submitted.events[0].date, "2025-10-12");
         assert.equal(submitted.events[0].time, "00:00");
@@ -365,9 +372,11 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.deepEqual(secondStudentProposals.map((proposal) => proposal.id), [secondStudentDraft.id],
             "Revision comments and proposals remain private to their author");
 
+        authorYear = 11;
+        authorName = "Changed Display Name";
         const revisedSubmit = await call(`proposals/${draft.id}`, {
             student: true, method: "PUT",
-            body: { ...submission, revision: returned.revision, duplicatesAcknowledged: true,
+            body: { ...submission, connectionSources: returned.connectionSources, revision: returned.revision, duplicatesAcknowledged: true,
                 description: "Revised factual description, with an added source explanation." }
         });
         assert.equal((await revisedSubmit.json()).status, "Submitted");
@@ -382,6 +391,10 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal(approved.originalCloudId, firstPublished.id);
         assert.equal(approved.connection, submission.connection);
         assert.equal(approved.connectionSources[0].supports, connectionSource.supports);
+        assert.equal(approved.contributor, draft.contributor);
+        assert.equal(approved.createdAt, draft.createdAt);
+        assert.equal(approved.connectionSources[0].id, returned.connectionSources[0].id);
+        assert.equal(approved.connectionSources[0].updatedAt, returned.connectionSources[0].updatedAt);
         const sharedClouds = await list("clouds", true);
         assert.equal(sharedClouds.length, 2);
         const approvedCloud = sharedClouds.find((cloud) => cloud.id === approved.publishedCloudId);
@@ -389,6 +402,13 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal(approvedCloud.description, "Revised factual description, with an added source explanation.");
         assert.equal(approvedCloud.contributor, "Test Student One");
         assert.equal(approvedCloud.sources[0].supports, cloudSource.supports);
+        assert.equal(approvedCloud.sources[0].contributor, "Test Student One");
+        assert.equal(approvedCloud.sources[0].addedAt, draft.sources[0].addedAt);
+        const seniorShared = await call("clouds", { account: "student-two@test.invalid" });
+        assert.equal(seniorShared.status, 200);
+        const seniorClouds = (await seniorShared.json()).clouds;
+        assert.ok(seniorClouds.some((cloud) => cloud.id === approved.publishedCloudId));
+        assert.doesNotMatch(JSON.stringify(seniorClouds), /student-one@test\.invalid|contributorEmail|added_by/);
         assert.deepEqual(approvedCloud.events, submitted.events, "Proposal event time survives review and cloud publication");
         assert.equal((await list("clouds", false)).length, 2, "Another eligible student can see the approved cloud");
         assert.equal(await pool.query("SELECT to_regclass('knowledge_web_kites') AS name").then((result) => result.rows[0].name),

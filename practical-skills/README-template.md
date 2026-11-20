@@ -118,7 +118,8 @@ students can open the kit when it is Live.
 ### KNOW Mode: Computing History Knowledge Web
 
 The **Knowledge Web** link in Licence and My Licence is available to current
-Years 9–10 students and teaching staff. In Teacher View, open
+Years 9–13 students and teaching staff, with MiddleDTECH and SeniorDTECH on the
+same shared web. In Teacher View, open
 **Licence → Manage Knowledge Web**. The first visit that loads clouds creates
 the initial NCEA disruptions draft in PostgreSQL; it has no verified sources
 yet and does not appear on the shared web. Check the history and dated events,

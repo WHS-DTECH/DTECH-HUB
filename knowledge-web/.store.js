@@ -208,6 +208,10 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
                 publication_date TEXT NOT NULL, reference TEXT NOT NULL, url TEXT, supports TEXT NOT NULL,
                 ordinal INTEGER NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
+            ALTER TABLE knowledge_web_proposal_sources ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+            UPDATE knowledge_web_proposal_sources SET updated_at=created_at WHERE updated_at IS NULL;
+            ALTER TABLE knowledge_web_proposal_sources ALTER COLUMN updated_at SET DEFAULT NOW(),
+                ALTER COLUMN updated_at SET NOT NULL;
             CREATE INDEX IF NOT EXISTS knowledge_web_proposal_sources_parent_idx
                 ON knowledge_web_proposal_sources(proposal_id, claim, ordinal);
             CREATE TABLE IF NOT EXISTS knowledge_web_proposal_events (
@@ -234,8 +238,12 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
             c.published_at AS "publishedAt", c.revision, jsonb_build_object('x', p.x, 'y', p.y) AS position,
             COALESCE((SELECT jsonb_agg(jsonb_build_object(
                 'id', s.id, 'title', s.title, 'author', s.author, 'publicationDate', s.publication_date,
-                'reference', s.reference, 'url', s.url, 'supports', s.supports, 'addedAt', s.created_at
-            ) ORDER BY s.ordinal) FROM knowledge_web_sources s WHERE s.cloud_id = c.id), '[]'::jsonb) AS sources
+                'reference', s.reference, 'url', s.url, 'supports', s.supports, 'addedAt', s.created_at,
+                'updatedAt', s.updated_at, 'contributor', psrc.contributor_name
+            ) ORDER BY s.ordinal) FROM knowledge_web_sources s
+                LEFT JOIN knowledge_web_proposal_sources ps ON ps.id = s.id
+                LEFT JOIN knowledge_web_proposals psrc ON psrc.id = ps.proposal_id AND psrc.published_cloud_id = c.id
+                WHERE s.cloud_id = c.id), '[]'::jsonb) AS sources
             FROM knowledge_web_clouds c JOIN knowledge_web_positions p ON p.cloud_id = c.id
             WHERE $1::boolean OR c.published_at IS NOT NULL ORDER BY LOWER(c.title), c.id`, [includeDrafts]);
         return rows;
@@ -296,11 +304,13 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
             LEFT JOIN LATERAL (
                 SELECT jsonb_agg(jsonb_build_object('id',src.id,'title',src.title,'author',src.author,
                     'publicationDate',src.publication_date,'reference',src.reference,'url',src.url,
-                    'supports',src.supports,'addedAt',src.created_at) ORDER BY src.ordinal)
+                    'supports',src.supports,'addedAt',src.created_at,'updatedAt',src.updated_at,
+                    'contributor',p.contributor_name) ORDER BY src.ordinal)
                     FILTER (WHERE src.claim='cloud') AS cloud_sources,
                     jsonb_agg(jsonb_build_object('id',src.id,'title',src.title,'author',src.author,
                     'publicationDate',src.publication_date,'reference',src.reference,'url',src.url,
-                    'supports',src.supports,'addedAt',src.created_at) ORDER BY src.ordinal)
+                    'supports',src.supports,'addedAt',src.created_at,'updatedAt',src.updated_at,
+                    'contributor',p.contributor_name) ORDER BY src.ordinal)
                     FILTER (WHERE src.claim='connection') AS connection_sources
                 FROM knowledge_web_proposal_sources src WHERE src.proposal_id=p.id
             ) s ON true
@@ -328,12 +338,25 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
         [randomUUID(), proposal.id, action, actorEmail, actorName, comment, JSON.stringify(snapshot)]);
     }
 
-    async function replaceProposalSources(db, proposalId, claim, sources) {
-        await db.query("DELETE FROM knowledge_web_proposal_sources WHERE proposal_id=$1 AND claim=$2", [proposalId, claim]);
-        for (const [ordinal, source] of sources.entries()) {
+    async function saveProposalSources(db, proposalId, cloudSources, connectionSources) {
+        await db.query("DELETE FROM knowledge_web_proposal_sources WHERE proposal_id=$1 AND NOT (id = ANY($2::uuid[]))",
+            [proposalId, [...cloudSources, ...connectionSources].map(({ id }) => id)]);
+        const entries = [
+            ...cloudSources.map((source, ordinal) => ({ source, ordinal, claim: "cloud" })),
+            ...connectionSources.map((source, ordinal) => ({ source, ordinal, claim: "connection" }))
+        ];
+        for (const { source, ordinal, claim } of entries) {
             await db.query(`INSERT INTO knowledge_web_proposal_sources
                 (id,proposal_id,claim,title,author,publication_date,reference,url,supports,ordinal)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (id) DO UPDATE SET
+                claim=EXCLUDED.claim,title=EXCLUDED.title,author=EXCLUDED.author,publication_date=EXCLUDED.publication_date,
+                reference=EXCLUDED.reference,url=EXCLUDED.url,supports=EXCLUDED.supports,ordinal=EXCLUDED.ordinal,updated_at=NOW()
+                WHERE knowledge_web_proposal_sources.proposal_id=EXCLUDED.proposal_id
+                AND (knowledge_web_proposal_sources.claim,knowledge_web_proposal_sources.title,knowledge_web_proposal_sources.author,
+                    knowledge_web_proposal_sources.publication_date,knowledge_web_proposal_sources.reference,
+                    knowledge_web_proposal_sources.url,knowledge_web_proposal_sources.supports,knowledge_web_proposal_sources.ordinal)
+                IS DISTINCT FROM (EXCLUDED.claim,EXCLUDED.title,EXCLUDED.author,EXCLUDED.publication_date,
+                    EXCLUDED.reference,EXCLUDED.url,EXCLUDED.supports,EXCLUDED.ordinal)`,
             [source.id, proposalId, claim, source.title, source.author, source.publicationDate,
                 source.reference, source.url, source.supports, ordinal]);
         }
@@ -371,7 +394,7 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
     }
 
     async function saveProposal(req, res, { email, staff }, existingId = null) {
-        if (staff) throw problem(403, "Student cloud proposals are available to Years 9 and 10 only.");
+        if (staff) throw problem(403, "Use Manage Knowledge Web to create a teacher cloud.");
         const intent = req.body?.intent;
         if (!["draft", "submit"].includes(intent)) throw problem(400, "Choose save draft or submit for review.");
         const input = readProposal(req.body, intent === "draft");
@@ -407,13 +430,12 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
                     significance: input.significance, events: input.events, status,
                     original_cloud_id: parent.id, connection_explanation: input.connection,
                     sources: cloudSources, connection_sources: connectionSources };
-                await replaceProposalSources(db, existingId, "cloud", cloudSources);
-                await replaceProposalSources(db, existingId, "connection", connectionSources);
+                await saveProposalSources(db, existingId, cloudSources, connectionSources);
             } else {
                 const id = randomUUID();
                 const status = intent === "submit" ? "Submitted" : "Draft";
                 const contributorName = await getContributorName(req, email);
-                const contributor = contributorName && !contributorName.includes("@") ? contributorName : "Year 9–10 student";
+                const contributor = contributorName && !contributorName.includes("@") ? contributorName : "DTECH student";
                 await db.query(`INSERT INTO knowledge_web_proposals
                     (id,contributor_email,contributor_name,title,description,significance,events,status,original_cloud_id,connection_explanation,submitted_at)
                     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,CASE WHEN $8='Submitted' THEN NOW() END)`,
@@ -421,11 +443,10 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
                     JSON.stringify(input.events), status, parent.id, input.connection]);
                 const cloudSources = input.sources.map((source) => ({ ...source, id: randomUUID() }));
                 const connectionSources = input.connectionSources.map((source) => ({ ...source, id: randomUUID() }));
-                proposal = { id, title: input.title, description: input.description, significance: input.significance,
+                proposal = { id, contributor_name: contributor, title: input.title, description: input.description, significance: input.significance,
                     events: input.events, status, original_cloud_id: parent.id, connection_explanation: input.connection,
                     sources: cloudSources, connection_sources: connectionSources };
-                await replaceProposalSources(db, id, "cloud", cloudSources);
-                await replaceProposalSources(db, id, "connection", connectionSources);
+                await saveProposalSources(db, id, cloudSources, connectionSources);
             }
             await auditProposal(db, proposal, intent === "submit" ? "Submitted" : "Draft saved", email,
                 proposal.contributor_name || await getContributorName(req, email));
@@ -467,10 +488,10 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
                 await db.query("INSERT INTO knowledge_web_positions (cloud_id,x,y) VALUES ($1,$2,$3)", [cloudId, x, y]);
                 for (const [ordinal, source] of cloudSources.entries()) {
                     await db.query(`INSERT INTO knowledge_web_sources
-                        (id,cloud_id,title,author,publication_date,reference,url,supports,ordinal,added_by)
-                        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-                    [source.id, cloudId, source.title, source.author, source.publication_date,
-                        source.reference, source.url, source.supports, ordinal, proposal.contributor_email]);
+                        (id,cloud_id,title,author,publication_date,reference,url,supports,ordinal,added_by,created_at,updated_at)
+                        SELECT id,$1,title,author,publication_date,reference,url,supports,$2,$3,created_at,updated_at
+                        FROM knowledge_web_proposal_sources WHERE id=$4`,
+                    [cloudId, ordinal, proposal.contributor_email, source.id]);
                 }
             }
             const updated = await db.query(`UPDATE knowledge_web_proposals SET status=$2,teacher_comment=$3,
@@ -518,8 +539,8 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
                 if (!staff) {
                     if (staffOnly) throw problem(403, "Only teaching staff can manage the Knowledge Web.");
                     const profile = await getStudentProfile(email);
-                    if (!profile?.available || ![9, 10].includes(Number(profile.year))) {
-                        throw problem(403, "The Knowledge Web pilot is open to Years 9 and 10.");
+                    if (!profile?.available || ![9, 10, 11, 12, 13].includes(Number(profile.year))) {
+                        throw problem(403, "The Knowledge Web is open to current Years 9–13 students.");
                     }
                 }
                 await handler(req, res, { email, staff });

@@ -187,7 +187,8 @@
             const title = element(source.url ? "a" : "strong", source.title);
             if (source.url) title.href = source.url;
             row.append(title, element("p", `${[source.author, formatHistoricalDate(source.publicationDate)].filter(Boolean).join(" · ")}${source.url ? "" : ` — ${source.reference}`}`),
-                element("p", `Supports: ${source.supports}`), element("small", `Added ${formatDate(source.addedAt)}`));
+                element("p", `Supports: ${source.supports}`),
+                element("small", `Added ${formatDate(source.addedAt)}${source.contributor ? ` by ${source.contributor}` : ""}`));
             sources.append(row);
         }
         detail.append(element("h3", "Sources"), sources,
@@ -475,6 +476,13 @@
                 element("p", `${proposal.connection || "No connection explanation saved yet."}`),
                 element("small", `${proposal.submittedAt ? `Submitted ${formatDate(proposal.submittedAt)}` : "Draft"} · Last updated ${formatDate(proposal.updatedAt)}`));
             if (proposal.teacherComment) card.append(element("p", `Teacher note: ${proposal.teacherComment}`));
+            for (const [label, id] of [["Open original cloud", proposal.originalCloudId], ["Open published cloud", proposal.publishedCloudId]]) {
+                const cloud = state.clouds.find((entry) => entry.id === id);
+                if (cloud) card.append(button(label, () => {
+                    showCloud(cloud, true);
+                    node("viewport").focus();
+                }));
+            }
             if (proposal.status === "Approved") {
                 card.append(element("h4", "Your proposed connection, saved for Phase 3"),
                     element("p", "The cloud is published. This relationship has been preserved as a draft kite; it has not been published."),
