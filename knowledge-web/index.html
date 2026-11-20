@@ -8,7 +8,7 @@
     <title>Computing History Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=13">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=14">
 </head>
 <body>
     <div class="page-shell">
@@ -23,50 +23,28 @@
             </nav>
         </header>
         <main class="knowledge-web">
-            <p class="section-kicker">KNOW MODE &middot; YEARS 9&ndash;13</p>
-            <h1 id="web-title">Computing History Knowledge Web</h1>
-            <p>One shared computing history web for MiddleDTECH (Years 9–10) and SeniorDTECH (Years 11–13). Explore the evidence in any order.</p>
-            <div class="kw-actions">
-                <a class="button button-secondary" href="/practical-skills/checklist.html">Back to My Licence</a>
-                <a class="button button-primary" id="web-explore-link" href="/knowledge-web/" hidden>Open shared web</a>
-                <a class="button button-primary" id="web-manage-link" href="/knowledge-web/?manage=1" hidden>Manage clouds</a>
-                <a class="button button-primary" id="web-contributions-link" href="/knowledge-web/?contributions=1" hidden>My Contributions</a>
-            </div>
+            <header class="kw-heading">
+                <div>
+                    <p class="section-kicker">KNOW MODE &middot; YEARS 9&ndash;13</p>
+                    <h1 id="web-title">Computing History Knowledge Web</h1>
+                </div>
+                <nav aria-label="Knowledge Web pages">
+                    <a href="/practical-skills/checklist.html">My Licence</a>
+                    <a id="web-explore-link" href="/knowledge-web/" hidden>Open shared web</a>
+                    <a id="web-contributions-link" href="/knowledge-web/?contributions=1" hidden>My Contributions</a>
+                    <a id="web-manage-link" href="/knowledge-web/?manage=1" hidden>Manage clouds</a>
+                </nav>
+            </header>
             <p id="web-status" role="status" aria-live="polite"></p>
             <button type="button" id="web-retry" hidden>Retry</button>
             <section id="web-explore" aria-label="Explore the Knowledge Web" hidden>
                 <p id="web-empty" hidden>No clouds have been published yet. Check back after your teacher releases one.</p>
-                <section id="web-timeline" class="kw-panel kw-timeline" aria-labelledby="web-timeline-title">
-                    <h2 id="web-timeline-title">Timeline</h2>
-                    <p id="web-timeline-caption">Select a cloud to see its timeline.</p>
+                <section class="kw-explore" aria-label="Find or add to the Knowledge Web">
                     <div class="kw-toolbar">
-                        <div id="web-timeline-controls" class="kw-toolbar-group" role="group" aria-label="Timeline controls">
-                            <span class="kw-group-label" aria-hidden="true">Timeline</span>
-                            <button id="web-timeline-year-view" type="button" aria-pressed="true">Year view</button>
-                            <button id="web-timeline-day-view" type="button" aria-pressed="false">Day view</button>
-                            <label for="web-timeline-year">Year <select id="web-timeline-year"></select></label>
-                            <label id="web-timeline-day-label" for="web-timeline-day" hidden>Day <select id="web-timeline-day"></select></label>
-                        </div>
-                        <div class="kw-toolbar-group" role="group" aria-label="Canvas controls">
-                            <span class="kw-group-label" aria-hidden="true">Canvas</span>
-                            <button type="button" id="web-zoom-out" aria-label="Zoom out">−</button>
-                            <button type="button" id="web-zoom-in" aria-label="Zoom in">+</button>
-                            <button type="button" id="web-reset">Reset view</button>
-                            <output id="web-zoom" aria-label="Canvas zoom" aria-live="polite">100%</output>
-                        </div>
-                    </div>
-                    <p id="web-timeline-message" role="status"></p>
-                    <div id="web-timeline-scroll" class="kw-timeline-scroll" tabindex="0" role="region" aria-label="Timeline events">
-                        <ol id="web-timeline-events" class="kw-timeline-events"></ol>
-                    </div>
-                </section>
-                <section class="kw-panel kw-explore" aria-labelledby="web-explore-title">
-                    <h2 id="web-explore-title">Explore the Knowledge Web</h2>
-                    <div class="kw-toolbar">
-                        <label class="kw-search-field" for="web-search">Search clouds, kites and connections
-                            <input id="web-search" type="search" autocomplete="off">
-                        </label>
-                        <details id="web-add-menu" hidden>
+                        <input id="web-search" type="search" autocomplete="off" aria-label="Search clouds, kites and connections"
+                            placeholder="Search clouds, kites and connections" aria-controls="web-search-results">
+                        <button id="web-browse" type="button" aria-expanded="false" aria-controls="web-search-results">Browse</button>
+                        <details id="web-add-menu" class="kw-menu" hidden>
                             <summary>+ Add</summary>
                             <div class="kw-add-options">
                                 <button id="web-add-kite" type="button" hidden>Add a Kite</button>
@@ -76,32 +54,60 @@
                                 <p id="web-add-help" hidden>Select a published cloud first to add a kite or propose a connected cloud.</p>
                             </div>
                         </details>
-                        <button id="web-refresh-kites" type="button" hidden>Refresh kites and connections</button>
                     </div>
                     <p id="web-kite-status" role="status"></p>
-                    <ul id="web-results" aria-label="Search results"></ul>
-                    <button id="web-more-results" type="button" hidden>Show more results</button>
+                    <div id="web-search-results" hidden>
+                        <ul id="web-results" aria-label="Search results"></ul>
+                        <button id="web-more-results" type="button" hidden>Show more results</button>
+                    </div>
                 </section>
                 <div class="kw-columns" id="web-clouds" hidden>
-                    <div class="kw-panel kw-map-panel">
-                        <div class="kw-map">
-                            <div class="kw-actions" aria-label="Layout controls">
-                                <button type="button" id="web-reset-layout" disabled>Reset Layout</button>
-                                <button type="button" id="web-edit-default" aria-pressed="false" hidden>Edit default layout</button>
+                    <section class="kw-map-panel" aria-label="Map workspace">
+                        <div class="kw-map-toolbar">
+                            <span class="kw-map-label">Map</span>
+                            <div class="kw-toolbar-group" role="group" aria-label="Canvas controls">
+                                <button type="button" id="web-zoom-out" aria-label="Zoom out">−</button>
+                                <output id="web-zoom" aria-label="Canvas zoom" aria-live="polite">100%</output>
+                                <button type="button" id="web-zoom-in" aria-label="Zoom in">+</button>
+                                <button type="button" id="web-reset">Reset view</button>
                             </div>
-                            <p id="web-layout-status" role="status"></p>
-                            <p id="web-pan-help">Scroll or focus the canvas and use the arrow keys to pan. Drag a cloud or kite to move it, or focus it and use Shift + arrow keys.</p>
-                            <p id="web-kite-map-note"></p>
-                            <div id="web-viewport" class="kw-viewport" tabindex="0" role="region" aria-label="Knowledge Web canvas" aria-describedby="web-pan-help">
-                                <div id="web-board"></div>
-                            </div>
+                            <details id="web-layout-menu" class="kw-menu kw-layout-menu">
+                                <summary>Layout</summary>
+                                <div class="kw-menu-items">
+                                    <button type="button" id="web-reset-layout" disabled>Reset Layout</button>
+                                    <button type="button" id="web-edit-default" aria-pressed="false" hidden>Edit default layout</button>
+                                    <button id="web-refresh-kites" type="button" hidden>Refresh kites and connections</button>
+                                </div>
+                            </details>
                         </div>
-                    </div>
+                        <p id="web-layout-status" role="status"></p>
+                        <div id="web-viewport" class="kw-viewport" tabindex="0" role="region" aria-label="Knowledge Web canvas" aria-describedby="web-pan-help">
+                            <div id="web-board"></div>
+                        </div>
+                        <details class="kw-map-help">
+                            <summary>Map help</summary>
+                            <p id="web-pan-help">Scroll or focus the canvas and use the arrow keys to pan. Drag a cloud or kite to move it, or focus it and use Shift + arrow keys. Solid strings attach kites to clouds; dashed strings link related ideas.</p>
+                            <p id="web-kite-map-note"></p>
+                        </details>
+                    </section>
                     <section class="kw-panel kw-selection" aria-label="Selected element">
                         <div id="web-cloud-detail">
                             <article id="web-detail" aria-label="Selected cloud" aria-live="polite" tabindex="-1"></article>
                             <div id="web-kite-editor" hidden></div>
                         </div>
+                        <details id="web-timeline" class="kw-timeline">
+                            <summary><strong>Timeline</strong> <span id="web-timeline-caption">Select a cloud to see its timeline.</span></summary>
+                            <div class="kw-toolbar-group" role="group" aria-label="Timeline controls">
+                                <button id="web-timeline-year-view" type="button" aria-pressed="true">Year view</button>
+                                <button id="web-timeline-day-view" type="button" aria-pressed="false">Day view</button>
+                                <label for="web-timeline-year">Year <select id="web-timeline-year"></select></label>
+                                <label id="web-timeline-day-label" for="web-timeline-day" hidden>Day <select id="web-timeline-day"></select></label>
+                            </div>
+                            <p id="web-timeline-message" role="status"></p>
+                            <div id="web-timeline-scroll" class="kw-timeline-scroll" tabindex="0" role="region" aria-label="Timeline events">
+                                <ol id="web-timeline-events" class="kw-timeline-events"></ol>
+                            </div>
+                        </details>
                         <article id="web-kite-detail" aria-label="Selected kite" tabindex="-1" hidden></article>
                         <div id="web-connection-editor" hidden></div>
                     </section>
@@ -207,8 +213,8 @@
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="/script.js?v=knowledge-web-2"></script>
-    <script src="/knowledge-web/contributions.js?v=8"></script>
+    <script src="/knowledge-web/contributions.js?v=9"></script>
     <script src="/knowledge-web/layout.js?v=1"></script>
-    <script src="/knowledge-web/web.js?v=18"></script>
+    <script src="/knowledge-web/web.js?v=19"></script>
 </body>
 </html>

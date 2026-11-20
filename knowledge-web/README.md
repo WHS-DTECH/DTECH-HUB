@@ -41,6 +41,8 @@ Stage 2 creates separate connection, comment, evidence, revision and moderation 
 
 Drag clouds and kites on the canvas, or focus one and use **Shift + arrow keys**. Enter and Space still open details. Strings follow their endpoints. Saved moves affect only your account; **Reset Layout** clears your personal positions without changing zoom or shared content. Authorised teachers can use **Edit default layout** to set starting positions for clouds and kites, then switch back to their own layout. A personal position overrides its shared default.
 
+Search opens a list of matching clouds, kites and connections; use **Browse** to open the list without typing. Select a result to inspect it beside the map (below it on narrow screens). Expand **Timeline** below the workspace for the selected cloud's dates and sources. The map toolbar has separate **Reset view** and **Layout** controls; **Map help** lists the keyboard shortcuts and explains the two kinds of strings.
+
 ### Stage 3 (planned): Upgrade to Cloud
 
 **Upgrade to Cloud** starts a separate historical cloud draft; it does not convert the kite or approve its interpretation. Only staff authorised to manage Knowledge Web clouds can start the draft or publish it. The draft stays private until explicitly published.

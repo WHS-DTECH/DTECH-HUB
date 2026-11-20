@@ -25,7 +25,7 @@
     const layout = createKnowledgeLayout({ node, request, state, redraw: redrawLayout });
     const contributions = createKnowledgeContributions({
         node, request, element, button, state, showCloud, resizeTextareas, formatDate, historyPage, exploreUrl,
-        onProposalsChanged: renderStudentProposals, onKitesChanged: renderSearch, layoutPosition: layout.position
+        onProposalsChanged: renderStudentProposals, onKitesChanged: renderSearch, layoutPosition: layout.position, searchResult
     });
     const formatHistoricalDate = (value) => {
         const match = String(value || "").match(/^(\d{4})-(\d{2})(?:-(\d{2}))?$/);
@@ -68,9 +68,9 @@
     }
 
     function updatePressed() {
-        for (const host of [node("results"), node("board")]) {
-            host.querySelectorAll("button[data-cloud-id]").forEach((el) => el.setAttribute("aria-pressed", String(el.dataset.cloudId === state.selected)));
-        }
+        node("results").querySelectorAll("button[data-cloud-id]").forEach((el) =>
+            el.setAttribute("aria-pressed", String(el.dataset.cloudId === state.selected)));
+        contributions.highlightSelection();
     }
 
     function timelineEntries(cloud) {
@@ -191,8 +191,10 @@
         updateAddMenu();
         renderTimeline();
         const detail = node("detail");
+        const back = button("Back to map", () => node("viewport").focus());
+        back.className = "kw-text-button";
         detail.replaceChildren(
-            element("h2", cloud.title), element("p", cloud.description),
+            back, element("h2", cloud.title), element("p", cloud.description),
             element("h3", "Historical significance"), element("p", cloud.significance)
         );
         if (cloud.events.length) {
@@ -215,7 +217,6 @@
         if (state.canContribute) detail.append(button("Add a Kite", () => contributions.openEditor(cloud)));
         if (state.canPropose) detail.append(button("Propose a new cloud connected to this one", () => beginProposal(cloud)));
         updatePressed();
-        contributions.drawMap();
         if (centre) {
             const viewport = node("viewport");
             const position = state.positions.get(cloud.id);
@@ -224,13 +225,32 @@
         }
     }
 
+    function showResults(open) {
+        node("search-results").hidden = !open;
+        node("browse").setAttribute("aria-expanded", String(open));
+    }
+
+    function searchResult(type, title, action, byline) {
+        const result = button("", () => {
+            showResults(false);
+            action();
+        });
+        result.className = "kw-result";
+        const badge = element("span", type);
+        badge.className = `kw-type kw-type-${type.toLowerCase()}`;
+        const text = element("span", title);
+        if (byline) text.append(element("small", byline));
+        result.append(badge, text);
+        return result;
+    }
+
     function renderSearch() {
         const query = node("search").value.trim().toLowerCase();
         const list = node("results");
         list.replaceChildren();
         const matches = state.clouds.filter((cloud) =>
             `${cloud.title} ${cloud.description} ${cloud.significance}`.toLowerCase().includes(query)).map((cloud) => {
-            const link = button(`Cloud: ${cloud.title}`, () => { showCloud(cloud, true); node("detail").focus(); });
+            const link = searchResult("Cloud", cloud.title, () => { showCloud(cloud, true); node("detail").focus(); });
             link.dataset.cloudId = cloud.id;
             return link;
         }).concat(contributions.searchKites(query), contributions.searchConnections(query));
@@ -306,7 +326,10 @@
         board.style.setProperty("--kw-cloud-width", `${CLOUD_WIDTH}px`);
         board.style.setProperty("--kw-cloud-height", `${CLOUD_HEIGHT}px`);
         for (const cloud of state.clouds) {
-            const item = button("", () => showCloud(cloud, false));
+            const item = button("", () => {
+                showCloud(cloud, false);
+                if (matchMedia("(max-width: 750px)").matches) node("detail").focus();
+            });
             item.className = "kw-cloud";
             item.dataset.cloudId = cloud.id;
             item.dataset.layoutType = "cloud";
@@ -797,7 +820,10 @@
         state.canManage = false;
         searchLimit = searchPageSize;
         node("search").value = "";
+        showResults(false);
         node("add-menu").open = false;
+        node("layout-menu").open = false;
+        node("timeline").open = false;
         state.saving = state.dirty = form.inert = false;
         form.reset();
         form.hidden = true;
@@ -881,7 +907,30 @@
     node("new").addEventListener("click", () => editCloud(null));
     node("add-source").addEventListener("click", () => addRow("source", {}, true));
     node("add-event").addEventListener("click", () => addRow("event", {}, true));
-    node("search").addEventListener("input", () => { searchLimit = searchPageSize; renderSearch(); });
+    node("search").addEventListener("input", () => {
+        searchLimit = searchPageSize;
+        showResults(!!node("search").value.trim());
+        renderSearch();
+    });
+    node("browse").addEventListener("click", () => showResults(node("search-results").hidden));
+    node("search").closest(".kw-explore").addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || node("search-results").hidden) return;
+        event.preventDefault();
+        showResults(false);
+        node("search").focus();
+    });
+    for (const id of ["add-menu", "layout-menu"]) {
+        const menu = node(id);
+        document.addEventListener("click", (event) => {
+            if (menu.open && !menu.contains(event.target)) menu.open = false;
+        });
+        menu.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape" || !menu.open) return;
+            event.stopPropagation();
+            menu.open = false;
+            menu.querySelector("summary").focus();
+        });
+    }
     node("more-results").addEventListener("click", () => {
         const firstNew = searchLimit;
         searchLimit += searchPageSize;

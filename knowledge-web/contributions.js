@@ -1,5 +1,5 @@
 function createKnowledgeContributions({ node, request, element, button, state, showCloud, resizeTextareas, formatDate,
-    historyPage, exploreUrl, onProposalsChanged, onKitesChanged, layoutPosition }) {
+    historyPage, exploreUrl, onProposalsChanged, onKitesChanged, layoutPosition, searchResult }) {
     let kites = [], connections = [], converted = new Set(), active = null, activeType = null, detailSequence = 0, refreshSequence = 0, reportSequence = 0;
     const empty = () => element("p", "Nothing to show yet.");
     const linkTitle = (kite) => kite.titleB ? `${kite.titleA} ↔ ${kite.titleB}` : kite.titleA;
@@ -271,6 +271,8 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                 grow(x + 100, y + 100);
                 mapLocations.set(`kite:${kite.id}`, position);
                 const string = document.createElementNS(svg.namespaceURI, "polyline");
+                string.dataset.kite = kite.id;
+                string.dataset.clouds = [kite.cloudA, kite.cloudB].filter(Boolean).join(" ");
                 const first = mapLocations.get(`cloud:${kite.cloudA}`), second = mapLocations.get(`cloud:${kite.cloudB}`);
                 string.setAttribute("points", `${first.x},${first.y} ${x},${y}${second ? ` ${second.x},${second.y}` : ""}`);
                 svg.append(string);
@@ -290,6 +292,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         }
         board.prepend(layer);
         drawConnections(board, svg.namespaceURI);
+        highlightSelection();
     }
 
     function drawConnections(board, namespace) {
@@ -320,6 +323,8 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                 group.setAttribute("role", "button");
                 group.setAttribute("tabindex", "0");
                 group.setAttribute("aria-label", `Connection: ${snippet(connection.explanation)}`);
+                group.dataset.connection = connection.id;
+                group.dataset.endpoints = keys.join(" ");
                 for (const className of ["kw-string-line", "kw-string-hit"]) {
                     const path = document.createElementNS(namespace, "path");
                     path.classList.add(className);
@@ -340,18 +345,39 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         board.prepend(layer);
     }
 
+    function highlightSelection() {
+        const key = activeType ? `${activeType}:${active}` : state.selected ? `cloud:${state.selected}` : "";
+        const board = node("board");
+        const groups = board.querySelectorAll("[data-connection]");
+        const selectedConnection = [...groups].find((group) => group.dataset.connection === active && activeType === "connection");
+        const endpoints = selectedConnection?.dataset.endpoints.split(" ") || [];
+        for (const item of board.querySelectorAll("[data-layout-type]")) {
+            const itemKey = `${item.dataset.layoutType}:${item.dataset.layoutId}`;
+            item.setAttribute("aria-pressed", String(itemKey === key));
+            item.classList.toggle("kw-linked", endpoints.includes(itemKey));
+        }
+        for (const string of board.querySelectorAll("polyline[data-kite]")) {
+            string.classList.toggle("kw-related", key === `kite:${string.dataset.kite}` ||
+                string.dataset.clouds.split(" ").some((id) => key === `cloud:${id}`));
+        }
+        for (const group of groups) {
+            group.setAttribute("aria-pressed", String(group === selectedConnection));
+            group.classList.toggle("kw-related", group.dataset.endpoints.split(" ").includes(key));
+        }
+    }
+
     function searchKites(query) {
         return kites.filter((kite) => `${linkTitle(kite)} ${kite.contributor} ${kite.argument}`.toLowerCase().includes(query))
-            .map((kite) => button(`Kite: ${linkTitle(kite)} — ${kite.contributor}: ${snippet(kite.argument)}`, () => {
+            .map((kite) => searchResult("Kite", snippet(kite.argument), () => {
                 locate(mapLocations.get(`kite:${kite.id}`)); void openKite(kite.id);
-            }));
+            }, `${linkTitle(kite)} · ${kite.contributor}`));
     }
 
     function searchConnections(query) {
         return connections.filter((item) => `${connectionTitle(item)} ${item.contributor} ${item.explanation}`.toLowerCase().includes(query))
-            .map((item) => button(`Connection: ${snippet(item.explanation)} — ${item.contributor}`, () => {
+            .map((item) => searchResult("Connection", snippet(item.explanation), () => {
                 locate(connectionLocations.get(item.id)); void openConnection(item.id);
-            }));
+            }, item.contributor));
     }
 
     async function refresh() {
@@ -394,6 +420,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         node("kite-detail").replaceChildren();
         node("kite-detail").hidden = true;
         node("cloud-detail").hidden = false;
+        highlightSelection();
     }
 
     const openKite = (id, focusId) => openDetail("kite", id, focusId);
@@ -404,6 +431,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         const host = node("kite-detail");
         active = id;
         activeType = kind;
+        highlightSelection();
         host.setAttribute("aria-label", `Selected ${kind}`);
         node("cloud-detail").hidden = true;
         host.hidden = false;
@@ -487,18 +515,39 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             row.tabIndex = -1;
             return row;
         };
-        host.replaceChildren(element("h2", isConnection ? "Connection" : linkTitle(kite)), meta(kite),
-            element("p", isConnection ? kite.explanation : kite.argument),
-            button("Back to canvas", () => { closeKite(); node("viewport").focus(); }));
+        const top = element("div");
+        top.className = "kw-detail-top";
+        const back = button("Back to map", () => { closeKite(); node("viewport").focus(); });
+        back.className = "kw-text-button";
+        top.append(back);
+        const actions = controls(kind, kite);
+        if (actions.childElementCount) {
+            const menu = element("details");
+            menu.className = "kw-detail-actions";
+            menu.append(element("summary", "Actions"), actions);
+            actions.addEventListener("click", () => { menu.open = false; });
+            top.append(menu);
+        }
+        host.replaceChildren(top, element("h2", isConnection ? "Connection" : linkTitle(kite)), meta(kite),
+            element("p", isConnection ? kite.explanation : kite.argument));
         const endpoints = isConnection ? [kite.first, kite.second] :
             [{ type: "cloud", id: kite.cloudA, label: kite.titleA }, ...(kite.cloudB ? [{ type: "cloud", id: kite.cloudB, label: kite.titleB }] : [])];
+        const links = element("ul");
+        links.className = "kw-endpoint-links";
         for (const endpoint of endpoints) {
-            host.append(button(`Open ${endpoint.type}: ${endpoint.label}`, () => {
+            const row = element("li");
+            const link = element("a", `${endpoint.type === "cloud" ? "Cloud" : "Kite"}: ${endpoint.label}`);
+            link.href = exploreUrl({ [endpoint.type]: endpoint.id });
+            link.addEventListener("click", (event) => {
+                if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+                event.preventDefault();
                 if (endpoint.type === "cloud") goToCloud(endpoint.id);
                 else { locate(mapLocations.get(endpointKey(endpoint))); void openKite(endpoint.id); }
-            }));
+            });
+            row.append(link);
+            links.append(row);
         }
-        host.append(controls(kind, kite), actionHost, element("h3", "Supporting evidence"));
+        host.append(element("h3", "Linked items"), links, actionHost, element("h3", "Supporting evidence"));
         if (state.canContribute) host.append(button("Add evidence", () => compose("evidence")));
         if (!evidence.length) host.append(element("p", "No evidence is currently visible for this argument."));
         for (const item of evidence) {
@@ -510,7 +559,11 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             host.append(row);
         }
         host.append(element("h3", "Discussion"));
-        if (state.canContribute) host.append(button("Write a comment", () => compose("comment")));
+        if (state.canContribute) {
+            const write = button("Write a comment", () => compose("comment"));
+            write.className = "kw-primary";
+            host.append(write);
+        }
         if (!comments.length) host.append(empty());
         const byId = new Map(comments.map((item) => [item.id, item]));
         for (const item of comments) {
@@ -563,7 +616,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
     node("refresh-kites").addEventListener("click", () => { void refresh(); if (active) void openDetail(activeType, active); });
     node("refresh-reports").addEventListener("click", () => { void reports(); });
     return {
-        drawMap, refresh, reports, openEditor, openKite, closeKite, searchKites, searchConnections, openConnection, openConnectionEditor,
+        drawMap, highlightSelection, refresh, reports, openEditor, openKite, closeKite, searchKites, searchConnections, openConnection, openConnectionEditor,
         selectedKite: () => activeType === "kite" ? active : null, converted: (id) => converted.has(id),
         reset() {
             kites = []; connections = []; converted = new Set(); closeKite();
