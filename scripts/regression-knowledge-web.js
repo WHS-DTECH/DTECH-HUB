@@ -859,7 +859,12 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
                 const parser = new PDFParse({ data, verbosity: 0 });
                 try {
                     const parsed = await parser.getText();
-                    return { text: parsed.text.replace(/-- \d+ of \d+ --/g, "").replace(/\s+/g, " "), pages: parsed.total };
+                    const text = parsed.pages.map(({ text }, index) => {
+                        const footer = `Page ${index + 1} of ${parsed.total}`;
+                        assert.ok(text.trimEnd().endsWith(footer), `Page ${index + 1} must end with "${footer}"`);
+                        return text.trimEnd().slice(0, -footer.length);
+                    }).join(" ").replace(/\s+/g, " ");
+                    return { text, pages: parsed.total };
                 } finally {
                     await parser.destroy();
                 }

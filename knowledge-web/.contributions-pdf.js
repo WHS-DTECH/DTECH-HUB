@@ -69,7 +69,7 @@ const teal = "#1b5b69";
 
 function renderContributionsPdf({ name, sets, now = new Date() }) {
     return new Promise((resolve, reject) => {
-        const doc = new PDFDocument({ size: "A4", margin: 42, info: { Title: "Knowledge Web - My Contributions" } });
+        const doc = new PDFDocument({ size: "A4", margin: 42, bufferPages: true, info: { Title: "Knowledge Web - My Contributions" } });
         const chunks = [];
         doc.on("data", (chunk) => chunks.push(chunk));
         doc.on("error", reject);
@@ -185,6 +185,16 @@ function renderContributionsPdf({ name, sets, now = new Date() }) {
                 doc.moveDown(0.7);
             }
             doc.moveDown();
+        }
+        const pages = doc.bufferedPageRange();
+        for (let index = 0; index < pages.count; index++) {
+            doc.switchToPage(pages.start + index);
+            const label = `Page ${index + 1} of ${pages.count}`;
+            const bottomMargin = doc.page.margins.bottom;
+            doc.page.margins.bottom = 0;
+            doc.font("Body").fontSize(9).fillColor(muted);
+            doc.text(label, left + width - doc.widthOfString(label), doc.page.height - 28, { lineBreak: false });
+            doc.page.margins.bottom = bottomMargin;
         }
         doc.end();
     });
