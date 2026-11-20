@@ -1,7 +1,10 @@
 "use strict";
 
 const { randomUUID } = require("node:crypto");
+const { readFileSync } = require("node:fs");
+const path = require("node:path");
 const { buildContributionSets, renderContributionsPdf } = require("./.contributions-pdf");
+const replayTemplate = readFileSync(path.join(__dirname, ".replay.html"), "utf8");
 
 const kiteSchema = `
 CREATE TABLE IF NOT EXISTS knowledge_web_kites (
@@ -436,8 +439,7 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
             convertedProposalIds: converted.map(({ id }) => id) });
     }));
 
-    app.get(`${base}/contributions/pdf`, handler(async (req, res, access) => {
-        const name = await nameFor(req, access);
+    async function contributionExport(email) {
         // Use one database snapshot for both owned records and their visible relationship context.
         const { rows: [report] } = await pool.query(`WITH RECURSIVE history AS MATERIALIZED (
             ${contributionFamilies.map((family) => historySql(family, true)).join(" UNION ALL ")}
@@ -465,9 +467,36 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
             LEFT JOIN knowledge_web_connections c ON r.type='connection' AND c.id=r.id
         )
         SELECT COALESCE((SELECT jsonb_agg(history ORDER BY "createdAt",id) FROM history),'[]') AS records,
-            COALESCE((SELECT jsonb_agg(context ORDER BY type,id) FROM context),'[]') AS context`, [access.email]);
-        const pdf = await renderContributionsPdf({ name, sets: buildContributionSets(report.records, report.context) });
+            COALESCE((SELECT jsonb_agg(context ORDER BY type,id) FROM context),'[]') AS context`, [email]);
+        return { records: report.records, sets: buildContributionSets(report.records, report.context) };
+    }
+
+    app.get(`${base}/contributions/pdf`, handler(async (req, res, access) => {
+        const name = await nameFor(req, access);
+        const { sets } = await contributionExport(access.email);
+        const pdf = await renderContributionsPdf({ name, sets });
         res.attachment("knowledge-web-my-contributions.pdf").send(pdf);
+    }, student));
+
+    app.get(`${base}/contributions/replay`, handler(async (req, res, access) => {
+        const name = await nameFor(req, access);
+        const { records, sets } = await contributionExport(access.email);
+        const steps = new Map(records.map((record, index) => [record.id, index]));
+        const groups = sets.map(({ objects, records: groupRecords }, group) => {
+            for (const record of groupRecords) record.group = group;
+            return objects.map(({ key, type, title, contributor, targets, label, owned }) => ({
+                key, type, title, targets, label,
+                contributor: !owned && contributor && !contributor.includes("@") ? contributor : undefined,
+                step: owned ? steps.get(owned.id) + 1 : null
+            }));
+        });
+        // Keep authored text inside inert JSON even if it contains HTML or script delimiters.
+        const replayRecords = records.map(({ group, subject, subjectId, kind, createdAt, content }) => ({
+            group, subject, subjectId, kind, createdAt,
+            content: kind === "comment" ? { body: content.body, replyTo: Boolean(content.replyTo) } : content
+        }));
+        const payload = JSON.stringify({ name, records: replayRecords, groups }).replace(/</g, "\\u003c");
+        res.attachment("knowledge-web-replay.html").send(replayTemplate.replace("<!--REPLAY_DATA-->", () => payload));
     }, student));
 
     app.get(`${base}/manage/reports`, handler(async (_req, res) => {

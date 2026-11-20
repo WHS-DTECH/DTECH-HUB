@@ -131,7 +131,7 @@ function renderContributionsPdf({ name, sets, now = new Date() }) {
             doc.y = y + 119;
         };
 
-        text("Computing History Knowledge Web", { size: 12, color: teal });
+        text("Knowledge Web", { size: 12, color: teal });
         text("My Contributions", { size: 24, bold: true });
         text(name, { bold: true });
         text(`Exported ${dateFormat.format(now)}`, { color: muted });

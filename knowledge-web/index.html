@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
     <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
-    <title>Computing History Knowledge Web | DTECH-HUB</title>
+    <title>Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=19">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=20">
 </head>
 <body>
     <div class="page-shell">
@@ -26,7 +26,7 @@
             <header class="kw-heading">
                 <div>
                     <p class="section-kicker">KNOW MODE &middot; YEARS 9&ndash;13</p>
-                    <h1 id="web-title">Computing History Knowledge Web</h1>
+                    <h1 id="web-title">Knowledge Web</h1>
                 </div>
                 <nav aria-label="Knowledge Web pages">
                     <a href="/practical-skills/checklist.html">My Licence</a>
@@ -152,8 +152,14 @@
                 </section>
             </section>
             <section id="web-my-proposals" class="kw-panel" aria-label="My Contributions" hidden>
-                <button id="web-export-pdf" class="kw-primary" type="button" hidden>Download my contributions PDF</button>
+                <div id="web-export-actions" class="kw-toolbar-group" hidden>
+                    <button id="web-export-pdf" type="button">Download my contributions PDF</button>
+                    <button id="web-play-replay" class="kw-primary" type="button" aria-expanded="false" aria-controls="web-replay">Replay My Thinking</button>
+                    <button id="web-export-replay" type="button">Download replay HTML</button>
+                </div>
                 <p id="web-export-status" role="status"></p>
+                <p id="web-replay-status" role="status"></p>
+                <iframe id="web-replay" title="Replay My Thinking player" sandbox="allow-scripts" hidden></iframe>
                 <p id="web-history-status" role="status"></p>
                 <div id="web-own-cloud-proposals" hidden>
                     <h2>My cloud proposals</h2>
@@ -220,6 +226,6 @@
     <script src="/script.js?v=knowledge-web-2"></script>
     <script src="/knowledge-web/contributions.js?v=12"></script>
     <script src="/knowledge-web/layout.js?v=4"></script>
-    <script src="/knowledge-web/web.js?v=24"></script>
+    <script src="/knowledge-web/web.js?v=25"></script>
 </body>
 </html>

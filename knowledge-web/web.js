@@ -67,6 +67,17 @@
         return body;
     }
 
+    function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const link = element("a");
+        link.href = url;
+        link.download = filename;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+    }
+
     async function downloadContributions() {
         const control = node("export-pdf");
         const status = node("export-status");
@@ -84,19 +95,65 @@
             }
             const pdf = await response.blob();
             if (state.revision !== revision) return;
-            const url = URL.createObjectURL(pdf);
-            const link = element("a");
-            link.href = url;
-            link.download = "knowledge-web-my-contributions.pdf";
-            document.body.append(link);
-            link.click();
-            link.remove();
-            setTimeout(() => URL.revokeObjectURL(url), 30000);
+            downloadBlob(pdf, "knowledge-web-my-contributions.pdf");
             status.textContent = "Your PDF is ready.";
         } catch (error) {
             if (state.revision === revision) status.textContent = `PDF download failed: ${error.message}`;
         } finally {
             if (state.revision === revision) control.disabled = false;
+        }
+    }
+
+    let replayUrl;
+    function closeReplay() {
+        const frame = node("replay");
+        frame.hidden = true;
+        frame.removeAttribute("src");
+        if (replayUrl) URL.revokeObjectURL(replayUrl);
+        replayUrl = undefined;
+        node("play-replay").setAttribute("aria-expanded", "false");
+        node("play-replay").textContent = "Replay My Thinking";
+    }
+
+    async function loadReplay(download) {
+        const play = node("play-replay");
+        const status = node("replay-status");
+        if (!download && replayUrl) {
+            closeReplay();
+            status.textContent = "";
+            return;
+        }
+        const revision = state.revision;
+        const controls = [play, node("export-replay")];
+        controls.forEach((control) => { control.disabled = true; });
+        status.textContent = "Preparing your replay...";
+        try {
+            const response = await fetch("/api/knowledge-web/contributions/replay", {
+                headers: withHubAuthHeaders({ Accept: "text/html" }, undefined, true),
+                cache: "no-store", signal: AbortSignal.timeout(60000)
+            });
+            if (!response.ok || !response.headers.get("Content-Type")?.startsWith("text/html")) {
+                const error = response.headers.get("Content-Type")?.includes("application/json") ? await response.json() : null;
+                throw new Error(error?.error || `Could not load the replay (${response.status}).`);
+            }
+            const replay = await response.blob();
+            if (state.revision !== revision) return;
+            if (download) {
+                downloadBlob(replay, "knowledge-web-replay.html");
+                status.textContent = "Your replay file is ready. Anyone with a copy can open it offline.";
+            } else {
+                const frame = node("replay");
+                replayUrl = URL.createObjectURL(replay);
+                frame.src = replayUrl;
+                frame.hidden = false;
+                play.setAttribute("aria-expanded", "true");
+                play.textContent = "Close replay";
+                status.textContent = "Replay ready. Use the player controls to begin.";
+            }
+        } catch (error) {
+            if (state.revision === revision) status.textContent = `Replay failed: ${error.message}`;
+        } finally {
+            if (state.revision === revision) controls.forEach((control) => { control.disabled = false; });
         }
     }
 
@@ -955,9 +1012,12 @@
         proposalForm.inert = false;
         node("proposal").hidden = true;
         node("my-proposals").hidden = true;
-        node("export-pdf").hidden = true;
+        node("export-actions").hidden = true;
         node("export-pdf").disabled = false;
         node("export-status").textContent = "";
+        closeReplay();
+        node("play-replay").disabled = node("export-replay").disabled = false;
+        node("replay-status").textContent = "";
         for (const id of ["manage", "explore", "manage-link", "explore-link", "contributions-link", "retry"]) node(id).hidden = true;
         node("status").textContent = token ? "Loading the Knowledge Web..." : "Sign in with your school Google account to open the Knowledge Web.";
         if (!token) return;
@@ -989,7 +1049,7 @@
                 if (historyPage) {
                     node("explore-link").hidden = false;
                     node("my-proposals").hidden = !state.canContribute;
-                    node("export-pdf").hidden = !state.canContribute || state.canManage;
+                    node("export-actions").hidden = !state.canContribute || state.canManage;
                     node("own-cloud-proposals").hidden = !state.canPropose;
                     if (state.canContribute) void contributions.refresh();
                 } else {
@@ -1042,6 +1102,8 @@
     });
     node("browse").addEventListener("click", () => showResults(node("search-results").hidden));
     node("export-pdf").addEventListener("click", downloadContributions);
+    node("play-replay").addEventListener("click", () => loadReplay(false));
+    node("export-replay").addEventListener("click", () => loadReplay(true));
     node("search").closest(".kw-explore").addEventListener("keydown", (event) => {
         if (event.key !== "Escape" || node("search-results").hidden) return;
         event.preventDefault();

@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>Replay My Thinking | Knowledge Web</title>
+<style>
+    :root { font: 16px/1.5 system-ui, sans-serif; color: #143347; background: #f5fafb; }
+    body { max-width: 76rem; margin: auto; padding: 1rem; }
+    h1, h2, p { margin: 0 0 .45rem; }
+    h1 { font-size: 1.65rem; }
+    h2 { font-size: 1.1rem; }
+    .controls { display: flex; flex-wrap: wrap; gap: .45rem; margin: .85rem 0; }
+    button { font: inherit; padding: .35rem .7rem; min-height: 2.5rem; border: 1px solid #1b5b69; border-radius: .45rem; background: white; color: inherit; cursor: pointer; }
+    button:enabled:hover { background: #dfedf3; }
+    button:disabled { opacity: .55; cursor: default; }
+    :focus-visible { outline: 3px solid #1b5b69; outline-offset: 3px; }
+    .layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: .75rem; align-items: start; }
+    #board, #detail { background: white; border: 1px solid #b6cdd5; border-radius: .65rem; padding: .75rem; overflow-wrap: anywhere; }
+    #board { max-height: 28rem; overflow: auto; background-image: radial-gradient(#b6cdd5 1px, transparent 1px); background-size: 16px 16px; }
+    .group { position: relative; padding: .65rem; margin-bottom: .65rem; border: 1px solid #b6cdd5; border-radius: .6rem; background: #ffffffed; }
+    .objects { position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); gap: 1rem; }
+    svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    line { stroke: #235b69; stroke-width: 2; }
+    line.explained { stroke: #69478b; stroke-dasharray: 6 4; }
+    .object { z-index: 1; background: #f3f9fb; border: 1px solid #6c9eac; padding: .45rem .65rem; text-align: center; }
+    .cloud { border-radius: 1.65rem; }
+    .kite { background: #fff3cc; border-color: #9c742c; border-radius: .4rem; }
+    .balloon { background: #ffece5; border-color: #a3614f; border-radius: 1.85rem 1.85rem .55rem .55rem; }
+    .basket { display: block; margin-top: .35rem; padding: .2rem; background: #f4e3ba; border-radius: .3rem; }
+    .activity { margin: .65rem 0 0; padding-inline-start: 1.3rem; }
+    .current { outline: 2px solid #1b5b69; outline-offset: 2px; }
+    #detail p { white-space: pre-wrap; }
+    .legend { font-size: .87rem; }
+    [hidden] { display: none !important; }
+    @media (max-width: 620px) { .layout { grid-template-columns: minmax(0, 1fr); } #board { max-height: 16rem; } }
+    @media (prefers-reduced-motion: no-preference) {
+        .appearing { animation: reveal .32s ease-out; }
+        @keyframes reveal { from { opacity: .15; } to { opacity: 1; } }
+    }
+</style>
+</head>
+<body>
+<h1>Replay My Thinking</h1>
+<p id="author"></p>
+<p>Build your Knowledge Web one contribution at a time, in the order you created it.</p>
+<div class="controls" id="controls" aria-label="Playback controls" role="group">
+    <button id="play" type="button">Play</button>
+    <button id="back" type="button">Previous</button>
+    <button id="next" type="button">Next</button>
+    <button id="restart" type="button">Restart</button>
+</div>
+<p id="status" role="status"></p>
+<p class="legend" id="legend">Solid lines are original attachments. Dashed lines are explained connections.</p>
+<div class="layout" id="layout">
+    <section id="board" aria-label="Replay whiteboard" tabindex="0"></section>
+    <section id="detail" aria-label="Current contribution"></section>
+</div>
+<script type="application/json" id="replay-data"><!--REPLAY_DATA--></script>
+<script>
+(() => {
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+    const { name, groups, records } = JSON.parse($("replay-data").textContent);
+    const board = $("board");
+    const detail = $("detail");
+    $("author").textContent = name;
+    if (!records.length) {
+        $("controls").hidden = $("layout").hidden = $("legend").hidden = true;
+        $("status").textContent = "You have no visible authored contributions to replay.";
+        return;
+    }
+    const html = (tag, text) => {
+        const el = document.createElement(tag);
+        if (text !== undefined) el.textContent = text;
+        return el;
+    };
+    const svg = (tag) => document.createElementNS("http://www.w3.org/2000/svg", tag);
+    const subjectKey = ({ subject, subjectId }) => `${subject}:${subjectId}`;
+    const types = { kite: "Kite", balloon: "Hot-air balloon", connection: "Explained connection", comment: "Discussion", evidence: "Supporting evidence" };
+    const date = new Intl.DateTimeFormat("en-NZ", { dateStyle: "long", timeStyle: "short", timeZone: "Pacific/Auckland" });
+    const cards = groups.map((objects, index) => {
+        const section = html("section");
+        section.className = "group";
+        const title = html("h2", `Contribution set ${index + 1}`);
+        const grid = html("div");
+        grid.className = "objects";
+        const strings = svg("svg");
+        strings.setAttribute("aria-hidden", "true");
+        grid.append(strings);
+        const activity = html("ul");
+        activity.className = "activity";
+        section.append(title, grid, activity);
+        board.append(section);
+        const byKey = new Map(objects.map((object) => [object.key, { ...object, first: Infinity }]));
+        for (const object of [...objects].sort((a, b) => Number(b.type === "cloud") - Number(a.type === "cloud"))) {
+            if (object.type === "connection") continue;
+            const el = html("div");
+            el.className = `object ${object.type}`;
+            const label = html("strong", object.type === "cloud" ? "Teacher Cloud" : object.label);
+            const caption = html("div", object.type === "cloud" ? object.title :
+                object.step ? "Referenced object" : `Context only${object.contributor ? `: ${object.contributor}` : ""}`);
+            el.append(label, caption);
+            grid.append(el);
+            Object.assign(byKey.get(object.key), { el, caption });
+        }
+        return { byKey, grid, strings, activity, section };
+    });
+    function revealAt(group, key, step) {
+        const object = group.byKey.get(key);
+        if (object.first <= step) return;
+        object.first = step;
+        for (const target of object.targets) revealAt(group, target, step);
+    }
+    records.forEach((record, index) => {
+        const group = cards[record.group];
+        const key = subjectKey(record);
+        revealAt(group, key, index + 1);
+        if (!["comment", "evidence", "connection"].includes(record.kind)) return;
+        const label = record.kind === "connection" ? group.byKey.get(key).label : `${types[record.kind]} on ${group.byKey.get(key).label}`;
+        record.note = html("li", label);
+        group.activity.append(record.note);
+    });
+    let position = 0;
+    let timer = null;
+    function drawStrings() {
+        for (const { byKey, grid, strings, section } of cards) {
+            if (section.hidden) continue;
+            const bounds = grid.getBoundingClientRect();
+            const point = ({ el }) => {
+                const box = el.getBoundingClientRect();
+                return [box.left - bounds.left + box.width / 2, box.top - bounds.top + box.height / 2];
+            };
+            const lines = [];
+            const add = (a, b, explained) => {
+                const line = svg("line");
+                const [x1, y1] = point(a), [x2, y2] = point(b);
+                for (const [key, value] of Object.entries({ x1, y1, x2, y2 })) line.setAttribute(key, value);
+                if (explained) line.classList.add("explained");
+                lines.push(line);
+            };
+            for (const object of byKey.values()) {
+                if ((object.step || object.first) > position) continue;
+                const targets = object.targets.map((key) => byKey.get(key));
+                if (object.type === "connection") add(targets[0], targets[1], true);
+                else for (const target of targets) add(object, target, false);
+            }
+            strings.replaceChildren(...lines);
+        }
+    }
+    const observer = new ResizeObserver(drawStrings);
+    for (const { grid } of cards) observer.observe(grid);
+    function render(scroll = true) {
+        const current = records[position - 1];
+        const currentGroup = current && cards[current.group];
+        const currentKey = current && subjectKey(current);
+        for (const group of cards) {
+            const { byKey, section } = group;
+            section.hidden = ![...byKey.values()].some(({ first }) => first <= position);
+            for (const object of byKey.values()) {
+                if (!object.el) continue;
+                const owned = object.step && object.step <= position;
+                object.el.hidden = object.first > position;
+                object.el.classList.toggle("current", group === currentGroup && object.key === currentKey);
+                object.el.classList.toggle("appearing", object.first === position);
+                if (!object.step) continue;
+                object.caption.textContent = owned ? object.type === "balloon"
+                    ? records[object.step - 1].content.principle : "Your contribution" : "Referenced object";
+                object.caption.classList.toggle("basket", Boolean(owned && object.type === "balloon"));
+            }
+        }
+        records.forEach((record, index) => {
+            if (!record.note) return;
+            record.note.hidden = index >= position;
+            record.note.classList.toggle("current", index === position - 1);
+        });
+        drawStrings();
+        detail.replaceChildren();
+        const field = (label, value) => {
+            if (value) detail.append(html("strong", label), html("p", value));
+        };
+        if (current) {
+            const { content, kind } = current;
+            const subject = currentGroup.byKey.get(currentKey);
+            const heading = kind === "comment" && content.replyTo ? "Discussion reply" : types[kind];
+            $("status").textContent = `Step ${position} of ${records.length}: ${heading}`;
+            detail.append(html("h2", heading), html("p", date.format(new Date(current.createdAt))));
+            if (kind === "comment" || kind === "evidence") field("On", subject.label);
+            if (kind === "kite") field("Kite contribution", content.argument);
+            if (kind === "balloon") {
+                field("Theoretical principle", content.principle);
+                field(content.idea ? "Idea (earlier balloon format)" : "Explanation of the principle", content.idea || content.principleExplanation);
+                field("Relationship explanation", content.explanation);
+            }
+            if (kind === "connection") field("Connection explanation", content.explanation);
+            if (kind === "comment") field("Discussion text", content.body);
+            if (kind === "evidence") {
+                field("Title", content.title);
+                field("Reference", content.reference);
+                field("Source author", content.author);
+                field("Publication date", content.publicationDate);
+                field("Evidence explanation", content.supports);
+            }
+            if (scroll) board.scrollTop += currentGroup.section.getBoundingClientRect().top - board.getBoundingClientRect().top - 12;
+        } else {
+            $("status").textContent = `Ready to replay ${records.length} ${records.length === 1 ? "contribution" : "contributions"}.`;
+            detail.append(html("p", "Choose Play to watch, or Next to move one step at a time."));
+            board.scrollTop = 0;
+        }
+        $("play").textContent = timer ? "Pause" : position === records.length ? "Play again" : "Play";
+        $("back").disabled = $("restart").disabled = position === 0;
+        $("next").disabled = position === records.length;
+    }
+    function pause() {
+        clearInterval(timer);
+        timer = null;
+    }
+    function move(step) {
+        pause();
+        position = step;
+        render();
+    }
+    $("play").addEventListener("click", () => {
+        if (timer) { pause(); render(false); return; }
+        if (position === records.length) position = 0;
+        const advance = () => {
+            if (++position === records.length) pause();
+            render();
+        };
+        timer = setInterval(advance, 3000);
+        advance();
+    });
+    $("back").addEventListener("click", () => move(position - 1));
+    $("next").addEventListener("click", () => move(position + 1));
+    $("restart").addEventListener("click", () => move(0));
+    render();
+})();
+</script>
+</body>
+</html>

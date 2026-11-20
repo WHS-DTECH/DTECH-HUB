@@ -115,7 +115,7 @@ course (for staff previewing Student View, it uses their selected course).
 The small **JNR/MID/SNR** or **MID/SNR** badge on each stamp shows which
 students can open the kit when it is Live.
 
-### KNOW Mode: Computing History Knowledge Web
+### KNOW Mode: Knowledge Web
 
 The **Knowledge Web** link in Licence and My Licence is available to current
 Years 9–13 students and teaching staff, with MiddleDTECH and SeniorDTECH on the
