@@ -33,6 +33,8 @@ The initial `2026 NCEA Digital Examination Disruptions` cloud is seeded as an un
 
 **Stage 1:** Select one published cloud and choose **Add a Kite** to publish an idea, observation, question, or argument without teacher approval. Evidence is optional and can also be added later. Each new kite has one string to its cloud. Existing two-cloud kites remain intact and readable without an inferred originating cloud. The original approved-proposal **Publish as Kite** flow still publishes a two-cloud kite during this transition.
 
+Select a cloud or kite on the canvas or in a searchable list to open it in the information panel next to the canvas (below it on narrow screens). Kite evidence, discussion and actions stay in that panel.
+
 **Stage 2 (planned):** A connection is a separate, attributed record linking a kite to another published cloud or linking two published clouds directly; it always requires a relationship explanation.
 
 ### Stage 3 (planned): Upgrade to Cloud

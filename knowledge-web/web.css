@@ -69,7 +69,13 @@
 .kw-entry button { margin: .25rem; }
 #web-duplicates { border-left: 4px solid #a76612; padding: .75rem 2rem; background: #fff7e8; }
 .kw-coordinates { display: flex; flex-wrap: wrap; gap: .6rem; }
-#web-detail p { white-space: pre-wrap; }
+.kw-selection h2:first-child { margin-top: 0; }
+.kw-selection p { white-space: pre-wrap; }
+.kw-map { background: #fff; padding-bottom: .15rem; }
+@media (min-width: 751px) {
+    .kw-map-panel { align-self: stretch; }
+    .kw-map { position: sticky; top: .75rem; }
+}
 #web-save-status, #web-status { min-height: 1.25em; }
 @media (max-width: 750px) {
     .kw-columns, #web-manage .kw-columns { grid-template-columns: minmax(0, 1fr); }

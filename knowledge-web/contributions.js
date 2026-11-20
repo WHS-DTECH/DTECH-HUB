@@ -249,14 +249,18 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         active = null;
         node("kite-detail").replaceChildren();
         node("kite-detail").hidden = true;
+        node("cloud-detail").hidden = false;
     }
 
     async function openKite(id, focusId) {
         const seq = ++detailSequence, revision = state.revision;
         const host = node("kite-detail");
         active = id;
+        node("cloud-detail").hidden = true;
         host.hidden = false;
-        host.replaceChildren(element("p", "Loading argument…"));
+        const loading = element("p", "Loading kite…");
+        loading.setAttribute("role", "status");
+        host.replaceChildren(loading);
         try {
             const result = await request(`kites/${id}`);
             if (revision !== state.revision || seq !== detailSequence) return;
@@ -279,7 +283,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         };
         const goToCloud = (id) => {
             const cloud = state.clouds.find((item) => item.id === id);
-            if (cloud) { showCloud(cloud, true); node("viewport").focus(); }
+            if (cloud) { showCloud(cloud, true); node("detail").focus(); }
         };
         const meta = (item) => element("small", `${item.contributor} · ${formatDate(item.createdAt)}${item.createdAt !== item.updatedAt ? ` · Edited ${formatDate(item.updatedAt)}` : ""}`);
         const report = (kind, item) => {
@@ -330,7 +334,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             row.tabIndex = -1;
             return row;
         };
-        host.replaceChildren(element("h3", linkTitle(kite)), meta(kite), element("p", kite.argument),
+        host.replaceChildren(element("h2", linkTitle(kite)), meta(kite), element("p", kite.argument),
             button("Back to canvas", () => { closeKite(); node("viewport").focus(); }),
             button(`Open cloud: ${kite.titleA}`, () => goToCloud(kite.cloudA)));
         if (kite.cloudB) host.append(button(`Open cloud: ${kite.titleB}`, () => goToCloud(kite.cloudB)));
@@ -401,7 +405,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
     node("refresh-kites").addEventListener("click", () => { void refresh(); if (active) void openKite(active); });
     node("refresh-reports").addEventListener("click", () => { void reports(); });
     return {
-        drawMap, refresh, reports, openEditor, openKite, converted: (id) => converted.has(id),
+        drawMap, refresh, reports, openEditor, openKite, closeKite, converted: (id) => converted.has(id),
         reset() {
             kites = []; converted = new Set(); displayLimit = 12; closeKite();
             for (const id of ["kite-list", "kite-editor", "kite-status", "kite-map-note", "contribution-list", "history-status", "report-list", "report-status"]) node(id).replaceChildren();

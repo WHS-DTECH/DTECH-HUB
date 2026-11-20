@@ -8,7 +8,7 @@
     <title>Computing History Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=9">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=10">
 </head>
 <body>
     <div class="page-shell">
@@ -53,7 +53,7 @@
                     </div>
                 </section>
                 <div class="kw-columns" id="web-clouds" hidden>
-                    <div class="kw-panel">
+                    <div class="kw-panel kw-map-panel">
                         <label for="web-search">Find a cloud by title</label>
                         <input id="web-search" type="search" autocomplete="off">
                         <ul id="web-results" aria-label="Clouds by title"></ul>
@@ -72,16 +72,22 @@
                             </div>
                             <p id="web-kite-status" role="status"></p>
                             <ul id="web-kite-list" aria-label="Kites by cloud, author or text"></ul>
-                            <div id="web-kite-editor" hidden></div>
-                            <article id="web-kite-detail" aria-label="Selected kite" tabindex="-1" hidden></article>
                         </section>
-                        <p id="web-pan-help">Scroll or use the arrow keys in the map to pan. You can also explore from the cloud list.</p>
-                        <p id="web-kite-map-note"></p>
-                        <div id="web-viewport" class="kw-viewport" tabindex="0" role="region" aria-label="Knowledge Web canvas" aria-describedby="web-pan-help">
-                            <div id="web-board"></div>
+                        <div class="kw-map">
+                            <p id="web-pan-help">Scroll or use the arrow keys in the map to pan. You can also explore from the cloud list.</p>
+                            <p id="web-kite-map-note"></p>
+                            <div id="web-viewport" class="kw-viewport" tabindex="0" role="region" aria-label="Knowledge Web canvas" aria-describedby="web-pan-help">
+                                <div id="web-board"></div>
+                            </div>
                         </div>
                     </div>
-                    <article class="kw-panel" id="web-detail" aria-label="Selected cloud" aria-live="polite" tabindex="-1"></article>
+                    <section class="kw-panel kw-selection" aria-label="Selected element">
+                        <div id="web-cloud-detail">
+                            <article id="web-detail" aria-label="Selected cloud" aria-live="polite" tabindex="-1"></article>
+                            <div id="web-kite-editor" hidden></div>
+                        </div>
+                        <article id="web-kite-detail" aria-label="Selected kite" tabindex="-1" hidden></article>
+                    </section>
                 </div>
                 <section id="web-proposal" class="kw-panel kw-proposal" aria-label="Propose a new historical cloud" hidden>
                     <h2>Propose a new cloud</h2>
@@ -184,7 +190,7 @@
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="/script.js?v=knowledge-web-2"></script>
-    <script src="/knowledge-web/contributions.js?v=4"></script>
-    <script src="/knowledge-web/web.js?v=14"></script>
+    <script src="/knowledge-web/contributions.js?v=5"></script>
+    <script src="/knowledge-web/web.js?v=15"></script>
 </body>
 </html>

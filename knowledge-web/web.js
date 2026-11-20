@@ -177,6 +177,7 @@
     }
 
     function showCloud(cloud, centre) {
+        contributions.closeKite();
         if (state.selected !== cloud.id) {
             state.timelineView = "year";
             state.timelineYear = "";
@@ -289,8 +290,8 @@
         }
         renderSearch();
         contributions.drawMap();
-        node("detail").replaceChildren(element("h2", "Explore a cloud"),
-            element("p", "Select a cloud on the canvas or in the title list to read more."));
+        node("detail").replaceChildren(element("h2", "Explore the Knowledge Web"),
+            element("p", "Select a cloud or kite on the canvas or in a list to read more."));
     }
 
     const eventFields = [
