@@ -6,7 +6,7 @@
     const proposalForm = node("proposal-form");
     const state = {
         clouds: [], positions: new Map(), selected: null, editing: null, editingProposal: null, proposalParentId: null,
-        proposals: [], canPropose: false, zoom: 1, token: null, revision: 0,
+        proposals: [], canPropose: false, canContribute: false, zoom: 1, token: null, revision: 0,
         dirty: false, proposalDirty: false, saving: false, duplicatesAcknowledgedTitle: "",
         timelineView: "year", timelineYear: "", timelineDay: ""
     };
@@ -258,7 +258,7 @@
     function renderExplore() {
         node("empty").hidden = state.clouds.length !== 0;
         node("clouds").hidden = state.clouds.length === 0;
-        node("connect").hidden = !state.canPropose || state.clouds.length < 2;
+        node("connect").hidden = !state.canContribute || state.clouds.length < 2;
         renderTimeline();
         if (!state.clouds.length) return;
         const board = node("board");
@@ -740,6 +740,7 @@
         state.editingProposal = null;
         state.proposalParentId = null;
         state.canPropose = false;
+        state.canContribute = false;
         state.saving = state.dirty = form.inert = false;
         form.reset();
         form.hidden = true;
@@ -778,8 +779,10 @@
                 node("explore").hidden = false;
                 node("manage-link").hidden = !result.canManage;
                 state.canPropose = result.canPropose;
-                node("my-proposals").hidden = !state.canPropose;
-                renderStudentProposals();
+                state.canContribute = result.canContribute;
+                node("my-proposals").hidden = !state.canContribute;
+                node("own-cloud-proposals").hidden = !state.canPropose;
+                if (state.canPropose) renderStudentProposals();
                 renderExplore();
                 void contributions.refresh();
             }

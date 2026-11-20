@@ -21,7 +21,8 @@ The initial `2026 NCEA Digital Examination Disruptions` cloud is seeded as an un
 
 ## Phase 3
 
-- **Connect Clouds** publishes a student's argument as a kite between two different published clouds. At least one piece of evidence with an explanation is required. Multiple kites about the same clouds remain separate arguments. The map limits how many kites it shows to reduce clutter; the keyboard-accessible searchable list gives access to all visible arguments.
+- **Connect Clouds** publishes an argument as a kite between two different published clouds. At least one piece of evidence with an explanation is required. Multiple kites about the same clouds remain separate arguments. The map limits how many kites it shows to reduce clutter; the keyboard-accessible searchable list gives access to all visible arguments.
+- Authorised teachers use the same kite form, discussions and evidence tools from the shared web under their own verified identity. They do not need to use **Switch to Student View**. Cloud management and student proposals remain separate.
 - On an approved proposal, **Publish as Kite** prefills the original connection and evidence, which the student can edit before publishing. The same proposal can be converted only once.
 - On a kite, students can post questions and replies without citations and add separately attributed evidence that supports, challenges, or contextualises the argument. Contributions publish immediately. Owners can edit their own contributions without changing original authorship or creation time; previous content is recorded privately.
 - **My Contributions** shows a student's proposals, kites, comments and evidence and can reopen their original context. Other readers see display names, not private school identities.

@@ -75,7 +75,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
     }
 
     function openEditor(proposal = null) {
-        if (!state.canPropose || state.clouds.length < 2) return;
+        if (!state.canContribute || state.clouds.length < 2 || (proposal && !state.canPropose)) return;
         const host = node("kite-editor");
         host.hidden = false;
         const fields = editor(host, proposal ? "Publish as Kite" : "Connect Clouds", "Publish kite", async (revision) => {
@@ -208,13 +208,13 @@ function createKnowledgeContributions({ node, request, element, button, state, s
     async function refresh() {
         const seq = ++refreshSequence, revision = state.revision;
         try {
-            const [shared, own] = await Promise.all([request("kites"), state.canPropose ? request("contributions") : null]);
+            const [shared, own] = await Promise.all([request("kites"), state.canContribute ? request("contributions") : null]);
             if (revision !== state.revision || seq !== refreshSequence) return;
             kites = shared.kites;
             converted = new Set(own?.convertedProposalIds);
             drawMap();
             renderList();
-            if (state.canPropose) {
+            if (own) {
                 const host = node("contribution-list");
                 host.replaceChildren();
                 if (!own.contributions.length) host.append(empty());
@@ -224,7 +224,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                         () => { void openKite(item.kiteId, item.id); }), element("small", ` Updated ${formatDate(item.updatedAt)}`));
                     host.append(row);
                 }
-                onProposalsChanged();
+                if (state.canPropose) onProposalsChanged();
             }
         } catch (error) {
             if (revision === state.revision && seq === refreshSequence) node("kite-status").textContent = error.message;
@@ -303,11 +303,11 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         const controls = (kind, item) => {
             const actions = element("div");
             actions.className = "kw-actions";
-            if (state.canPropose) {
+            if (state.canContribute) {
                 if (kind === "comment") actions.append(button("Reply", () => compose(kind, null, item)));
                 if (item.mine) actions.append(button(`Edit ${labels[kind].toLowerCase()}`, () => compose(kind, item)));
-                actions.append(button(`Report ${labels[kind].toLowerCase()}`, () => report(kind, item)));
             }
+            if (state.canPropose) actions.append(button(`Report ${labels[kind].toLowerCase()}`, () => report(kind, item)));
             return actions;
         };
         const entry = (item) => {
@@ -322,7 +322,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             button(`Open cloud: ${kite.titleA}`, () => goToCloud(kite.cloudA)),
             button(`Open cloud: ${kite.titleB}`, () => goToCloud(kite.cloudB)), controls("kite", kite), actionHost,
             element("h3", "Supporting evidence"));
-        if (state.canPropose) host.append(button("Add evidence", () => compose("evidence")));
+        if (state.canContribute) host.append(button("Add evidence", () => compose("evidence")));
         if (!evidence.length) host.append(element("p", "No evidence is currently visible for this argument."));
         for (const item of evidence) {
             const row = entry(item);
@@ -333,7 +333,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             host.append(row);
         }
         host.append(element("h3", "Discussion"));
-        if (state.canPropose) host.append(button("Write a comment", () => compose("comment")));
+        if (state.canContribute) host.append(button("Write a comment", () => compose("comment")));
         if (!comments.length) host.append(empty());
         const byId = new Map(comments.map((item) => [item.id, item]));
         for (const item of comments) {

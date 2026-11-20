@@ -165,7 +165,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             registerKnowledgeWeb(app, {
                 pool, getVerifiedEmail: (req) => req.headers["x-verified-test-account"] || "",
                 canManage: async (account) => account === "teacher@test.invalid",
-                getStudentProfile: async (account) => ({ available: true, year: account.startsWith("student-two") ? 13 : authorYear }),
+                getStudentProfile: async (account) => ({ available: true, year: account.startsWith("junior") ? 8 : account.startsWith("student-two") ? 13 : authorYear }),
                 notifyReport: async (...args) => { notifications.push(args); },
                 getContributorName: async (_req, account) => account === "teacher@test.invalid" ? "Test Teacher"
                     : account.startsWith("student-two") ? "Test Student Two" : account.startsWith("student-three") ? "Test Student Three"
@@ -191,7 +191,10 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         };
         const teacherCloudResponse = await call("clouds");
         assert.equal(teacherCloudResponse.status, 200);
-        assert.equal((await teacherCloudResponse.json()).canManage, true, "Teachers can open the shared-cloud view");
+        const teacherAccess = await teacherCloudResponse.json();
+        assert.equal(teacherAccess.canManage, true, "Teachers can open the shared-cloud view");
+        assert.equal(teacherAccess.canContribute, true);
+        assert.equal(teacherAccess.canPropose, false);
         assert.equal((await call("proposals")).status, 403,
             "The student-private proposal list remains teacher-restricted");
         assert.equal((await fetch(`${host}/knowledge-web/%2estore.js`)).status, 404);
@@ -527,4 +530,30 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.deepEqual((await get("contributions", studentD)).contributions, [], "Hidden kite evidence is not exposed");
         assert.equal((await pool.query("SELECT id FROM knowledge_web_moderation_actions")).rowCount, 3);
         assert.equal((await pool.query("SELECT id FROM knowledge_web_contribution_revisions")).rowCount, 1);
+
+        const teacher = "teacher@test.invalid";
+        const teacherDraft = { ...fromProposal, proposalId: undefined, argument: "A teacher's interpretation." };
+        assert.equal((await post("kites", teacherDraft, "junior@test.invalid")).status, 403);
+        assert.equal((await post("kites", { ...teacherDraft, evidence: [] }, teacher)).status, 400);
+        assert.equal((await post("kites", { ...teacherDraft, cloudB: seed.id }, teacher)).status, 404);
+        const teacherResult = await post("kites", { ...teacherDraft, contributor: "Pretend Student" }, teacher);
+        assert.equal(teacherResult.status, 201);
+        const { id: teacherKiteId } = await teacherResult.json();
+        const teacherKite = await get(`kites/${teacherKiteId}`, studentB);
+        assert.equal(teacherKite.kite.argument, teacherDraft.argument);
+        assert.equal(teacherKite.kite.contributor, "Test Teacher");
+        assert.equal(teacherKite.evidence[0].contributor, "Test Teacher");
+        assert.equal(teacherKite.kite.mine, false);
+        assert.doesNotMatch(JSON.stringify(teacherKite), /teacher@test\.invalid/);
+        assert.equal((await get(`kites/${teacherKiteId}`, teacher)).kite.mine, true);
+        assert.equal((await put(`kites/${kiteB}/contributions/kite/${kiteB}`, { argument: "Not my kite" }, teacher)).status, 403);
+        assert.equal((await put(`kites/${teacherKiteId}/contributions/kite/${teacherKiteId}`, { argument: "Updated teacher argument." }, teacher)).status, 200);
+        const teacherComment = await post(`kites/${kiteB}/comments`, { body: "How do you interpret this source?" }, teacher);
+        assert.equal(teacherComment.status, 201);
+        const teacherEvidence = await post(`kites/${kiteB}/evidence`, teacherDraft.evidence[0], teacher);
+        assert.equal(teacherEvidence.status, 201);
+        const teacherHistory = (await get("contributions", teacher)).contributions;
+        assert.deepEqual(new Set(teacherHistory.map(({ id }) => id)), new Set([
+            teacherKiteId, teacherKite.evidence[0].id, (await teacherComment.json()).id, (await teacherEvidence.json()).id
+        ]));
     });

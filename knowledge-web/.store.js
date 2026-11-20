@@ -556,7 +556,7 @@ function registerKnowledgeWeb(app, { pool, getVerifiedEmail, canManage, getStude
 
     app.get(`${base}/access`, route({}, (_req, res, { staff }) => res.json({ canManage: staff })));
     app.get(`${base}/clouds`, route({}, async (_req, res, { staff }) =>
-        res.json({ canManage: staff, canPropose: !staff, clouds: await listClouds(false) })));
+        res.json({ canManage: staff, canPropose: !staff, canContribute: true, clouds: await listClouds(false) })));
     app.get(`${base}/manage/clouds`, route({ staffOnly: true }, async (_req, res) => res.json({ clouds: await listClouds(true) })));
     const save = route({ staffOnly: true }, async (req, res, { email }) => {
         const id = req.params.id;

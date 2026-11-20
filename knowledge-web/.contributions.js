@@ -68,9 +68,9 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
         if (!Object.hasOwn(tables, value)) throw problem(400, "Choose a kite, comment or piece of evidence.");
         return value;
     };
-    const nameFor = async (req, email) => {
+    const nameFor = async (req, { email, staff }) => {
         const name = await getContributorName(req, email);
-        return name && !name.includes("@") ? name : "DTECH student";
+        return name && !name.includes("@") ? name : staff ? "DTECH teacher" : "DTECH student";
     };
     function evidence(body, initial = false) {
         const reference = text(body?.reference ?? "", "URL or reference", 2048, false);
@@ -135,7 +135,8 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
         res.json(result);
     }));
 
-    app.post(`${base}/kites`, handler(async (req, res, { email }) => {
+    app.post(`${base}/kites`, handler(async (req, res, access) => {
+        const { email, staff } = access;
         const [cloudA, cloudB] = [uid(req.body?.cloudA), uid(req.body?.cloudB)].sort();
         if (cloudA === cloudB) throw problem(400, "Select two different clouds.");
         const argument = text(req.body?.argument, "Connection argument", 4000);
@@ -144,7 +145,8 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
         }
         const sources = req.body.evidence.map((entry) => evidence(entry, true));
         const proposalId = req.body.proposalId ? uid(req.body.proposalId) : null;
-        const name = await nameFor(req, email);
+        if (proposalId && staff) throw problem(403, "Use Connect Clouds to publish a teacher kite.");
+        const name = await nameFor(req, access);
         const id = randomUUID();
         await transaction(async (db) => {
             if ((await db.query("SELECT id FROM knowledge_web_clouds WHERE id=ANY($1::uuid[]) AND published_at IS NOT NULL",
@@ -161,13 +163,14 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
             for (const values of sources) await addEvidence(db, id, values, email, name, true);
         });
         res.status(201).json({ id });
-    }, student));
+    }));
 
-    app.post(`${base}/kites/:id/comments`, handler(async (req, res, { email }) => {
+    app.post(`${base}/kites/:id/comments`, handler(async (req, res, access) => {
+        const { email } = access;
         const id = randomUUID();
         const body = text(req.body?.body, "Comment", 3000);
         const replyTo = req.body?.replyTo ? uid(req.body.replyTo) : null;
-        const name = await nameFor(req, email);
+        const name = await nameFor(req, access);
         await transaction(async (db) => {
             const kite = await lockKite(db, uid(req.params.id));
             if (replyTo) await target(db, kite, "comment", replyTo);
@@ -176,17 +179,18 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
             [id, kite.id, replyTo, body, email, name]);
         });
         res.status(201).json({ id });
-    }, student));
+    }));
 
-    app.post(`${base}/kites/:id/evidence`, handler(async (req, res, { email }) => {
+    app.post(`${base}/kites/:id/evidence`, handler(async (req, res, access) => {
+        const { email } = access;
         const values = evidence(req.body);
-        const name = await nameFor(req, email);
+        const name = await nameFor(req, access);
         const id = await transaction(async (db) => {
             const kite = await lockKite(db, uid(req.params.id));
             return addEvidence(db, kite.id, values, email, name, false);
         });
         res.status(201).json({ id });
-    }, student));
+    }));
 
     app.put(`${base}/kites/:id/contributions/:kind/:target`, handler(async (req, res, { email }) => {
         const kind = kindOf(req.params.kind);
@@ -206,7 +210,7 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
                 updated_at=NOW() WHERE id=$1`, [id, ...values]);
         });
         res.json({ id });
-    }, student));
+    }));
 
     app.get(`${base}/contributions`, handler(async (_req, res, { email }) => {
         const { rows } = await pool.query(`SELECT k.id,k.id AS "kiteId",'kite' AS kind,k.argument AS summary,
@@ -221,7 +225,7 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
             ORDER BY "updatedAt" DESC,id`, [email]);
         const { rows: converted } = await pool.query("SELECT proposal_id AS id FROM knowledge_web_kites WHERE contributor_email=$1 AND proposal_id IS NOT NULL", [email]);
         res.json({ contributions: rows, convertedProposalIds: converted.map(({ id }) => id) });
-    }, student));
+    }));
 
     app.post(`${base}/kites/:id/reports`, handler(async (req, res, { email }) => {
         const kind = kindOf(req.body?.kind);
