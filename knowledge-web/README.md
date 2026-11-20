@@ -29,6 +29,21 @@ The initial `2026 NCEA Digital Examination Disruptions` cloud is seeded as an un
 - Students can submit private reports about behaviour, not disagreement. A report does not hide content. Authorised staff can hide the reported contribution or dismiss the report; both actions are audited privately. Hiding a kite hides its discussion and evidence with it. Ordinary contributions do not enter a review queue.
 - The first open report for a contribution triggers a generic email to the configured DTECH Lead Teacher recipients when Hub mail is configured. The message includes a moderation link but no student identity or report content. Reports remain saved in **Manage Knowledge Web** if mail is unavailable or delivery fails.
 
+## Proposed architecture: one-cloud kites and historical cloud upgrades
+
+This design is not implemented. A new kite is an idea, observation, question, or argument anchored to one published cloud. It publishes without teacher approval. A connection is a separate, attributed record linking a kite to another published cloud or linking two published clouds directly; it always requires a relationship explanation. Existing two-cloud kites remain intact and readable without an inferred originating cloud.
+
+### Upgrade to Cloud
+
+**Upgrade to Cloud** starts a separate historical cloud draft; it does not convert the kite or approve its interpretation. Only staff authorised to manage Knowledge Web clouds can start the draft or publish it. The draft stays private until explicitly published.
+
+1. Check for an existing published cloud on the same topic when starting the draft and again before publication. If the topic already exists, use that cloud rather than publishing a duplicate. The student can add an attributed connection to it and explain the relationship. Neither finding a match nor publishing a new cloud automatically creates a student connection.
+2. Verify the historical event or development, write a standalone account of what happened and why it matters, and add relevant dates and context.
+3. Add credible sources to the new cloud that support its own historical claims and broaden the treatment beyond the original kite. The kite's argument and evidence are not automatically copied into the cloud as historical facts. The system can require the relevant fields and sources; the teacher is responsible for judging credibility, significance, and whether the topic stands on its own.
+4. Publish through the teacher cloud workflow. Record provenance separately from ordinary connections: link the new cloud ID to the original kite ID and record the responsible teacher and timestamps. Label it **Developed from a kite**, not as evidence or endorsement. Show a link to the original contribution only where it is visible to the reader; retain the provenance privately if the kite is later hidden.
+
+The original kite keeps its ID, student authorship, timestamps, evidence, discussion, and connection history. The teacher-authored cloud has its own ID, sources, timeline, and publication record. Sharing provenance does not change the student's contribution or make the student the author of the historical cloud.
+
 ## Future phases
 
 - **Phase 4:** Advanced kite tails and tangent-to-cloud conversion are not implemented.
