@@ -14,7 +14,7 @@
     const form = node("form");
     const proposalForm = node("proposal-form");
     const state = {
-        clouds: [], positions: new Map(), selected: null, editing: null, editingProposal: null, proposalParentId: null,
+        clouds: [], positions: new Map(), basePositions: new Map(), selected: null, editing: null, editingProposal: null, proposalParentId: null,
         proposals: [], canPropose: false, canContribute: false, canManage: false, zoom: 1, token: null, revision: 0,
         dirty: false, proposalDirty: false, saving: false, duplicatesAcknowledgedTitle: "",
         timelineView: "year", timelineYear: "", timelineDay: ""
@@ -22,9 +22,10 @@
     const searchPageSize = 6;
     let searchLimit = searchPageSize;
     const formatDate = (value) => value ? new Date(value).toLocaleDateString("en-NZ", { timeZone: "Pacific/Auckland" }) : "";
+    const layout = createKnowledgeLayout({ node, request, state, redraw: redrawLayout });
     const contributions = createKnowledgeContributions({
         node, request, element, button, state, showCloud, resizeTextareas, formatDate, historyPage, exploreUrl,
-        onProposalsChanged: renderStudentProposals, onKitesChanged: renderSearch
+        onProposalsChanged: renderStudentProposals, onKitesChanged: renderSearch, layoutPosition: layout.position
     });
     const formatHistoricalDate = (value) => {
         const match = String(value || "").match(/^(\d{4})-(\d{2})(?:-(\d{2}))?$/);
@@ -300,26 +301,35 @@
         renderSearch();
         if (!state.clouds.length) return;
         const board = node("board");
-        state.positions = layoutClouds(state.clouds);
+        state.basePositions = layoutClouds(state.clouds);
         board.replaceChildren();
         board.style.setProperty("--kw-cloud-width", `${CLOUD_WIDTH}px`);
         board.style.setProperty("--kw-cloud-height", `${CLOUD_HEIGHT}px`);
-        board.style.width = `${Math.max(390, ...[...state.positions.values()].map(({ x }) => x + CLOUD_WIDTH + 22))}px`;
-        board.style.height = `${Math.max(260, ...[...state.positions.values()].map(({ y }) => y + CLOUD_HEIGHT + 68))}px`;
         for (const cloud of state.clouds) {
-            const position = state.positions.get(cloud.id);
             const item = button("", () => showCloud(cloud, false));
             item.className = "kw-cloud";
             item.dataset.cloudId = cloud.id;
-            item.style.left = `${position.x}px`;
-            item.style.top = `${position.y}px`;
+            item.dataset.layoutType = "cloud";
+            item.dataset.layoutId = cloud.id;
+            item.setAttribute("aria-keyshortcuts", "Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight");
             item.append(element("span", cloud.title));
             board.append(item);
         }
         updatePressed();
-        contributions.drawMap();
+        redrawLayout();
         node("detail").replaceChildren(element("h2", "Explore the Knowledge Web"),
             element("p", "Select a cloud, kite or connection on the canvas or in search to read more."));
+    }
+
+    function redrawLayout() {
+        const board = node("board");
+        state.positions = new Map([...state.basePositions].map(([id, position]) => [id, layout.position("cloud", id) || position]));
+        for (const item of board.querySelectorAll(".kw-cloud")) {
+            const point = state.positions.get(item.dataset.cloudId);
+            item.style.left = `${point.x}px`;
+            item.style.top = `${point.y}px`;
+        }
+        contributions.drawMap();
     }
 
     const eventFields = [
@@ -773,6 +783,8 @@
         state.token = token;
         state.clouds = [];
         state.positions.clear();
+        state.basePositions.clear();
+        layout.reset();
         state.selected = null;
         state.timelineView = "year";
         state.timelineYear = state.timelineDay = "";
@@ -835,6 +847,8 @@
                     node("explore").hidden = false;
                     node("contributions-link").hidden = !state.canContribute;
                     renderExplore();
+                    if (state.clouds.length) await layout.load();
+                    if (revision !== state.revision) return;
                     const cloud = query.get("cloud");
                     const kite = query.get("kite");
                     const connection = query.get("connection");

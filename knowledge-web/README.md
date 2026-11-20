@@ -39,6 +39,8 @@ Use **Explore the Knowledge Web** to search clouds and kites together or open **
 
 Stage 2 creates separate connection, comment, evidence, revision and moderation tables through the existing transactional PostgreSQL schema setup. It does not convert or rewrite legacy two-cloud kites.
 
+Drag clouds and kites on the canvas, or focus one and use **Shift + arrow keys**. Enter and Space still open details. Strings follow their endpoints. Saved moves affect only your account; **Reset Layout** clears your personal positions without changing zoom or shared content. Authorised teachers can use **Edit default layout** to set starting positions for clouds and kites, then switch back to their own layout. A personal position overrides its shared default.
+
 ### Stage 3 (planned): Upgrade to Cloud
 
 **Upgrade to Cloud** starts a separate historical cloud draft; it does not convert the kite or approve its interpretation. Only staff authorised to manage Knowledge Web clouds can start the draft or publish it. The draft stays private until explicitly published.

@@ -8,7 +8,7 @@
     <title>Computing History Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=12">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=13">
 </head>
 <body>
     <div class="page-shell">
@@ -85,7 +85,12 @@
                 <div class="kw-columns" id="web-clouds" hidden>
                     <div class="kw-panel kw-map-panel">
                         <div class="kw-map">
-                            <p id="web-pan-help">Scroll or use the arrow keys in the map to pan. You can also explore using search.</p>
+                            <div class="kw-actions" aria-label="Layout controls">
+                                <button type="button" id="web-reset-layout" disabled>Reset Layout</button>
+                                <button type="button" id="web-edit-default" aria-pressed="false" hidden>Edit default layout</button>
+                            </div>
+                            <p id="web-layout-status" role="status"></p>
+                            <p id="web-pan-help">Scroll or focus the canvas and use the arrow keys to pan. Drag a cloud or kite to move it, or focus it and use Shift + arrow keys.</p>
                             <p id="web-kite-map-note"></p>
                             <div id="web-viewport" class="kw-viewport" tabindex="0" role="region" aria-label="Knowledge Web canvas" aria-describedby="web-pan-help">
                                 <div id="web-board"></div>
@@ -202,7 +207,8 @@
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="/script.js?v=knowledge-web-2"></script>
-    <script src="/knowledge-web/contributions.js?v=7"></script>
-    <script src="/knowledge-web/web.js?v=17"></script>
+    <script src="/knowledge-web/contributions.js?v=8"></script>
+    <script src="/knowledge-web/layout.js?v=1"></script>
+    <script src="/knowledge-web/web.js?v=18"></script>
 </body>
 </html>

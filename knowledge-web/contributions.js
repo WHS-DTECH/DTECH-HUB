@@ -1,5 +1,5 @@
 function createKnowledgeContributions({ node, request, element, button, state, showCloud, resizeTextareas, formatDate,
-    historyPage, exploreUrl, onProposalsChanged, onKitesChanged }) {
+    historyPage, exploreUrl, onProposalsChanged, onKitesChanged, layoutPosition }) {
     let kites = [], connections = [], converted = new Set(), active = null, activeType = null, detailSequence = 0, refreshSequence = 0, reportSequence = 0;
     const empty = () => element("p", "Nothing to show yet.");
     const linkTitle = (kite) => kite.titleB ? `${kite.titleA} ↔ ${kite.titleB}` : kite.titleA;
@@ -224,10 +224,13 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         layer.append(svg);
         const width = Number.parseFloat(board.style.getPropertyValue("--kw-cloud-width"));
         const height = Number.parseFloat(board.style.getPropertyValue("--kw-cloud-height"));
-        const boardWidth = Number.parseFloat(board.style.width);
-        const boardHeight = Number.parseFloat(board.style.height);
+        const originalClouds = [...state.basePositions.values()];
+        const boardWidth = Math.max(390, ...originalClouds.map(({ x }) => x + width + 22));
+        const boardHeight = Math.max(260, ...originalClouds.map(({ y }) => y + height + 68));
         const placed = [];
-        const clouds = [...state.positions.values()];
+        let extentX = boardWidth, extentY = boardHeight;
+        const grow = (x, y) => { extentX = Math.max(extentX, x); extentY = Math.max(extentY, y); };
+        for (const { x, y } of state.positions.values()) grow(x + width + 100, y + height + 100);
         for (const [id, point] of state.positions) mapLocations.set(`cloud:${id}`, { x: point.x + width / 2, y: point.y + height / 2 });
         const groups = new Map();
         for (const kite of shown) {
@@ -236,7 +239,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             groups.get(key).push(kite);
         }
         for (const pair of groups.values()) {
-            const a = state.positions.get(pair[0].cloudA), b = state.positions.get(pair[0].cloudB);
+            const a = state.basePositions.get(pair[0].cloudA), b = state.basePositions.get(pair[0].cloudB);
             const x1 = a.x + width / 2, y1 = a.y + height / 2;
             const x2 = b ? b.x + width / 2 : x1, y2 = b ? b.y + height / 2 : y1;
             const length = Math.hypot(x2 - x1, y2 - y1) || 1;
@@ -246,7 +249,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                     ? { x: (x1 + x2) / 2 - (y2 - y1) / length * offset, y: (y1 + y2) / 2 + (x2 - x1) / length * offset }
                     : { x: x1 + offset, y: a.y + height + 42 };
                 const free = (x, y) => x >= 23 && y >= 23 && x <= boardWidth - 23 && y <= boardHeight - 23 &&
-                    !clouds.some((cloud) => x > cloud.x - 20 && x < cloud.x + width + 20 && y > cloud.y - 20 && y < cloud.y + height + 20) &&
+                    !originalClouds.some((cloud) => x > cloud.x - 20 && x < cloud.x + width + 20 && y > cloud.y - 20 && y < cloud.y + height + 20) &&
                     !placed.some((other) => Math.abs(x - other.x) < 46 && Math.abs(y - other.y) < 46);
                 let position = free(midpoint.x, midpoint.y) ? midpoint : null;
                 if (!position) {
@@ -258,24 +261,32 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                         }
                     }
                 }
+                if (position) placed.push(position);
+                position = layoutPosition("kite", kite.id) || position;
                 if (!position) {
                     count.textContent = "Some kites do not fit on this map. All kites and connections are searchable.";
                     continue;
                 }
                 const { x, y } = position;
-                placed.push(position);
+                grow(x + 100, y + 100);
                 mapLocations.set(`kite:${kite.id}`, position);
                 const string = document.createElementNS(svg.namespaceURI, "polyline");
-                string.setAttribute("points", `${x1},${y1} ${x},${y}${b ? ` ${x2},${y2}` : ""}`);
+                const first = mapLocations.get(`cloud:${kite.cloudA}`), second = mapLocations.get(`cloud:${kite.cloudB}`);
+                string.setAttribute("points", `${first.x},${first.y} ${x},${y}${second ? ` ${second.x},${second.y}` : ""}`);
                 svg.append(string);
                 const item = button("", () => { void openKite(kite.id); });
                 item.className = "kw-kite";
+                item.dataset.layoutType = "kite";
+                item.dataset.layoutId = kite.id;
+                item.setAttribute("aria-keyshortcuts", "Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight");
                 item.style.left = `${x}px`;
                 item.style.top = `${y}px`;
                 item.setAttribute("aria-label", `Kite: ${linkTitle(kite)} — ${kite.contributor}: ${snippet(kite.argument)}`);
                 item.title = `${kite.contributor}: ${snippet(kite.argument)}`;
                 layer.append(item);
             }
+            board.style.width = `${extentX}px`;
+            board.style.height = `${extentY}px`;
         }
         board.prepend(layer);
         drawConnections(board, svg.namespaceURI);
