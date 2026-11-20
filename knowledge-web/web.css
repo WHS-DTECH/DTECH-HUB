@@ -3,8 +3,14 @@
 .knowledge-web h1 { font-size: clamp(1.45rem, 3vw, 2.25rem); margin: .2rem 0; }
 .kw-heading { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: .75rem 1.5rem; margin-bottom: 1rem; }
 .kw-heading .section-kicker { margin: 0; }
-.kw-heading nav { display: flex; flex-wrap: wrap; gap: .4rem 1rem; }
-.kw-heading a, .kw-selection a { color: #14516b; text-decoration: underline; text-underline-offset: .15em; }
+.kw-heading nav { display: flex; flex-wrap: wrap; gap: .5rem; }
+.kw-heading nav a {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 2.5rem;
+    padding: .4rem .7rem; border: 1px solid var(--kw-accent); border-radius: .5rem;
+    background: #fff; color: var(--kw-ink); font-weight: 650; text-decoration: none;
+}
+.kw-heading nav a:hover { background: #dfedf3; }
+.kw-selection a { color: #14516b; text-decoration: underline; text-underline-offset: .15em; }
 .knowledge-web h2 { font-size: 1.3rem; }
 .knowledge-web label { display: grid; gap: .3rem; font-weight: 650; margin-block: .65rem; }
 .knowledge-web p, .knowledge-web li { overflow-wrap: anywhere; }
