@@ -8,7 +8,7 @@
     <title>Computing History Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=8">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=9">
 </head>
 <body>
     <div class="page-shell">
@@ -30,6 +30,7 @@
                 <a class="button button-secondary" href="/practical-skills/checklist.html">Back to My Licence</a>
                 <a class="button button-primary" id="web-explore-link" href="/knowledge-web/" hidden>Open shared web</a>
                 <a class="button button-primary" id="web-manage-link" href="/knowledge-web/?manage=1" hidden>Manage clouds</a>
+                <a class="button button-primary" id="web-contributions-link" href="/knowledge-web/?contributions=1" hidden>My Contributions</a>
             </div>
             <p id="web-status" role="status" aria-live="polite"></p>
             <button type="button" id="web-retry" hidden>Retry</button>
@@ -80,7 +81,7 @@
                             <div id="web-board"></div>
                         </div>
                     </div>
-                    <article class="kw-panel" id="web-detail" aria-label="Selected cloud" aria-live="polite"></article>
+                    <article class="kw-panel" id="web-detail" aria-label="Selected cloud" aria-live="polite" tabindex="-1"></article>
                 </div>
                 <section id="web-proposal" class="kw-panel kw-proposal" aria-label="Propose a new historical cloud" hidden>
                     <h2>Propose a new cloud</h2>
@@ -117,16 +118,16 @@
                         <ul id="web-duplicates" aria-label="Possible matching clouds" hidden></ul>
                     </form>
                 </section>
-                <section id="web-my-proposals" class="kw-panel" aria-labelledby="web-my-contributions-title" hidden>
-                    <h2 id="web-my-contributions-title">My Contributions</h2>
-                    <div id="web-own-cloud-proposals" hidden>
-                        <h3>My cloud proposals</h3>
-                        <p>Your private drafts, proposal statuses and any teacher revision notes appear here.</p>
-                        <div id="web-proposal-list"></div>
-                    </div>
-                    <h3>My kites, comments and evidence</h3>
-                    <div id="web-contribution-list"></div>
-                </section>
+            </section>
+            <section id="web-my-proposals" class="kw-panel" aria-label="My Contributions" hidden>
+                <p id="web-history-status" role="status"></p>
+                <div id="web-own-cloud-proposals" hidden>
+                    <h2>My cloud proposals</h2>
+                    <p>Your private drafts, proposal statuses and any teacher revision notes appear here.</p>
+                    <div id="web-proposal-list"></div>
+                </div>
+                <h2>My kites, comments and evidence</h2>
+                <div id="web-contribution-list"></div>
             </section>
             <section id="web-manage" aria-label="Manage Knowledge Web" hidden>
                 <p>Drafts are private to teachers. Check the historical details and sources before publishing a cloud to students.</p>
@@ -183,7 +184,7 @@
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="/script.js?v=knowledge-web-2"></script>
-    <script src="/knowledge-web/contributions.js?v=3"></script>
-    <script src="/knowledge-web/web.js?v=13"></script>
+    <script src="/knowledge-web/contributions.js?v=4"></script>
+    <script src="/knowledge-web/web.js?v=14"></script>
 </body>
 </html>

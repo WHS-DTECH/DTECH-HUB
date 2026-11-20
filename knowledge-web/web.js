@@ -1,7 +1,16 @@
 (() => {
     "use strict";
     const node = (id) => document.getElementById(`web-${id}`);
-    const manage = new URLSearchParams(location.search).get("manage") === "1";
+    const query = new URLSearchParams(location.search);
+    const manage = query.get("manage") === "1";
+    const historyPage = !manage && query.get("contributions") === "1";
+    const validId = (id) => /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id || "");
+    const exploreUrl = (params) => `/knowledge-web/?${new URLSearchParams(params)}`;
+    if (historyPage) {
+        node("title").textContent = "My Contributions";
+        document.title = "My Contributions | Knowledge Web";
+        node("my-proposals").append(node("proposal"), node("kite-editor"));
+    }
     const form = node("form");
     const proposalForm = node("proposal-form");
     const state = {
@@ -12,7 +21,7 @@
     };
     const formatDate = (value) => value ? new Date(value).toLocaleDateString("en-NZ", { timeZone: "Pacific/Auckland" }) : "";
     const contributions = createKnowledgeContributions({
-        node, request, element, button, state, showCloud, resizeTextareas, formatDate,
+        node, request, element, button, state, showCloud, resizeTextareas, formatDate, historyPage, exploreUrl,
         onProposalsChanged: renderStudentProposals
     });
     const formatHistoricalDate = (value) => {
@@ -468,6 +477,7 @@
     }
 
     function renderStudentProposals() {
+        if (!historyPage) return;
         const host = node("proposal-list");
         host.replaceChildren();
         if (!state.proposals.length) {
@@ -485,10 +495,12 @@
             if (proposal.teacherComment) card.append(element("p", `Teacher note: ${proposal.teacherComment}`));
             for (const [label, id] of [["Open original cloud", proposal.originalCloudId], ["Open published cloud", proposal.publishedCloudId]]) {
                 const cloud = state.clouds.find((entry) => entry.id === id);
-                if (cloud) card.append(button(label, () => {
-                    showCloud(cloud, true);
-                    node("viewport").focus();
-                }));
+                if (cloud) {
+                    const link = element("a", label);
+                    link.href = exploreUrl({ cloud: id });
+                    link.className = "button button-secondary";
+                    card.append(link);
+                }
             }
             if (proposal.status === "Approved") {
                 card.append(element("h4", "Your proposed connection, saved for Phase 3"),
@@ -753,13 +765,13 @@
         proposalForm.inert = false;
         node("proposal").hidden = true;
         node("my-proposals").hidden = true;
-        for (const id of ["manage", "explore", "manage-link", "explore-link", "retry"]) node(id).hidden = true;
+        for (const id of ["manage", "explore", "manage-link", "explore-link", "contributions-link", "retry"]) node(id).hidden = true;
         node("status").textContent = token ? "Loading the Knowledge Web..." : "Sign in with your school Google account to open the Knowledge Web.";
         if (!token) return;
         try {
             const result = await request(manage ? "manage/clouds" : "clouds");
             let proposals = { proposals: [] };
-            if (manage || result.canPropose) {
+            if (manage || (historyPage && result.canPropose)) {
                 proposals = await request(manage ? "manage/proposals" : "proposals");
             }
             if (revision !== state.revision) return;
@@ -776,15 +788,34 @@
                 if (state.clouds.length) editCloud(state.clouds.find((cloud) => !cloud.publishedAt) || state.clouds[0], false);
                 if (location.hash === "#web-moderation") node("moderation").scrollIntoView();
             } else {
-                node("explore").hidden = false;
                 node("manage-link").hidden = !result.canManage;
                 state.canPropose = result.canPropose;
                 state.canContribute = result.canContribute;
-                node("my-proposals").hidden = !state.canContribute;
-                node("own-cloud-proposals").hidden = !state.canPropose;
-                if (state.canPropose) renderStudentProposals();
-                renderExplore();
-                void contributions.refresh();
+                if (historyPage) {
+                    node("explore-link").hidden = false;
+                    node("my-proposals").hidden = !state.canContribute;
+                    node("own-cloud-proposals").hidden = !state.canPropose;
+                    if (state.canContribute) void contributions.refresh();
+                } else {
+                    node("explore").hidden = false;
+                    node("contributions-link").hidden = !state.canContribute;
+                    renderExplore();
+                    const cloud = query.get("cloud");
+                    const kite = query.get("kite");
+                    const item = query.get("item");
+                    if (cloud) {
+                        const selected = state.clouds.find(({ id }) => id === cloud);
+                        if (selected) {
+                            showCloud(selected, true);
+                            node("detail").focus();
+                        } else node("status").textContent = "This cloud is not available.";
+                    }
+                    if (kite) {
+                        if (validId(kite) && state.clouds.length) void contributions.openKite(kite, validId(item) ? item : undefined);
+                        else node("status").textContent = "This kite is not available.";
+                    }
+                    if (state.clouds.length) void contributions.refresh();
+                }
             }
         } catch (error) {
             if (revision !== state.revision) return;

@@ -1,4 +1,5 @@
-function createKnowledgeContributions({ node, request, element, button, state, showCloud, resizeTextareas, formatDate, onProposalsChanged }) {
+function createKnowledgeContributions({ node, request, element, button, state, showCloud, resizeTextareas, formatDate,
+    historyPage, exploreUrl, onProposalsChanged }) {
     let kites = [], converted = new Set(), active = null, detailSequence = 0, refreshSequence = 0, reportSequence = 0, displayLimit = 12;
     const empty = () => element("p", "Nothing to show yet.");
     const linkTitle = (kite) => kite.titleB ? `${kite.titleA} ↔ ${kite.titleB}` : kite.titleA;
@@ -84,6 +85,10 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             const result = await send("kites", { ...origin, argument: argument.value, evidence: sources.map(({ read }) => read()) });
             if (revision !== state.revision) return;
             close();
+            if (historyPage) {
+                location.assign(exploreUrl({ kite: result.id }));
+                return;
+            }
             node("kite-status").textContent = "Kite published.";
             await Promise.all([refresh(), openKite(result.id)]);
         }, close);
@@ -213,26 +218,29 @@ function createKnowledgeContributions({ node, request, element, button, state, s
     async function refresh() {
         const seq = ++refreshSequence, revision = state.revision;
         try {
-            const [shared, own] = await Promise.all([request("kites"), state.canContribute ? request("contributions") : null]);
+            const result = await request(historyPage ? "contributions" : "kites");
             if (revision !== state.revision || seq !== refreshSequence) return;
-            kites = shared.kites;
-            converted = new Set(own?.convertedProposalIds);
-            drawMap();
-            renderList();
-            if (own) {
+            if (historyPage) {
+                node("history-status").textContent = "";
+                converted = new Set(result.convertedProposalIds);
                 const host = node("contribution-list");
                 host.replaceChildren();
-                if (!own.contributions.length) host.append(empty());
-                for (const item of own.contributions) {
+                if (!result.contributions.length) host.append(empty());
+                for (const item of result.contributions) {
                     const row = element("div");
-                    row.append(button(`${labels[item.kind]}: ${snippet(item.summary)}`,
-                        () => { void openKite(item.kiteId, item.id); }), element("small", ` Updated ${formatDate(item.updatedAt)}`));
+                    const link = element("a", `${labels[item.kind]}: ${snippet(item.summary)}`);
+                    link.href = exploreUrl({ kite: item.kiteId, item: item.id });
+                    row.append(link, element("small", ` Updated ${formatDate(item.updatedAt)}`));
                     host.append(row);
                 }
                 if (state.canPropose) onProposalsChanged();
+            } else {
+                kites = result.kites;
+                drawMap();
+                renderList();
             }
         } catch (error) {
-            if (revision === state.revision && seq === refreshSequence) node("kite-status").textContent = error.message;
+            if (revision === state.revision && seq === refreshSequence) node(historyPage ? "history-status" : "kite-status").textContent = error.message;
         }
     }
 
@@ -393,10 +401,10 @@ function createKnowledgeContributions({ node, request, element, button, state, s
     node("refresh-kites").addEventListener("click", () => { void refresh(); if (active) void openKite(active); });
     node("refresh-reports").addEventListener("click", () => { void reports(); });
     return {
-        drawMap, refresh, reports, openEditor, converted: (id) => converted.has(id),
+        drawMap, refresh, reports, openEditor, openKite, converted: (id) => converted.has(id),
         reset() {
             kites = []; converted = new Set(); displayLimit = 12; closeKite();
-            for (const id of ["kite-list", "kite-editor", "kite-status", "kite-map-note", "contribution-list", "report-list", "report-status"]) node(id).replaceChildren();
+            for (const id of ["kite-list", "kite-editor", "kite-status", "kite-map-note", "contribution-list", "history-status", "report-list", "report-status"]) node(id).replaceChildren();
             node("kite-editor").hidden = true;
             node("kite-search").value = "";
         }
