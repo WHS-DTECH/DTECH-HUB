@@ -5,11 +5,12 @@ const { randomUUID } = require("node:crypto");
 const schema = `
 CREATE TABLE IF NOT EXISTS knowledge_web_kites (
     id UUID PRIMARY KEY, cloud_a UUID NOT NULL REFERENCES knowledge_web_clouds(id),
-    cloud_b UUID NOT NULL REFERENCES knowledge_web_clouds(id), CHECK (cloud_a < cloud_b),
+    cloud_b UUID REFERENCES knowledge_web_clouds(id), CHECK (cloud_a < cloud_b),
     proposal_id UUID UNIQUE REFERENCES knowledge_web_proposals(id),
     argument TEXT NOT NULL, contributor_email TEXT NOT NULL, contributor_name TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), hidden_at TIMESTAMPTZ
 );
+ALTER TABLE knowledge_web_kites ALTER COLUMN cloud_b DROP NOT NULL;
 CREATE INDEX IF NOT EXISTS knowledge_web_kites_pair_idx ON knowledge_web_kites(cloud_a, cloud_b);
 CREATE TABLE IF NOT EXISTS knowledge_web_kite_comments (
     id UUID PRIMARY KEY, kite_id UUID NOT NULL REFERENCES knowledge_web_kites(id),
@@ -45,8 +46,8 @@ CREATE TABLE IF NOT EXISTS knowledge_web_moderation_actions (
 
 const tables = { kite: "knowledge_web_kites", comment: "knowledge_web_kite_comments", evidence: "knowledge_web_kite_evidence" };
 const kiteFrom = `FROM knowledge_web_kites k JOIN knowledge_web_clouds a ON a.id=k.cloud_a
-    JOIN knowledge_web_clouds b ON b.id=k.cloud_b`;
-const visible = "k.hidden_at IS NULL AND a.published_at IS NOT NULL AND b.published_at IS NOT NULL";
+    LEFT JOIN knowledge_web_clouds b ON b.id=k.cloud_b`;
+const visible = "k.hidden_at IS NULL AND a.published_at IS NOT NULL AND (k.cloud_b IS NULL OR b.published_at IS NOT NULL)";
 const kiteFields = `k.id,k.cloud_a AS "cloudA",k.cloud_b AS "cloudB",a.title AS "titleA",b.title AS "titleB",k.argument`;
 const attribution = `contributor_name AS contributor,created_at AS "createdAt",updated_at AS "updatedAt"`;
 const evidenceFields = `id,initial,title,reference,url,author,publication_date AS "publicationDate",supports,stance`;
@@ -137,20 +138,27 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
 
     app.post(`${base}/kites`, handler(async (req, res, access) => {
         const { email, staff } = access;
-        const [cloudA, cloudB] = [uid(req.body?.cloudA), uid(req.body?.cloudB)].sort();
-        if (cloudA === cloudB) throw problem(400, "Select two different clouds.");
-        const argument = text(req.body?.argument, "Connection argument", 4000);
-        if (!Array.isArray(req.body?.evidence) || !req.body.evidence.length || req.body.evidence.length > 20) {
-            throw problem(400, "Add at least one piece of supporting evidence (up to 20).");
+        const anchored = Object.hasOwn(req.body || {}, "originCloudId");
+        if (anchored && (req.body.cloudA != null || req.body.cloudB != null || req.body.proposalId != null)) {
+            throw problem(400, "A new kite starts from just one published cloud.");
         }
-        const sources = req.body.evidence.map((entry) => evidence(entry, true));
+        const [cloudA, cloudB] = anchored ? [uid(req.body.originCloudId), null]
+            : [uid(req.body?.cloudA), uid(req.body?.cloudB)].sort();
+        if (cloudA === cloudB) throw problem(400, "Select two different clouds.");
+        const argument = text(req.body?.argument, anchored ? "Kite idea" : "Connection argument", 4000);
+        const entries = anchored && req.body.evidence === undefined ? [] : req.body?.evidence;
+        if (!Array.isArray(entries) || entries.length > 20 || (!anchored && !entries.length)) {
+            throw problem(400, anchored ? "Add up to 20 pieces of supporting evidence." : "Add at least one piece of supporting evidence (up to 20).");
+        }
+        const sources = entries.map((entry) => evidence(entry, true));
         const proposalId = req.body.proposalId ? uid(req.body.proposalId) : null;
         if (proposalId && staff) throw problem(403, "Use Connect Clouds to publish a teacher kite.");
         const name = await nameFor(req, access);
         const id = randomUUID();
         await transaction(async (db) => {
+            const cloudIds = anchored ? [cloudA] : [cloudA, cloudB];
             if ((await db.query("SELECT id FROM knowledge_web_clouds WHERE id=ANY($1::uuid[]) AND published_at IS NOT NULL",
-                [[cloudA, cloudB]])).rowCount !== 2) throw problem(404, "Choose two published clouds.");
+                [cloudIds])).rowCount !== cloudIds.length) throw problem(404, anchored ? "Choose a published cloud." : "Choose two published clouds.");
             if (proposalId && !(await db.query(`SELECT id FROM knowledge_web_proposals WHERE id=$1 AND contributor_email=$2
                 AND status='Approved' AND original_cloud_id=ANY($3::uuid[]) AND published_cloud_id=ANY($3::uuid[])`,
             [proposalId, email, [cloudA, cloudB]])).rowCount) throw problem(404, "This approved proposal is not available for these clouds.");
@@ -201,7 +209,7 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
             if (current.contributor_email !== email) throw problem(403, "You can only edit your own contributions.");
             const fields = kind === "kite" ? ["argument"] : kind === "comment" ? ["body"]
                 : ["title", "reference", "url", "author", "publication_date", "supports", "stance"];
-            const values = kind === "kite" ? [text(req.body?.argument, "Connection argument", 4000)]
+            const values = kind === "kite" ? [text(req.body?.argument, kite.cloud_b ? "Connection argument" : "Kite idea", 4000)]
                 : kind === "comment" ? [text(req.body?.body, "Comment", 3000)] : evidence(req.body, current.initial);
             if (fields.every((field, index) => current[field] === values[index])) return;
             await db.query(`INSERT INTO knowledge_web_contribution_revisions (id,kind,target_id,actor_email,previous)
@@ -261,7 +269,7 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
                 ELSE k.argument END AS content,
             COALESCE(c.contributor_name,e.contributor_name,k.contributor_name) AS contributor
             FROM knowledge_web_reports r JOIN knowledge_web_kites k ON k.id=r.kite_id
-            JOIN knowledge_web_clouds a ON a.id=k.cloud_a JOIN knowledge_web_clouds b ON b.id=k.cloud_b
+            JOIN knowledge_web_clouds a ON a.id=k.cloud_a LEFT JOIN knowledge_web_clouds b ON b.id=k.cloud_b
             LEFT JOIN knowledge_web_kite_comments c ON r.kind='comment' AND c.id=r.target_id
             LEFT JOIN knowledge_web_kite_evidence e ON r.kind='evidence' AND e.id=r.target_id
             WHERE r.resolved_at IS NULL ORDER BY r.created_at,r.id`);

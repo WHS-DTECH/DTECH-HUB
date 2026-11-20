@@ -57,23 +57,22 @@
                         <input id="web-search" type="search" autocomplete="off">
                         <ul id="web-results" aria-label="Clouds by title"></ul>
                         <div class="kw-actions" aria-label="Canvas controls">
-                            <button type="button" id="web-connect" hidden>Connect Clouds</button>
                             <button type="button" id="web-zoom-out" aria-label="Zoom out">−</button>
                             <button type="button" id="web-zoom-in" aria-label="Zoom in">+</button>
                             <button type="button" id="web-reset">Reset view</button>
                             <output id="web-zoom" aria-live="polite">100%</output>
                         </div>
-                        <section id="web-kites" class="kw-panel kw-contribution-panel" aria-label="Kite arguments">
-                            <h2>Kite arguments</h2>
-                            <label>Find an argument <input id="web-kite-search" type="search" autocomplete="off"></label>
+                        <section id="web-kites" class="kw-panel kw-contribution-panel" aria-label="Kites">
+                            <h2>Kites</h2>
+                            <label>Find a kite <input id="web-kite-search" type="search" autocomplete="off"></label>
                             <div class="kw-actions">
                                 <button id="web-refresh-kites" type="button">Refresh kites</button>
-                                <button id="web-kite-more" type="button" hidden>Show more arguments</button>
+                                <button id="web-kite-more" type="button" hidden>Show more kites</button>
                             </div>
                             <p id="web-kite-status" role="status"></p>
-                            <ul id="web-kite-list" aria-label="Arguments by cloud, author or text"></ul>
+                            <ul id="web-kite-list" aria-label="Kites by cloud, author or text"></ul>
                             <div id="web-kite-editor" hidden></div>
-                            <article id="web-kite-detail" aria-label="Selected argument" tabindex="-1" hidden></article>
+                            <article id="web-kite-detail" aria-label="Selected kite" tabindex="-1" hidden></article>
                         </section>
                         <p id="web-pan-help">Scroll or use the arrow keys in the map to pan. You can also explore from the cloud list.</p>
                         <p id="web-kite-map-note"></p>
@@ -184,7 +183,7 @@
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="/script.js?v=knowledge-web-2"></script>
-    <script src="/knowledge-web/contributions.js?v=2"></script>
-    <script src="/knowledge-web/web.js?v=12"></script>
+    <script src="/knowledge-web/contributions.js?v=3"></script>
+    <script src="/knowledge-web/web.js?v=13"></script>
 </body>
 </html>

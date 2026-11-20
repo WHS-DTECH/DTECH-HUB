@@ -19,9 +19,9 @@ The Knowledge Web is a KNOW Mode feature separate from Licence Kit activities an
 
 The initial `2026 NCEA Digital Examination Disruptions` cloud is seeded as an unpublished draft without sources. A teacher must verify its historical information and add sources before publishing it; students need at least one published cloud to propose a connection.
 
-## Phase 3
+## Phase 3 foundation
 
-- **Connect Clouds** publishes an argument as a kite between two different published clouds. At least one piece of evidence with an explanation is required. Multiple kites about the same clouds remain separate arguments. The map limits how many kites it shows to reduce clutter; the keyboard-accessible searchable list gives access to all visible arguments.
+- Legacy two-cloud kites represent separately attributed arguments and require evidence. The map limits how many kites it shows to reduce clutter; the keyboard-accessible searchable list gives access to all visible kites.
 - Authorised teachers use the same kite form, discussions and evidence tools from the shared web under their own verified identity. They do not need to use **Switch to Student View**. Cloud management and student proposals remain separate.
 - On an approved proposal, **Publish as Kite** prefills the original connection and evidence, which the student can edit before publishing. The same proposal can be converted only once.
 - On a kite, students can post questions and replies without citations and add separately attributed evidence that supports, challenges, or contextualises the argument. Contributions publish immediately. Owners can edit their own contributions without changing original authorship or creation time; previous content is recorded privately.
@@ -29,11 +29,13 @@ The initial `2026 NCEA Digital Examination Disruptions` cloud is seeded as an un
 - Students can submit private reports about behaviour, not disagreement. A report does not hide content. Authorised staff can hide the reported contribution or dismiss the report; both actions are audited privately. Hiding a kite hides its discussion and evidence with it. Ordinary contributions do not enter a review queue.
 - The first open report for a contribution triggers a generic email to the configured DTECH Lead Teacher recipients when Hub mail is configured. The message includes a moderation link but no student identity or report content. Reports remain saved in **Manage Knowledge Web** if mail is unavailable or delivery fails.
 
-## Proposed architecture: one-cloud kites and historical cloud upgrades
+## Revised architecture
 
-This design is not implemented. A new kite is an idea, observation, question, or argument anchored to one published cloud. It publishes without teacher approval. A connection is a separate, attributed record linking a kite to another published cloud or linking two published clouds directly; it always requires a relationship explanation. Existing two-cloud kites remain intact and readable without an inferred originating cloud.
+**Stage 1:** Select one published cloud and choose **Add a Kite** to publish an idea, observation, question, or argument without teacher approval. Evidence is optional and can also be added later. Each new kite has one string to its cloud. Existing two-cloud kites remain intact and readable without an inferred originating cloud. The original approved-proposal **Publish as Kite** flow still publishes a two-cloud kite during this transition.
 
-### Upgrade to Cloud
+**Stage 2 (planned):** A connection is a separate, attributed record linking a kite to another published cloud or linking two published clouds directly; it always requires a relationship explanation.
+
+### Stage 3 (planned): Upgrade to Cloud
 
 **Upgrade to Cloud** starts a separate historical cloud draft; it does not convert the kite or approve its interpretation. Only staff authorised to manage Knowledge Web clouds can start the draft or publish it. The draft stays private until explicitly published.
 

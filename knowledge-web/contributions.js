@@ -1,7 +1,7 @@
 function createKnowledgeContributions({ node, request, element, button, state, showCloud, resizeTextareas, formatDate, onProposalsChanged }) {
     let kites = [], converted = new Set(), active = null, detailSequence = 0, refreshSequence = 0, reportSequence = 0, displayLimit = 12;
     const empty = () => element("p", "Nothing to show yet.");
-    const linkTitle = (kite) => `${kite.titleA} ↔ ${kite.titleB}`;
+    const linkTitle = (kite) => kite.titleB ? `${kite.titleA} ↔ ${kite.titleB}` : kite.titleA;
     const send = (path, body, method = "POST") => request(path, { method, body: JSON.stringify(body) });
     const labels = { kite: "Kite", comment: "Comment", evidence: "Evidence" };
     const reasons = { harassment: "Harassment", "personal-information": "Personal information disclosure", spam: "Spam",
@@ -74,32 +74,34 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             publicationDate: date.value, supports: supports.value, stance: stance ? stance.value : "supports" });
     }
 
-    function openEditor(proposal = null) {
-        if (!state.canContribute || state.clouds.length < 2 || (proposal && !state.canPropose)) return;
+    function openEditor(cloud, proposal = null) {
+        if (!state.canContribute || (proposal ? !state.canPropose || state.clouds.length < 2 : !cloud)) return;
         const host = node("kite-editor");
         host.hidden = false;
-        const fields = editor(host, proposal ? "Publish as Kite" : "Connect Clouds", "Publish kite", async (revision) => {
-            if (first.value === second.value) throw new Error("Select two different clouds.");
-            const result = await send("kites", { cloudA: first.value, cloudB: second.value,
-                argument: argument.value, evidence: sources.map(({ read }) => read()), proposalId: proposal?.id });
+        const fields = editor(host, proposal ? "Publish as Kite" : "Add a Kite", "Publish kite", async (revision) => {
+            const origin = proposal ? { cloudA: proposal.originalCloudId, cloudB: proposal.publishedCloudId, proposalId: proposal.id }
+                : { originCloudId: cloud.id };
+            const result = await send("kites", { ...origin, argument: argument.value, evidence: sources.map(({ read }) => read()) });
             if (revision !== state.revision) return;
             close();
             node("kite-status").textContent = "Kite published.";
             await Promise.all([refresh(), openKite(result.id)]);
         }, close);
         function close() { host.replaceChildren(); host.hidden = true; }
-        const choices = state.clouds.map(({ id, title }) => [id, title]);
-        const first = labeled(fields, "First cloud", select(choices, proposal?.originalCloudId || state.selected, "Choose a cloud"));
-        const second = labeled(fields, "Second cloud", select(choices, proposal?.publishedCloudId, "Choose a different cloud"));
-        first.disabled = second.disabled = Boolean(proposal);
-        const argument = field(fields, "Connection argument", 4000, proposal?.connection, { multiline: true });
+        if (proposal) {
+            const titles = [proposal.originalCloudId, proposal.publishedCloudId].map((id) => state.clouds.find((entry) => entry.id === id)?.title);
+            fields.append(element("p", titles.join(" ↔ ")));
+        } else fields.append(element("p", `Originating cloud: ${cloud.title}`));
+        const argument = field(fields, proposal ? "Connection argument" : "Idea, observation, question or argument",
+            4000, proposal?.connection, { multiline: true });
+        if (!proposal) fields.append(element("p", "Evidence is optional. You can also add it after publishing."));
         const sources = [];
         const addSource = (current = {}, focus = false) => {
             const group = element("fieldset");
             group.append(element("legend", "Supporting evidence"));
             const entry = { read: evidenceFields(group, current, true) };
             const remove = button("Remove this evidence", () => {
-                if (sources.length === 1) return;
+                if (proposal && sources.length === 1) return;
                 sources.splice(sources.indexOf(entry), 1);
                 group.remove();
                 updateSourceControls();
@@ -112,15 +114,15 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             updateSourceControls();
             if (focus) group.querySelector("input").focus();
         };
-        const add = button("Add another source", () => addSource({}, true));
+        const add = button("Add a source", () => addSource({}, true));
         function updateSourceControls() {
-            sources.forEach(({ remove }) => { remove.disabled = sources.length === 1; });
+            sources.forEach(({ remove }) => { remove.disabled = Boolean(proposal && sources.length === 1); });
             add.disabled = sources.length >= 20;
         }
         fields.append(add);
-        (proposal?.connectionSources?.length ? proposal.connectionSources : [{}]).forEach((source) => addSource(source));
+        if (proposal) (proposal.connectionSources.length ? proposal.connectionSources : [{}]).forEach((source) => addSource(source));
         resizeTextareas(fields);
-        (proposal ? argument : first).focus();
+        argument.focus();
     }
 
     function drawMap() {
@@ -128,8 +130,8 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         board.querySelector(".kw-kite-layer")?.remove();
         const count = node("kite-map-note");
         const nearby = kites.filter((kite) => !state.selected || [kite.cloudA, kite.cloudB].includes(state.selected));
-        const shown = nearby.filter((kite) => state.positions.has(kite.cloudA) && state.positions.has(kite.cloudB)).slice(0, 24);
-        count.textContent = nearby.length > shown.length ? `Showing ${shown.length} of ${nearby.length} related kites on the map. All arguments are in the searchable list.`
+        const shown = nearby.filter((kite) => state.positions.has(kite.cloudA) && (!kite.cloudB || state.positions.has(kite.cloudB))).slice(0, 24);
+        count.textContent = nearby.length > shown.length ? `Showing ${shown.length} of ${nearby.length} related kites on the map. All kites are in the searchable list.`
             : `${shown.length} kite${shown.length === 1 ? "" : "s"} on the map${state.selected ? " for this cloud" : ""}.`;
         if (!shown.length) return;
         const layer = element("div");
@@ -151,11 +153,14 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         }
         for (const pair of groups.values()) {
             const a = state.positions.get(pair[0].cloudA), b = state.positions.get(pair[0].cloudB);
-            const x1 = a.x + width / 2, x2 = b.x + width / 2, y1 = a.y + height / 2, y2 = b.y + height / 2;
+            const x1 = a.x + width / 2, y1 = a.y + height / 2;
+            const x2 = b ? b.x + width / 2 : x1, y2 = b ? b.y + height / 2 : y1;
             const length = Math.hypot(x2 - x1, y2 - y1) || 1;
             for (const [index, kite] of pair.entries()) {
                 const offset = (index - (pair.length - 1) / 2) * 55;
-                const midpoint = { x: (x1 + x2) / 2 - (y2 - y1) / length * offset, y: (y1 + y2) / 2 + (x2 - x1) / length * offset };
+                const midpoint = b
+                    ? { x: (x1 + x2) / 2 - (y2 - y1) / length * offset, y: (y1 + y2) / 2 + (x2 - x1) / length * offset }
+                    : { x: x1 + offset, y: a.y + height + 42 };
                 const free = (x, y) => x >= 23 && y >= 23 && x <= boardWidth - 23 && y <= boardHeight - 23 &&
                     !clouds.some((cloud) => x > cloud.x - 20 && x < cloud.x + width + 20 && y > cloud.y - 20 && y < cloud.y + height + 20) &&
                     !placed.some((other) => Math.abs(x - other.x) < 46 && Math.abs(y - other.y) < 46);
@@ -170,13 +175,13 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                     }
                 }
                 if (!position) {
-                    count.textContent = "Some kites do not fit on this map. All arguments are in the searchable list.";
+                    count.textContent = "Some kites do not fit on this map. All kites are in the searchable list.";
                     continue;
                 }
                 const { x, y } = position;
                 placed.push(position);
                 const string = document.createElementNS(svg.namespaceURI, "polyline");
-                string.setAttribute("points", `${x1},${y1} ${x},${y} ${x2},${y2}`);
+                string.setAttribute("points", `${x1},${y1} ${x},${y}${b ? ` ${x2},${y2}` : ""}`);
                 svg.append(string);
                 const item = button("", () => { void openKite(kite.id); });
                 item.className = "kw-kite";
@@ -293,7 +298,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             let read;
             if (kind === "evidence") read = evidenceFields(fields, item || {}, item?.initial);
             else {
-                const input = field(fields, kind === "kite" ? "Connection argument" : "Comment (citations optional)",
+                const input = field(fields, kind === "kite" ? (kite.cloudB ? "Connection argument" : "Kite idea") : "Comment (citations optional)",
                     kind === "kite" ? 4000 : 3000, item?.argument || item?.body, { multiline: true });
                 read = () => kind === "kite" ? { argument: input.value } : { body: input.value, replyTo: reply?.id };
             }
@@ -319,9 +324,9 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         };
         host.replaceChildren(element("h3", linkTitle(kite)), meta(kite), element("p", kite.argument),
             button("Back to canvas", () => { closeKite(); node("viewport").focus(); }),
-            button(`Open cloud: ${kite.titleA}`, () => goToCloud(kite.cloudA)),
-            button(`Open cloud: ${kite.titleB}`, () => goToCloud(kite.cloudB)), controls("kite", kite), actionHost,
-            element("h3", "Supporting evidence"));
+            button(`Open cloud: ${kite.titleA}`, () => goToCloud(kite.cloudA)));
+        if (kite.cloudB) host.append(button(`Open cloud: ${kite.titleB}`, () => goToCloud(kite.cloudB)));
+        host.append(controls("kite", kite), actionHost, element("h3", "Supporting evidence"));
         if (state.canContribute) host.append(button("Add evidence", () => compose("evidence")));
         if (!evidence.length) host.append(element("p", "No evidence is currently visible for this argument."));
         for (const item of evidence) {
@@ -383,7 +388,6 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         }
     }
 
-    node("connect").addEventListener("click", () => openEditor());
     node("kite-search").addEventListener("input", () => { displayLimit = 12; renderList(); });
     node("kite-more").addEventListener("click", () => { displayLimit += 12; renderList(); });
     node("refresh-kites").addEventListener("click", () => { void refresh(); if (active) void openKite(active); });
@@ -394,7 +398,6 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             kites = []; converted = new Set(); displayLimit = 12; closeKite();
             for (const id of ["kite-list", "kite-editor", "kite-status", "kite-map-note", "contribution-list", "report-list", "report-status"]) node(id).replaceChildren();
             node("kite-editor").hidden = true;
-            node("connect").hidden = true;
             node("kite-search").value = "";
         }
     };

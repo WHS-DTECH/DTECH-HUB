@@ -197,6 +197,7 @@
         }
         detail.append(element("h3", "Sources"), sources,
             element("small", `Contributed by ${cloud.contributor} · Added ${formatDate(cloud.createdAt)} · Updated ${formatDate(cloud.updatedAt)}`));
+        if (state.canContribute) detail.append(button("Add a Kite", () => contributions.openEditor(cloud)));
         if (state.canPropose) detail.append(button("Propose a new cloud connected to this one", () => beginProposal(cloud)));
         updatePressed();
         contributions.drawMap();
@@ -258,7 +259,6 @@
     function renderExplore() {
         node("empty").hidden = state.clouds.length !== 0;
         node("clouds").hidden = state.clouds.length === 0;
-        node("connect").hidden = !state.canContribute || state.clouds.length < 2;
         renderTimeline();
         if (!state.clouds.length) return;
         const board = node("board");
@@ -267,7 +267,7 @@
         board.style.setProperty("--kw-cloud-width", `${CLOUD_WIDTH}px`);
         board.style.setProperty("--kw-cloud-height", `${CLOUD_HEIGHT}px`);
         board.style.width = `${Math.max(390, ...[...state.positions.values()].map(({ x }) => x + CLOUD_WIDTH + 22))}px`;
-        board.style.height = `${Math.max(260, ...[...state.positions.values()].map(({ y }) => y + CLOUD_HEIGHT + 25))}px`;
+        board.style.height = `${Math.max(260, ...[...state.positions.values()].map(({ y }) => y + CLOUD_HEIGHT + 68))}px`;
         for (const cloud of state.clouds) {
             const position = state.positions.get(cloud.id);
             const item = button("", () => showCloud(cloud, false));
@@ -496,7 +496,7 @@
                     element("p", proposal.connection));
                 sourceList(card, proposal.connectionSources);
                 if (!contributions.converted(proposal.id)) {
-                    card.append(button("Publish as Kite", () => contributions.openEditor(proposal)));
+                    card.append(button("Publish as Kite", () => contributions.openEditor(null, proposal)));
                 } else card.append(element("p", "You already published a kite from this proposal."));
             } else if (["Draft", "Returned for Revision"].includes(proposal.status)) {
                 card.append(button(proposal.status === "Draft" ? "Continue draft" : "Revise and resubmit",

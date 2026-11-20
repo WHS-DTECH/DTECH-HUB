@@ -245,6 +245,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal((await call(`manage/clouds/${id}`, { method: "PUT", body: update })).status, 200);
         assert.equal((await call(`manage/clouds/${id}`, { method: "PUT", body: update })).status, 409);
 
+        await pool.query("ALTER TABLE knowledge_web_kites ALTER COLUMN cloud_b SET NOT NULL");
         host = await startApp();
         const publicClouds = await list("clouds", true);
         assert.equal(publicClouds.length, 1, "The original draft is still private after reinitialisation");
@@ -260,6 +261,20 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.doesNotMatch(JSON.stringify(published), /teacher@test\.invalid/);
         assert.equal((await call(`manage/clouds/${id}`, { method: "PUT", body: { ...published, publish: false, sources: [] } })).status, 400);
         assert.equal((await list("clouds", true))[0].sources.length, 1);
+        const anchoredDraft = { originCloudId: id, argument: "What happened before this event?" };
+        const createAnchored = (body) => call("kites", { student: true, method: "POST", body });
+        assert.equal((await createAnchored({ ...anchoredDraft, originCloudId: seed.id })).status, 404);
+        assert.equal((await createAnchored({ ...anchoredDraft, argument: "  " })).status, 400);
+        assert.equal((await createAnchored({ ...anchoredDraft, cloudB: seed.id })).status, 400);
+        const anchored = await createAnchored(anchoredDraft);
+        assert.equal(anchored.status, 201, "One published cloud is sufficient, including on an upgraded database");
+        const { id: anchoredId } = await anchored.json();
+        const anchoredDetail = await (await call(`kites/${anchoredId}`)).json();
+        assert.equal(anchoredDetail.kite.cloudA, id);
+        assert.equal(anchoredDetail.kite.cloudB, null);
+        assert.equal(anchoredDetail.kite.argument, anchoredDraft.argument);
+        assert.equal(anchoredDetail.kite.contributor, "Test Student One");
+        assert.deepEqual(anchoredDetail.evidence, []);
 
         const firstPublished = (await list("clouds", true))[0];
         const draftBody = {
@@ -417,7 +432,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.doesNotMatch(JSON.stringify(seniorClouds), /student-one@test\.invalid|contributorEmail|added_by/);
         assert.deepEqual(approvedCloud.events, submitted.events, "Proposal event time survives review and cloud publication");
         assert.equal((await list("clouds", false)).length, 2, "Another eligible student can see the approved cloud");
-        assert.deepEqual((await (await call("kites", { student: true })).json()).kites, [],
+        assert.deepEqual((await (await call("kites", { student: true })).json()).kites.map(({ id }) => id), [anchoredId],
             "Cloud approval does not automatically publish a kite");
         const audit = await pool.query(`SELECT action,actor_email,comment FROM knowledge_web_proposal_events WHERE proposal_id=$1 ORDER BY created_at,id`, [draft.id]);
         assert.deepEqual(audit.rows.map((row) => row.action), ["Draft saved", "Submitted", "Returned for Revision", "Submitted", "Approved"]);
@@ -468,7 +483,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             proposalId: undefined, argument: "An alternative interpretation of the same two events." }, studentB);
         assert.equal(opponent.status, 201);
         const { id: kiteB } = await opponent.json();
-        const grouped = (await get("kites", studentB)).kites;
+        const grouped = (await get("kites", studentB)).kites.filter((kite) => kite.cloudB);
         assert.deepEqual(new Set(grouped.map(({ id }) => id)), new Set([kiteA, kiteB]));
         assert.deepEqual(grouped.map(({ cloudA, cloudB }) => [cloudA, cloudB]), Array(2).fill([originalKite.kite.cloudA, originalKite.kite.cloudB]));
         assert.equal((await put(`kites/${kiteA}/contributions/kite/${kiteA}`, { argument: "Unauthorised edit" }, studentB)).status, 403);
@@ -525,7 +540,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal((await post(`manage/reports/${(await kiteReport.json()).id}`, { action: "hide", note: "Confirmed." }, "teacher@test.invalid")).status, 200);
         host = await startApp();
         assert.equal((await call(`kites/${kiteA}`, { account: studentB })).status, 404);
-        assert.deepEqual((await get("kites", studentB)).kites.map(({ id }) => id), [kiteB]);
+        assert.deepEqual((await get("kites", studentB)).kites.map(({ id }) => id), [anchoredId, kiteB]);
         assert.equal((await get(`kites/${kiteB}`, studentB)).kite.contributor, "Test Student Two");
         assert.deepEqual((await get("contributions", studentD)).contributions, [], "Hidden kite evidence is not exposed");
         assert.equal((await pool.query("SELECT id FROM knowledge_web_moderation_actions")).rowCount, 3);
@@ -556,4 +571,18 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.deepEqual(new Set(teacherHistory.map(({ id }) => id)), new Set([
             teacherKiteId, teacherKite.evidence[0].id, (await teacherComment.json()).id, (await teacherEvidence.json()).id
         ]));
+        assert.ok((await get("contributions")).contributions.some(({ id }) => id === anchoredId));
+        assert.equal((await post(`kites/${anchoredId}/comments`, { body: "An answer to the question." }, studentB)).status, 201);
+        assert.equal((await post(`kites/${anchoredId}/evidence`, teacherDraft.evidence[0], studentB)).status, 201);
+        const reopened = await get(`kites/${anchoredId}`, studentB);
+        assert.equal(reopened.comments[0].contributor, "Test Student Two");
+        assert.equal(reopened.evidence[0].contributor, "Test Student Two");
+        const anchoredReport = await post(`kites/${anchoredId}/reports`, {
+            kind: "kite", targetId: anchoredId, reason: "spam"
+        }, studentB);
+        assert.equal(anchoredReport.status, 201);
+        const { id: anchoredReportId } = await anchoredReport.json();
+        assert.ok((await get("manage/reports", teacher)).reports.some(({ id, titleB }) => id === anchoredReportId && titleB === null));
+        assert.equal((await post(`manage/reports/${anchoredReportId}`, { action: "hide", note: "Test moderation." }, teacher)).status, 200);
+        assert.equal((await call(`kites/${anchoredId}`, { account: studentB })).status, 404);
     });
