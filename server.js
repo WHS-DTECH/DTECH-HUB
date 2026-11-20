@@ -6234,9 +6234,9 @@ app.use(async (req, _res, next) => {
     (/^\/api\/knowledge-web\/(?:access|clouds|proposals(?:\/duplicates)?|manage\/clouds|manage\/proposals)\/?$/i.test(req.path) && req.method === "GET") ||
     (/^\/api\/knowledge-web\/(?:proposals|manage\/proposals\/[^/]+\/decision|manage\/clouds|manage\/source-metadata)\/?$/i.test(req.path) && req.method === "POST") ||
     (/^\/api\/knowledge-web\/(?:proposals|manage\/clouds)\/[^/]+\/?$/i.test(req.path) && req.method === "PUT") ||
-    (req.method === "GET" && /^\/api\/knowledge-web\/(?:kites(?:\/[a-f0-9-]+)?|contributions|manage\/reports)\/?$/i.test(req.path)) ||
-    (req.method === "POST" && /^\/api\/knowledge-web\/(?:kites(?:\/[a-f0-9-]+\/(?:comments|evidence|reports))?|manage\/reports\/[a-f0-9-]+)\/?$/i.test(req.path)) ||
-    (req.method === "PUT" && /^\/api\/knowledge-web\/kites\/[a-f0-9-]+\/contributions\/(?:kite|comment|evidence)\/[a-f0-9-]+\/?$/i.test(req.path)) ||
+    (req.method === "GET" && /^\/api\/knowledge-web\/(?:(?:kites|connections)(?:\/[a-f0-9-]+)?|contributions|manage\/reports)\/?$/i.test(req.path)) ||
+    (req.method === "POST" && /^\/api\/knowledge-web\/(?:(?:kites|connections)(?:\/[a-f0-9-]+\/(?:comments|evidence|reports))?|manage\/(?:reports|connection-reports)\/[a-f0-9-]+)\/?$/i.test(req.path)) ||
+    (req.method === "PUT" && /^\/api\/knowledge-web\/(?:kites|connections)\/[a-f0-9-]+\/contributions\/(?:kite|connection|comment|evidence)\/[a-f0-9-]+\/?$/i.test(req.path)) ||
     (req.method === "GET" && /^(?:\/practical-skills\/library\.json|\/api\/practical-skills\/(?:library|my-progress|minecraft-access|typing-kit|(?:kit-content|progress)\/[^/]+))\/?$/i.test(req.path)) ||
     (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/licences\/[a-zA-Z0-9_-]+$/.test(req.path)) ||
     (["GET", "POST"].includes(req.method) && req.path === "/api/practical-skills/drawing-filing") ||

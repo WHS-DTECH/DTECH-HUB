@@ -2,7 +2,7 @@
 
 const { randomUUID } = require("node:crypto");
 
-const schema = `
+const kiteSchema = `
 CREATE TABLE IF NOT EXISTS knowledge_web_kites (
     id UUID PRIMARY KEY, cloud_a UUID NOT NULL REFERENCES knowledge_web_clouds(id),
     cloud_b UUID REFERENCES knowledge_web_clouds(id), CHECK (cloud_a < cloud_b),
@@ -11,40 +11,50 @@ CREATE TABLE IF NOT EXISTS knowledge_web_kites (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), hidden_at TIMESTAMPTZ
 );
 ALTER TABLE knowledge_web_kites ALTER COLUMN cloud_b DROP NOT NULL;
-CREATE INDEX IF NOT EXISTS knowledge_web_kites_pair_idx ON knowledge_web_kites(cloud_a, cloud_b);
-CREATE TABLE IF NOT EXISTS knowledge_web_kite_comments (
-    id UUID PRIMARY KEY, kite_id UUID NOT NULL REFERENCES knowledge_web_kites(id),
-    reply_to UUID REFERENCES knowledge_web_kite_comments(id), body TEXT NOT NULL,
+CREATE INDEX IF NOT EXISTS knowledge_web_kites_pair_idx ON knowledge_web_kites(cloud_a, cloud_b);`;
+
+const families = [
+    { root: "kite", tables: { kite: "knowledge_web_kites", comment: "knowledge_web_kite_comments", evidence: "knowledge_web_kite_evidence" },
+        reports: "knowledge_web_reports", revisions: "knowledge_web_contribution_revisions", audit: "knowledge_web_moderation_actions" },
+    { root: "connection", tables: { connection: "knowledge_web_connections", comment: "knowledge_web_connection_comments", evidence: "knowledge_web_connection_evidence" },
+        reports: "knowledge_web_connection_reports", revisions: "knowledge_web_connection_revisions", audit: "knowledge_web_connection_moderation_actions" }
+];
+function childSchema({ root, tables, reports, revisions, audit }) {
+    const key = `${root}_id`;
+    return `
+CREATE TABLE IF NOT EXISTS ${tables.comment} (
+    id UUID PRIMARY KEY, ${key} UUID NOT NULL REFERENCES ${tables[root]}(id),
+    reply_to UUID REFERENCES ${tables.comment}(id), body TEXT NOT NULL,
     contributor_email TEXT NOT NULL, contributor_name TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), hidden_at TIMESTAMPTZ
 );
-CREATE INDEX IF NOT EXISTS knowledge_web_kite_comments_kite_idx ON knowledge_web_kite_comments(kite_id, created_at);
-CREATE TABLE IF NOT EXISTS knowledge_web_kite_evidence (
-    id UUID PRIMARY KEY, kite_id UUID NOT NULL REFERENCES knowledge_web_kites(id),
+CREATE INDEX IF NOT EXISTS ${tables.comment}_${root}_idx ON ${tables.comment}(${key}, created_at);
+CREATE TABLE IF NOT EXISTS ${tables.evidence} (
+    id UUID PRIMARY KEY, ${key} UUID NOT NULL REFERENCES ${tables[root]}(id),
     initial BOOLEAN NOT NULL DEFAULT FALSE, title TEXT NOT NULL, reference TEXT NOT NULL, url TEXT,
     author TEXT NOT NULL DEFAULT '', publication_date TEXT NOT NULL DEFAULT '',
     supports TEXT NOT NULL, stance TEXT NOT NULL CHECK (stance IN ('supports','challenges','context')),
     contributor_email TEXT NOT NULL, contributor_name TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), hidden_at TIMESTAMPTZ
 );
-CREATE INDEX IF NOT EXISTS knowledge_web_kite_evidence_kite_idx ON knowledge_web_kite_evidence(kite_id, created_at);
-CREATE TABLE IF NOT EXISTS knowledge_web_contribution_revisions (
+CREATE INDEX IF NOT EXISTS ${tables.evidence}_${root}_idx ON ${tables.evidence}(${key}, created_at);
+CREATE TABLE IF NOT EXISTS ${revisions} (
     id UUID PRIMARY KEY, kind TEXT NOT NULL, target_id UUID NOT NULL, actor_email TEXT NOT NULL,
     previous JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE TABLE IF NOT EXISTS knowledge_web_reports (
-    id UUID PRIMARY KEY, kite_id UUID NOT NULL REFERENCES knowledge_web_kites(id),
-    kind TEXT NOT NULL CHECK (kind IN ('kite','comment','evidence')), target_id UUID NOT NULL, reporter_email TEXT NOT NULL,
+CREATE TABLE IF NOT EXISTS ${reports} (
+    id UUID PRIMARY KEY, ${key} UUID NOT NULL REFERENCES ${tables[root]}(id),
+    kind TEXT NOT NULL CHECK (kind IN ('${root}','comment','evidence')), target_id UUID NOT NULL, reporter_email TEXT NOT NULL,
     reason TEXT NOT NULL, details TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), resolved_at TIMESTAMPTZ
 );
-CREATE INDEX IF NOT EXISTS knowledge_web_reports_open_idx ON knowledge_web_reports(kind, target_id) WHERE resolved_at IS NULL;
-CREATE TABLE IF NOT EXISTS knowledge_web_moderation_actions (
-    id UUID PRIMARY KEY, report_id UUID NOT NULL REFERENCES knowledge_web_reports(id),
+CREATE INDEX IF NOT EXISTS ${reports}_open_idx ON ${reports}(kind, target_id) WHERE resolved_at IS NULL;
+CREATE TABLE IF NOT EXISTS ${audit} (
+    id UUID PRIMARY KEY, report_id UUID NOT NULL REFERENCES ${reports}(id),
     action TEXT NOT NULL CHECK (action IN ('hide','dismiss')), note TEXT NOT NULL, actor_email TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );`;
+}
 
-const tables = { kite: "knowledge_web_kites", comment: "knowledge_web_kite_comments", evidence: "knowledge_web_kite_evidence" };
 const kiteFrom = `FROM knowledge_web_kites k JOIN knowledge_web_clouds a ON a.id=k.cloud_a
     LEFT JOIN knowledge_web_clouds b ON b.id=k.cloud_b`;
 const visible = "k.hidden_at IS NULL AND a.published_at IS NOT NULL AND (k.cloud_b IS NULL OR b.published_at IS NOT NULL)";
@@ -52,6 +62,34 @@ const kiteFields = `k.id,k.cloud_a AS "cloudA",k.cloud_b AS "cloudB",a.title AS 
 const attribution = `contributor_name AS contributor,created_at AS "createdAt",updated_at AS "updatedAt"`;
 const evidenceFields = `id,initial,title,reference,url,author,publication_date AS "publicationDate",supports,stance`;
 const commentFields = `c.id,c.body,c.reply_to AS "replyTo"`;
+const connectionFrom = `FROM knowledge_web_connections k
+    JOIN knowledge_web_connection_endpoints a ON a.id=COALESCE(k.first_cloud,k.first_kite)
+        AND a.type=CASE WHEN k.first_cloud IS NULL THEN 'kite' ELSE 'cloud' END
+    JOIN knowledge_web_connection_endpoints b ON b.id=COALESCE(k.second_cloud,k.second_kite)
+        AND b.type=CASE WHEN k.second_cloud IS NULL THEN 'kite' ELSE 'cloud' END`;
+const connectionFields = `k.id,k.argument AS explanation,
+    json_build_object('type',a.type,'id',a.id,'label',a.label) AS "first",
+    json_build_object('type',b.type,'id',b.id,'label',b.label) AS "second"`;
+const connectionVisible = "k.hidden_at IS NULL";
+const connectionSchema = `
+CREATE TABLE IF NOT EXISTS knowledge_web_connections (
+    id UUID PRIMARY KEY,
+    first_cloud UUID REFERENCES knowledge_web_clouds(id), first_kite UUID REFERENCES knowledge_web_kites(id),
+    second_cloud UUID REFERENCES knowledge_web_clouds(id), second_kite UUID REFERENCES knowledge_web_kites(id),
+    CHECK (num_nonnulls(first_cloud,first_kite)=1 AND num_nonnulls(second_cloud,second_kite)=1),
+    CHECK (first_cloud IS NULL OR second_cloud IS NULL OR first_cloud<>second_cloud),
+    CHECK (first_kite IS NULL OR second_kite IS NULL OR first_kite<>second_kite),
+    argument TEXT NOT NULL, contributor_email TEXT NOT NULL, contributor_name TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), hidden_at TIMESTAMPTZ
+);
+CREATE OR REPLACE VIEW knowledge_web_connection_endpoints AS
+    SELECT 'cloud'::text AS type,id,title AS label FROM knowledge_web_clouds WHERE published_at IS NOT NULL
+    UNION ALL SELECT 'kite',k.id,concat_ws(' / ',a.title,b.title) || ': ' || left(k.argument,105)
+        ${kiteFrom} WHERE ${visible};`;
+const contributionFamilies = [
+    { ...families[0], from: kiteFrom, fields: kiteFields, visible },
+    { ...families[1], from: connectionFrom, fields: connectionFields, visible: connectionVisible }
+];
 
 function registerContributions(app, { base, pool, route, ensureSchema, transaction, getContributorName, notifyReport, UUID, problem, text, date }) {
     const handler = (callback, { staffOnly = false, studentOnly = false } = {}) => route({ staffOnly }, async (req, res, access) => {
@@ -64,10 +102,6 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
     const uid = (value) => {
         if (typeof value !== "string" || !UUID.test(value)) throw problem(400, "A valid contribution or cloud identifier is required.");
         return value.toLowerCase();
-    };
-    const kindOf = (value) => {
-        if (!Object.hasOwn(tables, value)) throw problem(400, "Choose a kite, comment or piece of evidence.");
-        return value;
     };
     const nameFor = async (req, { email, staff }) => {
         const name = await getContributorName(req, email);
@@ -87,54 +121,13 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
             text(body?.supports, "Explanation of what the evidence supports", 1000), stance];
     }
 
-    async function lockKite(db, id) {
-        const kite = (await db.query(`SELECT k.* ${kiteFrom} WHERE k.id=$1 AND ${visible} FOR UPDATE OF k`, [id])).rows[0];
-        if (!kite) throw problem(404, "This kite is not available.");
-        return kite;
-    }
-
-    async function target(db, kite, kind, id) {
-        const row = kind === "kite" ? (kite.id === id ? kite : null)
-            : (await db.query(`SELECT * FROM ${tables[kind]} WHERE id=$1 AND kite_id=$2 AND hidden_at IS NULL`, [id, kite.id])).rows[0];
-        if (!row) throw problem(404, "This contribution is not available.");
-        return row;
-    }
-
-    async function addEvidence(db, kiteId, values, email, name, initial) {
+    async function addEvidence(db, table, parentKey, parentId, values, email, name, initial) {
         const id = randomUUID();
-        await db.query(`INSERT INTO knowledge_web_kite_evidence
-            (id,kite_id,title,reference,url,author,publication_date,supports,stance,contributor_email,contributor_name,initial)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [id, kiteId, ...values, email, name, initial]);
+        await db.query(`INSERT INTO ${table}
+            (id,${parentKey},title,reference,url,author,publication_date,supports,stance,contributor_email,contributor_name,initial)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [id, parentId, ...values, email, name, initial]);
         return id;
     }
-
-    app.get(`${base}/kites`, handler(async (_req, res, { email }) => {
-        const { rows } = await pool.query(`SELECT ${kiteFields},k.contributor_name AS contributor,
-            k.created_at AS "createdAt",k.updated_at AS "updatedAt",k.contributor_email=$1 AS "mine"
-            ${kiteFrom} WHERE ${visible} ORDER BY k.created_at,k.id`, [email]);
-        res.json({ kites: rows });
-    }));
-
-    app.get(`${base}/kites/:id`, handler(async (req, res, { email }) => {
-        const id = uid(req.params.id);
-        const result = await transaction(async (db) => {
-            await db.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
-            const kite = (await db.query(`SELECT ${kiteFields},k.contributor_name AS contributor,k.created_at AS "createdAt",
-                k.updated_at AS "updatedAt",k.contributor_email=$2 AS "mine" ${kiteFrom}
-                WHERE k.id=$1 AND ${visible}`, [id, email])).rows[0];
-            if (!kite) throw problem(404, "This kite is not available.");
-            const comments = (await db.query(`SELECT ${commentFields},c.contributor_name AS contributor,
-                c.created_at AS "createdAt",c.updated_at AS "updatedAt",c.contributor_email=$2 AS "mine",
-                parent.hidden_at IS NOT NULL AS "replyUnavailable"
-                FROM knowledge_web_kite_comments c LEFT JOIN knowledge_web_kite_comments parent ON parent.id=c.reply_to
-                WHERE c.kite_id=$1 AND c.hidden_at IS NULL ORDER BY c.created_at,c.id`, [id, email])).rows;
-            const sources = (await db.query(`SELECT ${evidenceFields},${attribution},contributor_email=$2 AS "mine"
-                FROM knowledge_web_kite_evidence WHERE kite_id=$1 AND hidden_at IS NULL
-                ORDER BY initial DESC,created_at,id`, [id, email])).rows;
-            return { kite, comments, evidence: sources };
-        });
-        res.json(result);
-    }));
 
     app.post(`${base}/kites`, handler(async (req, res, access) => {
         const { email, staff } = access;
@@ -168,51 +161,122 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
             [id, cloudA, cloudB, proposalId, argument, email, name])).rowCount) {
                 throw problem(409, "A kite has already been published from this proposal.");
             }
-            for (const values of sources) await addEvidence(db, id, values, email, name, true);
+            for (const values of sources) await addEvidence(db, families[0].tables.evidence, "kite_id", id, values, email, name, true);
         });
         res.status(201).json({ id });
     }));
 
-    app.post(`${base}/kites/:id/comments`, handler(async (req, res, access) => {
+    app.post(`${base}/connections`, handler(async (req, res, access) => {
+        function endpoint(input) {
+            if (!["cloud", "kite"].includes(input?.type)) throw problem(400, "Choose a cloud or kite.");
+            return { type: input.type, id: uid(input.id) };
+        }
+        const first = endpoint(req.body?.first), second = endpoint(req.body?.second);
+        if (first.type === second.type && first.id === second.id) throw problem(400, "Choose two different items.");
+        const explanation = text(req.body?.explanation, "Connection explanation", 4000);
+        const entries = req.body.evidence === undefined ? [] : req.body.evidence;
+        if (!Array.isArray(entries) || entries.length > 20) throw problem(400, "Add up to 20 pieces of supporting evidence.");
+        const sources = entries.map((entry) => evidence(entry, true));
+        const id = randomUUID(), name = await nameFor(req, access);
+        await transaction(async (db) => {
+            if ((await db.query(`SELECT id FROM knowledge_web_connection_endpoints
+                WHERE (type,id) IN (($1,$2::uuid),($3,$4::uuid))`, [first.type, first.id, second.type, second.id])).rowCount !== 2) {
+                throw problem(404, "Choose two available clouds or kites.");
+            }
+            await db.query(`INSERT INTO knowledge_web_connections
+                (id,first_cloud,first_kite,second_cloud,second_kite,argument,contributor_email,contributor_name)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [id, first.type === "cloud" ? first.id : null, first.type === "kite" ? first.id : null,
+                second.type === "cloud" ? second.id : null, second.type === "kite" ? second.id : null, explanation, access.email, name]);
+            for (const values of sources) await addEvidence(db, families[1].tables.evidence, "connection_id", id, values, access.email, name, true);
+        });
+        res.status(201).json({ id });
+    }));
+
+    for (const family of contributionFamilies) {
+        registerFamily(family);
+    }
+
+    function registerFamily({ root, from, fields, visible: available, tables, reports, revisions, audit }) {
+    const collection = `${base}/${root}s`, parentKey = `${root}_id`;
+    const kindOf = (value) => {
+        if (!Object.hasOwn(tables, value)) throw problem(400, "Choose a contribution to act on.");
+        return value;
+    };
+    async function lockParent(db, id) {
+        const parent = (await db.query(`SELECT k.* ${from} WHERE k.id=$1 AND ${available} FOR UPDATE OF k`, [id])).rows[0];
+        if (!parent) throw problem(404, `This ${root} is not available.`);
+        return parent;
+    }
+    async function target(db, parent, kind, id) {
+        const row = kind === root ? (parent.id === id ? parent : null)
+            : (await db.query(`SELECT * FROM ${tables[kind]} WHERE id=$1 AND ${parentKey}=$2 AND hidden_at IS NULL`, [id, parent.id])).rows[0];
+        if (!row) throw problem(404, "This contribution is not available.");
+        return row;
+    }
+    app.get(collection, handler(async (_req, res, { email }) => {
+        const { rows } = await pool.query(`SELECT ${fields},k.contributor_name AS contributor,k.created_at AS "createdAt",
+            k.updated_at AS "updatedAt",k.contributor_email=$1 AS mine ${from} WHERE ${available} ORDER BY k.created_at,k.id`, [email]);
+        res.json({ [`${root}s`]: rows });
+    }));
+    app.get(`${collection}/:id`, handler(async (req, res, { email }) => {
+        const id = uid(req.params.id);
+        res.json(await transaction(async (db) => {
+            await db.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
+            const parent = (await db.query(`SELECT ${fields},k.contributor_name AS contributor,k.created_at AS "createdAt",
+                k.updated_at AS "updatedAt",k.contributor_email=$2 AS mine ${from} WHERE k.id=$1 AND ${available}`, [id, email])).rows[0];
+            if (!parent) throw problem(404, `This ${root} is not available.`);
+            const comments = (await db.query(`SELECT ${commentFields},c.contributor_name AS contributor,
+                c.created_at AS "createdAt",c.updated_at AS "updatedAt",c.contributor_email=$2 AS mine,
+                parent.hidden_at IS NOT NULL AS "replyUnavailable" FROM ${tables.comment} c
+                LEFT JOIN ${tables.comment} parent ON parent.id=c.reply_to
+                WHERE c.${parentKey}=$1 AND c.hidden_at IS NULL ORDER BY c.created_at,c.id`, [id, email])).rows;
+            const sources = (await db.query(`SELECT ${evidenceFields},${attribution},contributor_email=$2 AS mine
+                FROM ${tables.evidence} WHERE ${parentKey}=$1 AND hidden_at IS NULL ORDER BY initial DESC,created_at,id`, [id, email])).rows;
+            return { [root]: parent, comments, evidence: sources };
+        }));
+    }));
+
+    app.post(`${collection}/:id/comments`, handler(async (req, res, access) => {
         const { email } = access;
         const id = randomUUID();
         const body = text(req.body?.body, "Comment", 3000);
         const replyTo = req.body?.replyTo ? uid(req.body.replyTo) : null;
         const name = await nameFor(req, access);
         await transaction(async (db) => {
-            const kite = await lockKite(db, uid(req.params.id));
+            const kite = await lockParent(db, uid(req.params.id));
             if (replyTo) await target(db, kite, "comment", replyTo);
-            await db.query(`INSERT INTO knowledge_web_kite_comments
-                (id,kite_id,reply_to,body,contributor_email,contributor_name) VALUES ($1,$2,$3,$4,$5,$6)`,
+            await db.query(`INSERT INTO ${tables.comment}
+                (id,${parentKey},reply_to,body,contributor_email,contributor_name) VALUES ($1,$2,$3,$4,$5,$6)`,
             [id, kite.id, replyTo, body, email, name]);
         });
         res.status(201).json({ id });
     }));
 
-    app.post(`${base}/kites/:id/evidence`, handler(async (req, res, access) => {
+    app.post(`${collection}/:id/evidence`, handler(async (req, res, access) => {
         const { email } = access;
         const values = evidence(req.body);
         const name = await nameFor(req, access);
         const id = await transaction(async (db) => {
-            const kite = await lockKite(db, uid(req.params.id));
-            return addEvidence(db, kite.id, values, email, name, false);
+            const kite = await lockParent(db, uid(req.params.id));
+            return addEvidence(db, tables.evidence, parentKey, kite.id, values, email, name, false);
         });
         res.status(201).json({ id });
     }));
 
-    app.put(`${base}/kites/:id/contributions/:kind/:target`, handler(async (req, res, { email }) => {
+    app.put(`${collection}/:id/contributions/:kind/:target`, handler(async (req, res, { email }) => {
         const kind = kindOf(req.params.kind);
         const id = uid(req.params.target);
         await transaction(async (db) => {
-            const kite = await lockKite(db, uid(req.params.id));
+            const kite = await lockParent(db, uid(req.params.id));
             const current = await target(db, kite, kind, id);
             if (current.contributor_email !== email) throw problem(403, "You can only edit your own contributions.");
-            const fields = kind === "kite" ? ["argument"] : kind === "comment" ? ["body"]
+            const fields = kind === root ? ["argument"] : kind === "comment" ? ["body"]
                 : ["title", "reference", "url", "author", "publication_date", "supports", "stance"];
-            const values = kind === "kite" ? [text(req.body?.argument, kite.cloud_b ? "Connection argument" : "Kite idea", 4000)]
+            const values = kind === root ? [text(root === "connection" ? req.body?.explanation : req.body?.argument,
+                root === "connection" ? "Connection explanation" : kite.cloud_b ? "Connection argument" : "Kite idea", 4000)]
                 : kind === "comment" ? [text(req.body?.body, "Comment", 3000)] : evidence(req.body, current.initial);
             if (fields.every((field, index) => current[field] === values[index])) return;
-            await db.query(`INSERT INTO knowledge_web_contribution_revisions (id,kind,target_id,actor_email,previous)
+            await db.query(`INSERT INTO ${revisions} (id,kind,target_id,actor_email,previous)
                 VALUES ($1,$2,$3,$4,$5)`, [randomUUID(), kind, id, email, JSON.stringify(current)]);
             await db.query(`UPDATE ${tables[kind]} SET ${fields.map((field, i) => `${field}=$${i + 2}`).join(",")},
                 updated_at=NOW() WHERE id=$1`, [id, ...values]);
@@ -220,22 +284,7 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
         res.json({ id });
     }));
 
-    app.get(`${base}/contributions`, handler(async (_req, res, { email }) => {
-        const { rows } = await pool.query(`SELECT k.id,k.id AS "kiteId",'kite' AS kind,k.argument AS summary,
-            k.created_at AS "createdAt",k.updated_at AS "updatedAt",NULL::uuid AS "proposalId"
-            ${kiteFrom} WHERE ${visible} AND k.contributor_email=$1
-            UNION ALL SELECT c.id,k.id,'comment',c.body,c.created_at,c.updated_at,NULL::uuid
-            ${kiteFrom} JOIN knowledge_web_kite_comments c ON c.kite_id=k.id
-            WHERE ${visible} AND c.hidden_at IS NULL AND c.contributor_email=$1
-            UNION ALL SELECT e.id,k.id,'evidence',e.title,e.created_at,e.updated_at,NULL::uuid
-            ${kiteFrom} JOIN knowledge_web_kite_evidence e ON e.kite_id=k.id
-            WHERE ${visible} AND e.hidden_at IS NULL AND e.contributor_email=$1
-            ORDER BY "updatedAt" DESC,id`, [email]);
-        const { rows: converted } = await pool.query("SELECT proposal_id AS id FROM knowledge_web_kites WHERE contributor_email=$1 AND proposal_id IS NOT NULL", [email]);
-        res.json({ contributions: rows, convertedProposalIds: converted.map(({ id }) => id) });
-    }));
-
-    app.post(`${base}/kites/:id/reports`, handler(async (req, res, { email }) => {
+    app.post(`${collection}/:id/reports`, handler(async (req, res, { email }) => {
         const kind = kindOf(req.body?.kind);
         const targetId = uid(req.body?.targetId);
         const reason = req.body?.reason;
@@ -244,14 +293,14 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
         }
         const details = text(req.body?.details ?? "", "Report details", 1000, reason === "other");
         const result = await transaction(async (db) => {
-            const kite = await lockKite(db, uid(req.params.id));
+            const kite = await lockParent(db, uid(req.params.id));
             await target(db, kite, kind, targetId);
-            const open = (await db.query(`SELECT id,reporter_email FROM knowledge_web_reports
+            const open = (await db.query(`SELECT id,reporter_email FROM ${reports}
                 WHERE kind=$1 AND target_id=$2 AND resolved_at IS NULL`, [kind, targetId])).rows;
             const own = open.find((row) => row.reporter_email === email);
             if (own) return { id: own.id, notify: false };
             const id = randomUUID();
-            await db.query(`INSERT INTO knowledge_web_reports (id,kite_id,kind,target_id,reporter_email,reason,details)
+            await db.query(`INSERT INTO ${reports} (id,${parentKey},kind,target_id,reporter_email,reason,details)
                 VALUES ($1,$2,$3,$4,$5,$6,$7)`, [id, kite.id, kind, targetId, email, reason, details]);
             return { id, notify: !open.length };
         });
@@ -262,45 +311,72 @@ function registerContributions(app, { base, pool, route, ensureSchema, transacti
         res.status(201).json({ id: result.id });
     }, student));
 
-    app.get(`${base}/manage/reports`, handler(async (_req, res) => {
-        const { rows } = await pool.query(`SELECT r.id,r.kite_id AS "kiteId",r.target_id AS "targetId",r.kind,
-            r.reason,r.details,r.created_at AS "createdAt",a.title AS "titleA",b.title AS "titleB",
-            CASE r.kind WHEN 'comment' THEN c.body WHEN 'evidence' THEN concat_ws(' — ',e.title,e.supports,e.reference)
-                ELSE k.argument END AS content,
-            COALESCE(c.contributor_name,e.contributor_name,k.contributor_name) AS contributor
-            FROM knowledge_web_reports r JOIN knowledge_web_kites k ON k.id=r.kite_id
-            JOIN knowledge_web_clouds a ON a.id=k.cloud_a LEFT JOIN knowledge_web_clouds b ON b.id=k.cloud_b
-            LEFT JOIN knowledge_web_kite_comments c ON r.kind='comment' AND c.id=r.target_id
-            LEFT JOIN knowledge_web_kite_evidence e ON r.kind='evidence' AND e.id=r.target_id
-            WHERE r.resolved_at IS NULL ORDER BY r.created_at,r.id`);
-        res.json({ reports: rows });
-    }, teacher));
-
-    app.post(`${base}/manage/reports/:id`, handler(async (req, res, { email }) => {
+    const reportPath = root === "kite" ? "reports" : "connection-reports";
+    app.post(`${base}/manage/${reportPath}/:id`, handler(async (req, res, { email }) => {
         const id = uid(req.params.id);
         const action = req.body?.action;
         if (!["hide", "dismiss"].includes(action)) throw problem(400, "Choose hide or dismiss.");
         const note = text(req.body?.note ?? "", "Moderation note", 1000);
         await transaction(async (db) => {
-            const report = (await db.query("SELECT * FROM knowledge_web_reports WHERE id=$1", [id])).rows[0];
+            const report = (await db.query(`SELECT * FROM ${reports} WHERE id=$1`, [id])).rows[0];
             if (!report) throw problem(404, "Report not found.");
-            await db.query("SELECT id FROM knowledge_web_kites WHERE id=$1 FOR UPDATE", [report.kite_id]);
-            if (!(await db.query("SELECT id FROM knowledge_web_reports WHERE id=$1 AND resolved_at IS NULL", [id])).rowCount) {
+            await db.query(`SELECT id FROM ${tables[root]} WHERE id=$1 FOR UPDATE`, [report[parentKey]]);
+            if (!(await db.query(`SELECT id FROM ${reports} WHERE id=$1 AND resolved_at IS NULL`, [id])).rowCount) {
                 throw problem(409, "This report has already been resolved.");
             }
             if (action === "hide") {
                 await db.query(`UPDATE ${tables[kindOf(report.kind)]} SET hidden_at=NOW() WHERE id=$1 AND hidden_at IS NULL`, [report.target_id]);
-                await db.query(`UPDATE knowledge_web_reports SET resolved_at=NOW() WHERE resolved_at IS NULL
-                    AND ((kind=$1 AND target_id=$2) OR ($3::boolean AND kite_id=$4))`,
-                [report.kind, report.target_id, report.kind === "kite", report.kite_id]);
+                await db.query(`UPDATE ${reports} SET resolved_at=NOW() WHERE resolved_at IS NULL
+                    AND ((kind=$1 AND target_id=$2) OR ($3::boolean AND ${parentKey}=$4))`,
+                [report.kind, report.target_id, report.kind === root, report[parentKey]]);
             } else {
-                await db.query("UPDATE knowledge_web_reports SET resolved_at=NOW() WHERE id=$1", [id]);
+                await db.query(`UPDATE ${reports} SET resolved_at=NOW() WHERE id=$1`, [id]);
             }
-            await db.query(`INSERT INTO knowledge_web_moderation_actions (id,report_id,action,note,actor_email)
+            await db.query(`INSERT INTO ${audit} (id,report_id,action,note,actor_email)
                 VALUES ($1,$2,$3,$4,$5)`, [randomUUID(), id, action, note, email]);
         });
         res.json({ action });
     }, teacher));
+    }
+
+    function historySql({ root, from, visible, tables }) {
+        const key = `${root}_id`;
+        return `SELECT k.id,k.id AS "subjectId",'${root}' AS subject,'${root}' AS kind,k.argument AS summary,
+            k.created_at AS "createdAt",k.updated_at AS "updatedAt" ${from} WHERE ${visible} AND k.contributor_email=$1
+            UNION ALL SELECT c.id,k.id,'${root}','comment',c.body,c.created_at,c.updated_at
+            ${from} JOIN ${tables.comment} c ON c.${key}=k.id WHERE ${visible} AND c.hidden_at IS NULL AND c.contributor_email=$1
+            UNION ALL SELECT e.id,k.id,'${root}','evidence',e.title,e.created_at,e.updated_at
+            ${from} JOIN ${tables.evidence} e ON e.${key}=k.id WHERE ${visible} AND e.hidden_at IS NULL AND e.contributor_email=$1`;
+    }
+    app.get(`${base}/contributions`, handler(async (_req, res, { email }) => {
+        const { rows } = await pool.query(`${contributionFamilies.map(historySql).join(" UNION ALL ")} ORDER BY "updatedAt" DESC,id`, [email]);
+        const { rows: converted } = await pool.query("SELECT proposal_id AS id FROM knowledge_web_kites WHERE contributor_email=$1 AND proposal_id IS NOT NULL", [email]);
+        res.json({ contributions: rows.map((row) => row.subject === "kite" ? { ...row, kiteId: row.subjectId } : row),
+            convertedProposalIds: converted.map(({ id }) => id) });
+    }));
+
+    app.get(`${base}/manage/reports`, handler(async (_req, res) => {
+        const queries = families.map(({ root, tables, reports }) => {
+            const key = `${root}_id`;
+            const isKite = root === "kite";
+            return `SELECT r.id,k.id AS "subjectId",'${root}' AS subject,r.target_id AS "targetId",r.kind,
+                r.reason,r.details,r.created_at AS "createdAt",${isKite ? "a.title" : "COALESCE(a.label,'Unavailable item')"} AS "titleA",
+                ${isKite ? "b.title" : "COALESCE(b.label,'Unavailable item')"} AS "titleB",
+                CASE r.kind WHEN 'comment' THEN c.body WHEN 'evidence' THEN concat_ws(' — ',e.title,e.supports,e.reference)
+                    ELSE k.argument END AS content,COALESCE(c.contributor_name,e.contributor_name,k.contributor_name) AS contributor
+                FROM ${reports} r JOIN ${tables[root]} k ON k.id=r.${key}
+                ${isKite ? `JOIN knowledge_web_clouds a ON a.id=k.cloud_a LEFT JOIN knowledge_web_clouds b ON b.id=k.cloud_b` :
+                `LEFT JOIN knowledge_web_connection_endpoints a ON a.id=COALESCE(k.first_cloud,k.first_kite)
+                    AND a.type=CASE WHEN k.first_cloud IS NULL THEN 'kite' ELSE 'cloud' END
+                 LEFT JOIN knowledge_web_connection_endpoints b ON b.id=COALESCE(k.second_cloud,k.second_kite)
+                    AND b.type=CASE WHEN k.second_cloud IS NULL THEN 'kite' ELSE 'cloud' END`}
+                LEFT JOIN ${tables.comment} c ON r.kind='comment' AND c.id=r.target_id
+                LEFT JOIN ${tables.evidence} e ON r.kind='evidence' AND e.id=r.target_id
+                WHERE r.resolved_at IS NULL`;
+        });
+        const { rows } = await pool.query(`${queries.join(" UNION ALL ")} ORDER BY "createdAt",id`);
+        res.json({ reports: rows });
+    }, teacher));
 }
 
-module.exports = { registerContributions, schema };
+module.exports = { registerContributions, schema: kiteSchema + connectionSchema + families.map(childSchema).join("") };

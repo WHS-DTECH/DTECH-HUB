@@ -577,6 +577,65 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         const reopened = await get(`kites/${anchoredId}`, studentB);
         assert.equal(reopened.comments[0].contributor, "Test Student Two");
         assert.equal(reopened.evidence[0].contributor, "Test Student Two");
+        const cloudNode = (id) => ({ type: "cloud", id }), kiteNode = (id) => ({ type: "kite", id });
+        const connectionBody = (first, second, explanation = "Both show a shift in computing.") => ({ first, second, explanation });
+        const cloudPair = connectionBody(cloudNode(id), cloudNode(approved.publishedCloudId));
+        assert.equal((await post("connections", cloudPair, "junior@test.invalid")).status, 403);
+        assert.equal((await post("connections", cloudPair, " ")).status, 401);
+        assert.equal((await post("connections", connectionBody(cloudNode(id), cloudNode(id)))).status, 400);
+        assert.equal((await post("connections", connectionBody(cloudNode(id), cloudNode(seed.id)))).status, 404);
+        assert.equal((await post("connections", connectionBody(cloudNode(id), kiteNode(kiteA)))).status, 404);
+        assert.equal((await post("connections", { ...cloudPair, explanation: " " })).status, 400);
+        const publishConnection = async (data, account) => {
+            const response = await post("connections", data, account);
+            assert.equal(response.status, 201);
+            return (await response.json()).id;
+        };
+        const cloudString = await publishConnection(cloudPair);
+        const mixedString = await publishConnection(connectionBody(cloudNode(id), kiteNode(anchoredId)), studentB);
+        const kiteString = await publishConnection(connectionBody(kiteNode(anchoredId), kiteNode(kiteB)), teacher);
+        const opposing = await publishConnection(connectionBody(cloudPair.second, cloudPair.first, "I disagree."),
+            studentB);
+        const reversedMixed = await publishConnection({ ...connectionBody(kiteNode(anchoredId), cloudNode(id)),
+            evidence: [teacherDraft.evidence[0]] }, teacher);
+        assert.equal((await get(`connections/${reversedMixed}`)).evidence.length, 1);
+        assert.equal((await get("connections")).connections.length, 5);
+        const showString = async (stringId, account) => get(`connections/${stringId}`, account);
+        const originalString = (await showString(cloudString, studentB)).connection;
+        assert.deepEqual([originalString.first.id, originalString.second.id], [id, approved.publishedCloudId]);
+        assert.equal(originalString.contributor, "Changed Display Name");
+        assert.equal((await showString(kiteString)).connection.contributor, "Test Teacher");
+        assert.equal((await showString(mixedString)).connection.second.type, "kite");
+        assert.doesNotMatch(JSON.stringify(originalString), /@test\.invalid/);
+        const stringEdit = `connections/${cloudString}/contributions/connection/${cloudString}`;
+        assert.equal((await put(stringEdit, { explanation: "Not mine" }, studentB)).status, 403);
+        assert.equal((await put(stringEdit, { explanation: "An updated interpretation." })).status, 200);
+        const stringComment = await post(`connections/${cloudString}/comments`, { body: "Could this be independent?" }, studentB);
+        assert.equal(stringComment.status, 201);
+        const stringCommentId = (await stringComment.json()).id;
+        assert.equal((await post(`connections/${opposing}/comments`, { body: "Cross-thread", replyTo: stringCommentId }, studentC)).status, 404);
+        assert.equal((await post(`connections/${cloudString}/comments`, { body: "Possibly.", replyTo: stringCommentId }, studentC)).status, 201);
+        assert.equal((await post(`connections/${cloudString}/evidence`, teacherDraft.evidence[0], studentD)).status, 201);
+        host = await startApp();
+        const persistedString = await showString(cloudString);
+        assert.equal(persistedString.connection.createdAt, originalString.createdAt);
+        assert.equal(persistedString.connection.explanation, "An updated interpretation.");
+        assert.equal(persistedString.comments.length, 2);
+        assert.equal(persistedString.evidence[0].contributor, "Test Student Four");
+        assert.ok((await get("contributions", studentD)).contributions.some(({ subjectId, subject, kind }) =>
+            subjectId === cloudString && subject === "connection" && kind === "evidence"));
+        assert.equal((await get(`kites/${anchoredId}`)).kite.cloudA, id);
+        const stringReport = await post(`connections/${cloudString}/reports`, {
+            kind: "connection", targetId: cloudString, reason: "spam"
+        }, studentB);
+        assert.equal(stringReport.status, 201);
+        const { id: stringReportId } = await stringReport.json();
+        assert.ok((await get("manage/reports", teacher)).reports.some(({ id, subject }) => id === stringReportId && subject === "connection"));
+        assert.equal((await post(`manage/connection-reports/${stringReportId}`, { action: "hide", note: "Test moderation." }, studentB)).status, 403);
+        assert.equal((await post(`manage/connection-reports/${stringReportId}`, { action: "hide", note: "Test moderation." }, teacher)).status, 200);
+        assert.equal((await call(`connections/${cloudString}`, { student: true })).status, 404);
+        assert.equal((await showString(opposing)).connection.id, opposing);
+        assert.ok((await list("clouds", true)).some((cloud) => cloud.id === id));
         const anchoredReport = await post(`kites/${anchoredId}/reports`, {
             kind: "kite", targetId: anchoredId, reason: "spam"
         }, studentB);
@@ -585,4 +644,9 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.ok((await get("manage/reports", teacher)).reports.some(({ id, titleB }) => id === anchoredReportId && titleB === null));
         assert.equal((await post(`manage/reports/${anchoredReportId}`, { action: "hide", note: "Test moderation." }, teacher)).status, 200);
         assert.equal((await call(`kites/${anchoredId}`, { account: studentB })).status, 404);
+        assert.equal((await call(`connections/${kiteString}`, { account: studentB })).status, 404);
+        assert.equal((await call(`connections/${mixedString}`, { account: studentB })).status, 404);
+        assert.deepEqual((await get("connections")).connections.map(({ id }) => id), [opposing]);
+        assert.equal((await pool.query("SELECT id FROM knowledge_web_connections")).rowCount, 5);
+        assert.equal((await pool.query("SELECT id FROM knowledge_web_connection_moderation_actions")).rowCount, 1);
     });

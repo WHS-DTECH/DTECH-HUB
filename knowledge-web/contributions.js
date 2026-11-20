@@ -1,10 +1,12 @@
 function createKnowledgeContributions({ node, request, element, button, state, showCloud, resizeTextareas, formatDate,
     historyPage, exploreUrl, onProposalsChanged, onKitesChanged }) {
-    let kites = [], converted = new Set(), active = null, detailSequence = 0, refreshSequence = 0, reportSequence = 0;
+    let kites = [], connections = [], converted = new Set(), active = null, activeType = null, detailSequence = 0, refreshSequence = 0, reportSequence = 0;
     const empty = () => element("p", "Nothing to show yet.");
     const linkTitle = (kite) => kite.titleB ? `${kite.titleA} ↔ ${kite.titleB}` : kite.titleA;
     const send = (path, body, method = "POST") => request(path, { method, body: JSON.stringify(body) });
-    const labels = { kite: "Kite", comment: "Comment", evidence: "Evidence" };
+    const labels = { kite: "Kite", connection: "Connection", cloud: "Cloud", comment: "Comment", evidence: "Evidence" };
+    const endpointKey = ({ type, id }) => `${type}:${id}`;
+    const connectionTitle = ({ first, second }) => `${first.label} ↔ ${second.label}`;
     const reasons = { harassment: "Harassment", "personal-information": "Personal information disclosure", spam: "Spam",
         disruption: "Deliberately disruptive content", other: "Other inappropriate behaviour" };
     const stances = { supports: "Supports the argument", challenges: "Challenges the argument", context: "Adds context" };
@@ -130,15 +132,91 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         argument.focus();
     }
 
+    function openConnectionEditor(selected) {
+        if (!state.canContribute) return;
+        const host = node("connection-editor");
+        const choices = [
+            ...state.clouds.map(({ id, title }) => ({ type: "cloud", id, label: title })),
+            ...kites.map((kite) => ({ type: "kite", id: kite.id, label: `${linkTitle(kite)}: ${snippet(kite.argument)}` }))
+        ];
+        if (choices.length < 2) {
+            node("kite-status").textContent = "Two published clouds or visible kites are needed. Try refreshing if an item was just added.";
+            return;
+        }
+        closeKite();
+        node("cloud-detail").hidden = true;
+        host.hidden = false;
+        const fields = editor(host, "Connect Ideas", "Publish Connection", async (revision) => {
+            const first = choices.find((item) => endpointKey(item) === firstSelect.value);
+            const second = choices.find((item) => endpointKey(item) === secondSelect.value);
+            if (!first || !second || firstSelect.value === secondSelect.value) throw new Error("Choose two different items.");
+            const result = await send("connections", { first, second, explanation: explanation.value,
+                evidence: source ? [source()] : [] });
+            if (revision !== state.revision) return;
+            close();
+            node("kite-status").textContent = "Connection published.";
+            await refresh();
+            if (revision === state.revision && !active && host.hidden && !node("cloud-detail").hidden) {
+                await openConnection(result.id);
+            }
+        }, close);
+        function close() {
+            host.replaceChildren();
+            host.hidden = true;
+            node("cloud-detail").hidden = false;
+        }
+        function picker(label, preset) {
+            const filter = labeled(fields, `Search ${label.toLowerCase()}`, element("input"));
+            filter.type = "search";
+            const choice = labeled(fields, label, element("select"));
+            choice.required = true;
+            function update(current) {
+                const query = filter.value.trim().toLowerCase();
+                choice.replaceChildren(new Option("Choose a cloud or kite", ""));
+                for (const item of choices) {
+                    const key = endpointKey(item), name = `${labels[item.type]}: ${item.label}`;
+                    if (key === current || name.toLowerCase().includes(query)) choice.append(new Option(name, key));
+                }
+                choice.value = [...choice.options].some((option) => option.value === current) ? current : "";
+            }
+            update(preset ? endpointKey(preset) : "");
+            filter.addEventListener("input", () => update(choice.value));
+            return choice;
+        }
+        const firstSelect = picker("First item", selected);
+        const secondSelect = picker("Second item");
+        const explanation = field(fields, "How are these items related?", 4000, "", { multiline: true });
+        const sourceHost = element("div");
+        let source = null;
+        const addSource = button("Add optional evidence", () => {
+            source = evidenceFields(sourceHost, {}, true);
+            sourceHost.append(button("Remove optional evidence", () => {
+                source = null; sourceHost.replaceChildren(); addSource.hidden = false; addSource.focus();
+            }));
+            addSource.hidden = true;
+            sourceHost.querySelector("input").focus();
+        });
+        fields.append(addSource, sourceHost);
+        firstSelect.focus();
+    }
+
+    let mapLocations = new Map(), connectionLocations = new Map();
+    function locate(position) {
+        if (!position) return;
+        const viewport = node("viewport");
+        viewport.scrollTo(position.x * state.zoom - viewport.clientWidth / 2, position.y * state.zoom - viewport.clientHeight / 2);
+    }
+
     function drawMap() {
         const board = node("board");
         board.querySelector(".kw-kite-layer")?.remove();
+        board.querySelector(".kw-string-layer")?.remove();
+        mapLocations = new Map();
+        connectionLocations = new Map();
         const count = node("kite-map-note");
-        const nearby = kites.filter((kite) => !state.selected || [kite.cloudA, kite.cloudB].includes(state.selected));
-        const shown = nearby.filter((kite) => state.positions.has(kite.cloudA) && (!kite.cloudB || state.positions.has(kite.cloudB))).slice(0, 24);
-        count.textContent = nearby.length > shown.length ? `Showing ${shown.length} of ${nearby.length} related kites on the map. All kites are in the searchable list.`
-            : `${shown.length} kite${shown.length === 1 ? "" : "s"} on the map${state.selected ? " for this cloud" : ""}.`;
-        if (!shown.length) return;
+        const shown = kites.filter((kite) => state.positions.has(kite.cloudA) && (!kite.cloudB || state.positions.has(kite.cloudB))).slice(0, 24);
+        count.textContent = kites.length > shown.length ? `Showing ${shown.length} of ${kites.length} kites on the map. All kites and connections are searchable.`
+            : `${shown.length} kite${shown.length === 1 ? "" : "s"} on the map.`;
         const layer = element("div");
         layer.className = "kw-kite-layer";
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -150,6 +228,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         const boardHeight = Number.parseFloat(board.style.height);
         const placed = [];
         const clouds = [...state.positions.values()];
+        for (const [id, point] of state.positions) mapLocations.set(`cloud:${id}`, { x: point.x + width / 2, y: point.y + height / 2 });
         const groups = new Map();
         for (const kite of shown) {
             const key = `${kite.cloudA}:${kite.cloudB}`;
@@ -180,11 +259,12 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                     }
                 }
                 if (!position) {
-                    count.textContent = "Some kites do not fit on this map. All kites are in the searchable list.";
+                    count.textContent = "Some kites do not fit on this map. All kites and connections are searchable.";
                     continue;
                 }
                 const { x, y } = position;
                 placed.push(position);
+                mapLocations.set(`kite:${kite.id}`, position);
                 const string = document.createElementNS(svg.namespaceURI, "polyline");
                 string.setAttribute("points", `${x1},${y1} ${x},${y}${b ? ` ${x2},${y2}` : ""}`);
                 svg.append(string);
@@ -198,17 +278,76 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             }
         }
         board.prepend(layer);
+        drawConnections(board, svg.namespaceURI);
+    }
+
+    function drawConnections(board, namespace) {
+        const layer = document.createElementNS(namespace, "svg");
+        layer.classList.add("kw-string-layer");
+        const pairs = new Map();
+        for (const connection of connections) {
+            const keys = [endpointKey(connection.first), endpointKey(connection.second)].sort();
+            if (!keys.every((key) => mapLocations.has(key))) continue;
+            const pair = keys.join("/");
+            if (!pairs.has(pair)) pairs.set(pair, []);
+            pairs.get(pair).push(connection);
+        }
+        for (const [pair, items] of pairs) {
+            const keys = pair.split("/");
+            const [a, b] = keys.map((key) => mapLocations.get(key));
+            const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+            const attachedKite = keys[1].startsWith("kite:") && keys[0].startsWith("cloud:")
+                ? kites.find(({ id }) => keys[1] === `kite:${id}`) : null;
+            const overlapsAttachment = attachedKite && [attachedKite.cloudA, attachedKite.cloudB].some((id) => keys[0] === `cloud:${id}`);
+            for (const [index, connection] of items.entries()) {
+                let offset = (index - (items.length - 1) / 2) * 34;
+                if (overlapsAttachment) offset += offset < 0 ? -24 : 24;
+                const x = (a.x + b.x) / 2 - (b.y - a.y) / length * offset;
+                const y = (a.y + b.y) / 2 + (b.x - a.x) / length * offset;
+                const d = `M ${a.x} ${a.y} Q ${x} ${y} ${b.x} ${b.y}`;
+                const group = document.createElementNS(namespace, "g");
+                group.setAttribute("role", "button");
+                group.setAttribute("tabindex", "0");
+                group.setAttribute("aria-label", `Connection: ${snippet(connection.explanation)}`);
+                for (const className of ["kw-string-line", "kw-string-hit"]) {
+                    const path = document.createElementNS(namespace, "path");
+                    path.classList.add(className);
+                    path.setAttribute("d", d);
+                    group.append(path);
+                }
+                group.addEventListener("click", () => { void openConnection(connection.id); });
+                group.addEventListener("keydown", (event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        void openConnection(connection.id);
+                    }
+                });
+                connectionLocations.set(connection.id, { x: (a.x + 2 * x + b.x) / 4, y: (a.y + 2 * y + b.y) / 4 });
+                layer.append(group);
+            }
+        }
+        board.prepend(layer);
     }
 
     function searchKites(query) {
         return kites.filter((kite) => `${linkTitle(kite)} ${kite.contributor} ${kite.argument}`.toLowerCase().includes(query))
-            .map((kite) => button(`Kite: ${linkTitle(kite)} — ${kite.contributor}: ${snippet(kite.argument)}`, () => { void openKite(kite.id); }));
+            .map((kite) => button(`Kite: ${linkTitle(kite)} — ${kite.contributor}: ${snippet(kite.argument)}`, () => {
+                locate(mapLocations.get(`kite:${kite.id}`)); void openKite(kite.id);
+            }));
+    }
+
+    function searchConnections(query) {
+        return connections.filter((item) => `${connectionTitle(item)} ${item.contributor} ${item.explanation}`.toLowerCase().includes(query))
+            .map((item) => button(`Connection: ${snippet(item.explanation)} — ${item.contributor}`, () => {
+                locate(connectionLocations.get(item.id)); void openConnection(item.id);
+            }));
     }
 
     async function refresh() {
         const seq = ++refreshSequence, revision = state.revision;
         try {
-            const result = await request(historyPage ? "contributions" : "kites");
+            const result = historyPage ? await request("contributions") :
+                await Promise.all([request("kites"), request("connections")]);
             if (revision !== state.revision || seq !== refreshSequence) return;
             if (historyPage) {
                 node("history-status").textContent = "";
@@ -219,13 +358,14 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                 for (const item of result.contributions) {
                     const row = element("div");
                     const link = element("a", `${labels[item.kind]}: ${snippet(item.summary)}`);
-                    link.href = exploreUrl({ kite: item.kiteId, item: item.id });
+                    link.href = exploreUrl({ [item.subject || "kite"]: item.subjectId || item.kiteId, item: item.id });
                     row.append(link, element("small", ` Updated ${formatDate(item.updatedAt)}`));
                     host.append(row);
                 }
                 if (state.canPropose) onProposalsChanged();
             } else {
-                kites = result.kites;
+                kites = result[0].kites;
+                connections = result[1].connections;
                 drawMap();
                 onKitesChanged();
             }
@@ -237,24 +377,32 @@ function createKnowledgeContributions({ node, request, element, button, state, s
     function closeKite() {
         detailSequence++;
         active = null;
+        activeType = null;
+        node("connection-editor").hidden = true;
+        node("connection-editor").replaceChildren();
         node("kite-detail").replaceChildren();
         node("kite-detail").hidden = true;
         node("cloud-detail").hidden = false;
     }
 
-    async function openKite(id, focusId) {
+    const openKite = (id, focusId) => openDetail("kite", id, focusId);
+    const openConnection = (id, focusId) => openDetail("connection", id, focusId);
+    async function openDetail(kind, id, focusId) {
+        closeKite();
         const seq = ++detailSequence, revision = state.revision;
         const host = node("kite-detail");
         active = id;
+        activeType = kind;
+        host.setAttribute("aria-label", `Selected ${kind}`);
         node("cloud-detail").hidden = true;
         host.hidden = false;
-        const loading = element("p", "Loading kite…");
+        const loading = element("p", `Loading ${kind}…`);
         loading.setAttribute("role", "status");
         host.replaceChildren(loading);
         try {
-            const result = await request(`kites/${id}`);
+            const result = await request(`${kind}s/${id}`);
             if (revision !== state.revision || seq !== detailSequence) return;
-            renderDetail(result);
+            renderDetail(kind, result);
             (focusId && document.getElementById(`kw-contribution-${focusId}`) || host).focus();
         } catch (error) {
             if (revision !== state.revision || seq !== detailSequence) return;
@@ -263,13 +411,15 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         }
     }
 
-    function renderDetail({ kite, comments, evidence }) {
+    function renderDetail(kind, result) {
+        const { comments, evidence } = result, kite = result[kind];
+        const isConnection = kind === "connection", path = `${kind}s/${kite.id}`;
         const host = node("kite-detail");
         const actionHost = element("div");
         const changed = async (revision, id) => {
             if (revision !== state.revision) return;
             node("kite-status").textContent = "Contribution saved.";
-            await Promise.all([refresh(), active === kite.id ? openKite(kite.id, id) : null]);
+            await Promise.all([refresh(), active === kite.id && activeType === kind ? openDetail(kind, kite.id, id) : null]);
         };
         const goToCloud = (id) => {
             const cloud = state.clouds.find((item) => item.id === id);
@@ -278,7 +428,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         const meta = (item) => element("small", `${item.contributor} · ${formatDate(item.createdAt)}${item.createdAt !== item.updatedAt ? ` · Edited ${formatDate(item.updatedAt)}` : ""}`);
         const report = (kind, item) => {
             const fields = editor(actionHost, `Report ${labels[kind].toLowerCase()}`, "Send private report", async (revision) => {
-                await send(`kites/${kite.id}/reports`, { kind, targetId: item.id, reason: reason.value, details: details.value });
+                await send(`${path}/reports`, { kind, targetId: item.id, reason: reason.value, details: details.value });
                 if (revision !== state.revision || active !== kite.id) return;
                 actionHost.replaceChildren();
                 node("kite-status").textContent = "Private report sent. The content stays visible unless a teacher hides it.";
@@ -293,16 +443,18 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             const fields = editor(actionHost, item ? `Edit ${labels[kind].toLowerCase()}` : reply ? `Reply to ${reply.contributor}` : kind === "evidence" ? "Add evidence" : "Write a comment",
                 item ? "Save edit" : "Publish", async (revision) => {
                     const payload = read();
-                    const path = item ? `kites/${kite.id}/contributions/${kind}/${item.id}` : `kites/${kite.id}/${kind === "comment" ? "comments" : "evidence"}`;
-                    const saved = await send(path, payload, item ? "PUT" : "POST");
+                    const targetPath = item ? `${path}/contributions/${kind}/${item.id}` : `${path}/${kind === "comment" ? "comments" : "evidence"}`;
+                    const saved = await send(targetPath, payload, item ? "PUT" : "POST");
                     await changed(revision, saved.id);
                 });
             let read;
             if (kind === "evidence") read = evidenceFields(fields, item || {}, item?.initial);
             else {
-                const input = field(fields, kind === "kite" ? (kite.cloudB ? "Connection argument" : "Kite idea") : "Comment (citations optional)",
-                    kind === "kite" ? 4000 : 3000, item?.argument || item?.body, { multiline: true });
-                read = () => kind === "kite" ? { argument: input.value } : { body: input.value, replyTo: reply?.id };
+                const input = field(fields, kind === "connection" ? "Connection explanation" :
+                    kind === "kite" ? (kite.cloudB ? "Connection argument" : "Kite idea") : "Comment (citations optional)",
+                kind === "comment" ? 3000 : 4000, item?.explanation || item?.argument || item?.body, { multiline: true });
+                read = () => kind === "connection" ? { explanation: input.value } : kind === "kite" ?
+                    { argument: input.value } : { body: input.value, replyTo: reply?.id };
             }
             resizeTextareas(fields);
             fields.querySelector("input,textarea")?.focus();
@@ -324,11 +476,18 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             row.tabIndex = -1;
             return row;
         };
-        host.replaceChildren(element("h2", linkTitle(kite)), meta(kite), element("p", kite.argument),
-            button("Back to canvas", () => { closeKite(); node("viewport").focus(); }),
-            button(`Open cloud: ${kite.titleA}`, () => goToCloud(kite.cloudA)));
-        if (kite.cloudB) host.append(button(`Open cloud: ${kite.titleB}`, () => goToCloud(kite.cloudB)));
-        host.append(controls("kite", kite), actionHost, element("h3", "Supporting evidence"));
+        host.replaceChildren(element("h2", isConnection ? "Connection" : linkTitle(kite)), meta(kite),
+            element("p", isConnection ? kite.explanation : kite.argument),
+            button("Back to canvas", () => { closeKite(); node("viewport").focus(); }));
+        const endpoints = isConnection ? [kite.first, kite.second] :
+            [{ type: "cloud", id: kite.cloudA, label: kite.titleA }, ...(kite.cloudB ? [{ type: "cloud", id: kite.cloudB, label: kite.titleB }] : [])];
+        for (const endpoint of endpoints) {
+            host.append(button(`Open ${endpoint.type}: ${endpoint.label}`, () => {
+                if (endpoint.type === "cloud") goToCloud(endpoint.id);
+                else { locate(mapLocations.get(endpointKey(endpoint))); void openKite(endpoint.id); }
+            }));
+        }
+        host.append(controls(kind, kite), actionHost, element("h3", "Supporting evidence"));
         if (state.canContribute) host.append(button("Add evidence", () => compose("evidence")));
         if (!evidence.length) host.append(element("p", "No evidence is currently visible for this argument."));
         for (const item of evidence) {
@@ -375,7 +534,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                 const moderate = (action) => {
                     const fields = editor(target, action === "hide" ? "Hide this contribution" : "Dismiss this report",
                         action === "hide" ? "Confirm hide" : "Confirm dismissal", async (current) => {
-                            await send(`manage/reports/${report.id}`, { action, note: note.value });
+                            await send(`manage/${report.subject === "connection" ? "connection-reports" : "reports"}/${report.id}`, { action, note: note.value });
                             if (current === state.revision) await reports();
                         });
                     if (action === "hide" && report.kind === "kite") fields.append(element("p", "Hiding the kite also hides its discussion and evidence."));
@@ -390,12 +549,14 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         }
     }
 
-    node("refresh-kites").addEventListener("click", () => { void refresh(); if (active) void openKite(active); });
+    node("refresh-kites").addEventListener("click", () => { void refresh(); if (active) void openDetail(activeType, active); });
     node("refresh-reports").addEventListener("click", () => { void reports(); });
     return {
-        drawMap, refresh, reports, openEditor, openKite, closeKite, searchKites, converted: (id) => converted.has(id),
+        drawMap, refresh, reports, openEditor, openKite, closeKite, searchKites, searchConnections, openConnection, openConnectionEditor,
+        selectedKite: () => activeType === "kite" ? active : null, converted: (id) => converted.has(id),
         reset() {
-            kites = []; converted = new Set(); closeKite();
+            kites = []; connections = []; converted = new Set(); closeKite();
+            mapLocations.clear(); connectionLocations.clear();
             for (const id of ["kite-editor", "kite-status", "kite-map-note", "contribution-list", "history-status", "report-list", "report-status"]) node(id).replaceChildren();
             node("kite-editor").hidden = true;
         }

@@ -8,7 +8,7 @@
     <title>Computing History Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=11">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=12">
 </head>
 <body>
     <div class="page-shell">
@@ -63,19 +63,20 @@
                 <section class="kw-panel kw-explore" aria-labelledby="web-explore-title">
                     <h2 id="web-explore-title">Explore the Knowledge Web</h2>
                     <div class="kw-toolbar">
-                        <label class="kw-search-field" for="web-search">Search clouds and kites
+                        <label class="kw-search-field" for="web-search">Search clouds, kites and connections
                             <input id="web-search" type="search" autocomplete="off">
                         </label>
                         <details id="web-add-menu" hidden>
                             <summary>+ Add</summary>
                             <div class="kw-add-options">
                                 <button id="web-add-kite" type="button" hidden>Add a Kite</button>
+                                <button id="web-add-connection" type="button" hidden>Connect Ideas</button>
                                 <button id="web-add-proposal" type="button" hidden>Propose a new cloud</button>
                                 <a id="web-add-cloud" href="/knowledge-web/?manage=1&amp;new=1" hidden>New draft cloud</a>
                                 <p id="web-add-help" hidden>Select a published cloud first to add a kite or propose a connected cloud.</p>
                             </div>
                         </details>
-                        <button id="web-refresh-kites" type="button" hidden>Refresh kites</button>
+                        <button id="web-refresh-kites" type="button" hidden>Refresh kites and connections</button>
                     </div>
                     <p id="web-kite-status" role="status"></p>
                     <ul id="web-results" aria-label="Search results"></ul>
@@ -97,6 +98,7 @@
                             <div id="web-kite-editor" hidden></div>
                         </div>
                         <article id="web-kite-detail" aria-label="Selected kite" tabindex="-1" hidden></article>
+                        <div id="web-connection-editor" hidden></div>
                     </section>
                 </div>
                 <section id="web-proposal" class="kw-panel kw-proposal" aria-label="Propose a new historical cloud" hidden>
@@ -200,7 +202,7 @@
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="/script.js?v=knowledge-web-2"></script>
-    <script src="/knowledge-web/contributions.js?v=6"></script>
-    <script src="/knowledge-web/web.js?v=16"></script>
+    <script src="/knowledge-web/contributions.js?v=7"></script>
+    <script src="/knowledge-web/web.js?v=17"></script>
 </body>
 </html>

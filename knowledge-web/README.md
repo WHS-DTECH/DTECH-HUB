@@ -35,7 +35,9 @@ The initial `2026 NCEA Digital Examination Disruptions` cloud is seeded as an un
 
 Use **Explore the Knowledge Web** to search clouds and kites together or open **+ Add** for the actions available to your account. Select a result or canvas item to open it in the information panel next to the canvas (below it on narrow screens). Kite evidence, discussion and actions stay in that panel. The Timeline toolbar groups date navigation separately from canvas zoom and reset.
 
-**Stage 2 (planned):** A connection is a separate, attributed record linking a kite to another published cloud or linking two published clouds directly; it always requires a relationship explanation.
+**Stage 2:** Use **+ Add → Connect Ideas** to link two different published clouds or visible kites in either order. The selected cloud or kite is prefilled when available. Write a relationship explanation; evidence is optional. Independent explanations between the same pair can coexist. Dashed strings are selectable separately from the solid kite attachments, and unified search can open any connection, including those whose endpoints are outside the canvas's kite display limit. Connections, evidence, and replies publish immediately. **My Contributions** includes connection work. Staff can hide reported strings without hiding their endpoints; hiding a kite makes its connections unavailable without deleting them.
+
+Stage 2 creates separate connection, comment, evidence, revision and moderation tables through the existing transactional PostgreSQL schema setup. It does not convert or rewrite legacy two-cloud kites.
 
 ### Stage 3 (planned): Upgrade to Cloud
 
