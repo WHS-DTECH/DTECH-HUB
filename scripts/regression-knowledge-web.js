@@ -209,12 +209,13 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
 
         const body = {
             title: "Test-only historical cloud", description: "Test description", significance: "Test significance",
-            events: [{ date: "18-11-2026", time: "09:05", description: "Test event" }, { date: "2026-10", description: "Earlier event" }],
+            events: [{ date: "18-11-2026", time: "09:05", description: "Test event" }, { date: "2026-10", description: "Earlier event" },
+                { date: "2018", description: "Only the year is known." }],
             position: { x: 70, y: 120 }, publish: false,
             sources: [{ title: "Test source", author: "Test organisation", publicationDate: "11-2026",
                 reference: "https://example.test/article", supports: "Supports the test event." }]
         };
-        for (const invalidDate of ["31-02-2026", "13-2026", "00-11-2026"]) {
+        for (const invalidDate of ["31-02-2026", "13-2026", "00-11-2026", "0000"]) {
             const invalid = await call("manage/clouds", {
                 method: "POST", body: { ...body, events: [{ date: invalidDate, description: "Invalid" }] }
             });
@@ -222,7 +223,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
             assert.match((await invalid.json()).error, /MM-YYYY or DD-MM-YYYY/);
         }
         for (const [date, time] of [["18-11-2026", "24:00"], ["18-11-2026", "09:60"],
-            ["18-11-2026", "9:05"], ["11-2026", "09:05"]]) {
+            ["18-11-2026", "9:05"], ["11-2026", "09:05"], ["2018", "09:05"]]) {
             const invalid = await call("manage/clouds", {
                 method: "POST", body: { ...body, events: [{ date, time, description: "Invalid" }] }
             });
@@ -234,7 +235,7 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         const find = (clouds) => clouds.find((cloud) => cloud.id === id);
         const cloudDraft = find(await list("manage/clouds"));
         assert.equal(cloudDraft.publishedAt, null);
-        assert.deepEqual(cloudDraft.events.map((event) => event.date), ["2026-11-18", "2026-10"]);
+        assert.deepEqual(cloudDraft.events.map((event) => event.date), ["2026-11-18", "2026-10", "2018"]);
         assert.equal(cloudDraft.events[0].time, "09:05");
         assert.equal(cloudDraft.events[1].time, undefined, "Legacy month-only events have no invented time");
         assert.equal(cloudDraft.sources[0].publicationDate, "2026-11");

@@ -19,9 +19,10 @@ function text(value, field, limit, required = true) {
     return value.trim();
 }
 
-function date(value, field) {
+function date(value, field, allowYear = false) {
     let when = text(value ?? "", field, 10, false);
     if (!when) return "";
+    if (allowYear && /^(?!0000)\d{4}$/.test(when)) return when;
     const localDay = when.match(/^(\d{2})-(\d{2})-(\d{4})$/);
     const localMonth = when.match(/^(\d{2})-(\d{4})$/);
     if (localDay) when = `${localDay[3]}-${localDay[2]}-${localDay[1]}`;
@@ -29,13 +30,13 @@ function date(value, field) {
     const day = when.length === 7 ? `${when}-01` : when;
     const parsed = new Date(day);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== day) {
-        throw problem(400, `${field} must be a real date in MM-YYYY or DD-MM-YYYY format.`);
+        throw problem(400, `${field} must be a real date in ${allowYear ? "YYYY, " : ""}MM-YYYY or DD-MM-YYYY format.`);
     }
     return when;
 }
 
 function readEvent(event, allowIncomplete = false) {
-    const when = date(event?.date, "Event date");
+    const when = date(event?.date, "Event date", true);
     if (!when && !allowIncomplete) throw problem(400, "Each event needs a date.");
     const time = text(event?.time ?? "", "Event time", 5, false);
     if (time && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {

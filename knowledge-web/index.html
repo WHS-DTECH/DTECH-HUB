@@ -122,7 +122,7 @@
                         <label>Historical significance<textarea name="significance" rows="3" required maxlength="2000"></textarea></label>
                         <fieldset>
                             <legend>Dated events (optional)</legend>
-                            <p>Use MM-YYYY or DD-MM-YYYY. A time is optional and needs a full date when submitting.</p>
+                            <p>Use YYYY, MM-YYYY or DD-MM-YYYY. A time is optional and needs a full date when submitting.</p>
                             <div id="web-proposal-events"></div>
                             <button id="web-add-proposal-event" type="button">Add dated event</button>
                         </fieldset>
@@ -161,7 +161,7 @@
             </section>
             <section id="web-manage" aria-label="Manage Knowledge Web" hidden>
                 <p>Drafts are private to teachers. Check the historical details and sources before publishing a cloud to students.</p>
-                <p id="web-save-status" role="status" aria-live="polite"></p>
+                <p id="web-save-status" role="status" aria-live="polite" tabindex="-1"></p>
                 <div class="kw-columns">
                     <div class="kw-panel">
                         <button id="web-new" type="button">New draft cloud</button>
@@ -175,7 +175,7 @@
                         <label>Historical significance<textarea name="significance" rows="3" required maxlength="2000"></textarea></label>
                         <fieldset>
                             <legend>Timeline details</legend>
-                            <p>Add verified historical events using MM-YYYY or DD-MM-YYYY. A time is optional and needs a full date.</p>
+                            <p>Add verified historical events using YYYY, MM-YYYY or DD-MM-YYYY. A time is optional and needs a full date.</p>
                             <p>Sources with publication dates also appear automatically on the timeline, labelled separately from historical events. Add or edit those dates in Sources below.</p>
                             <div id="web-events"></div>
                             <button id="web-add-event" type="button">Add dated event</button>
@@ -216,6 +216,6 @@
     <script src="/script.js?v=knowledge-web-2"></script>
     <script src="/knowledge-web/contributions.js?v=12"></script>
     <script src="/knowledge-web/layout.js?v=4"></script>
-    <script src="/knowledge-web/web.js?v=21"></script>
+    <script src="/knowledge-web/web.js?v=22"></script>
 </body>
 </html>

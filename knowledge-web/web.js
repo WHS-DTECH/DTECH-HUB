@@ -132,7 +132,7 @@
             return option;
         }));
         year.value = state.timelineYear;
-        const events = entries.filter((entry) => entry.date.startsWith(`${state.timelineYear}-`));
+        const events = entries.filter((entry) => entry.date.slice(0, 4) === state.timelineYear);
         const days = [...new Set(events.filter((entry) => entry.date.length === 10).map((entry) => entry.date))].sort();
         if (!days.includes(state.timelineDay)) state.timelineDay = days[0] || "";
         day.replaceChildren(...days.map((value) => {
@@ -146,7 +146,7 @@
 
         if (dayView) {
             if (!days.length) {
-                message.textContent = "No exact days are recorded for this year. Month-only entries are available in Year view.";
+                message.textContent = "No exact days are recorded for this year. Year-only and month-only entries are available in Year view.";
                 scroll.hidden = true;
                 return;
             }
@@ -161,17 +161,18 @@
             return;
         }
 
-        message.textContent = "Source publication dates may differ from event dates. Month-only entries have no recorded day. Times, where provided, are shown as recorded.";
+        message.textContent = "Source publication dates may differ from event dates. Dates and times are shown only as precisely as recorded.";
         const months = [...new Set(events.map((event) => event.date.slice(0, 7)))].sort();
         for (const month of months) {
             const item = element("li");
             item.append(element("strong", formatHistoricalDate(month)));
             const monthEvents = element("ul");
-            const sorted = events.filter((event) => event.date.startsWith(month))
+            const sorted = events.filter((event) => event.date.slice(0, 7) === month)
                 .sort((a, b) => a.date.localeCompare(b.date) || (a.time || "99:99").localeCompare(b.time || "99:99"));
             for (const event of sorted) {
                 const entry = element("li");
-                const label = event.date.length === 7 ? "Day not recorded" : formatHistoricalDate(event.date);
+                const label = event.date.length === 4 ? "Month and day not recorded"
+                    : event.date.length === 7 ? "Day not recorded" : formatHistoricalDate(event.date);
                 appendTimelineEntry(entry, event, `${label}${event.time ? ` · ${event.time}` : ""}`);
                 monthEvents.append(entry);
             }
@@ -362,7 +363,7 @@
     }
 
     const eventFields = [
-        ["date", "Date (MM-YYYY or DD-MM-YYYY)", 10], ["time", "Time (optional; as recorded)", 5],
+        ["date", "Date (YYYY, MM-YYYY or DD-MM-YYYY)", 10], ["time", "Time (optional; as recorded)", 5],
         ["description", "What happened", 500]
     ];
     const sourceFields = [
@@ -434,7 +435,8 @@
             input.maxLength = limit;
             input.required = key !== "publicationDate" && key !== "time";
             input.value = key === "date" || key === "publicationDate" ? formatHistoricalDate(values[key]) : values[key] || "";
-            if (key === "date" || key === "publicationDate") input.placeholder = "MM-YYYY or DD-MM-YYYY";
+            if (key === "date") input.placeholder = "YYYY, MM-YYYY or DD-MM-YYYY";
+            if (key === "publicationDate") input.placeholder = "MM-YYYY or DD-MM-YYYY";
             label.append(input);
             row.append(label);
             if (!event && !hostId && key === "reference") {
@@ -796,6 +798,7 @@
         } catch (error) {
             if (revision !== state.revision) return;
             node("save-status").textContent = saved ? "Saved, but the updated cloud list could not be loaded. Reload before editing again." : error.message;
+            node("save-status").focus();
             if (saved) form.hidden = true;
         } finally {
             if (revision === state.revision) {
@@ -862,7 +865,7 @@
                 renderManagement();
                 renderReviews();
                 void contributions.reports();
-                if (query.get("new") === "1") editCloud(null);
+                if (query.get("new") === "1") editCloud(null, false);
                 else if (state.clouds.length) editCloud(state.clouds.find((cloud) => !cloud.publishedAt) || state.clouds[0], false);
                 if (location.hash === "#web-moderation") node("moderation").scrollIntoView();
             } else {
