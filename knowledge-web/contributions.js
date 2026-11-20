@@ -1,6 +1,6 @@
 function createKnowledgeContributions({ node, request, element, button, state, showCloud, resizeTextareas, formatDate,
-    historyPage, exploreUrl, onProposalsChanged }) {
-    let kites = [], converted = new Set(), active = null, detailSequence = 0, refreshSequence = 0, reportSequence = 0, displayLimit = 12;
+    historyPage, exploreUrl, onProposalsChanged, onKitesChanged }) {
+    let kites = [], converted = new Set(), active = null, detailSequence = 0, refreshSequence = 0, reportSequence = 0;
     const empty = () => element("p", "Nothing to show yet.");
     const linkTitle = (kite) => kite.titleB ? `${kite.titleA} ↔ ${kite.titleB}` : kite.titleA;
     const send = (path, body, method = "POST") => request(path, { method, body: JSON.stringify(body) });
@@ -200,19 +200,9 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         board.prepend(layer);
     }
 
-    function renderList() {
-        const query = node("kite-search").value.trim().toLowerCase();
-        const matches = kites.filter((kite) => `${linkTitle(kite)} ${kite.contributor} ${kite.argument}`.toLowerCase().includes(query));
-        node("kite-list").replaceChildren(...matches.slice(0, displayLimit).map((kite) => {
-            const item = element("li");
-            item.append(button(`${linkTitle(kite)} — ${kite.contributor}: ${snippet(kite.argument)}`, () => { void openKite(kite.id); }));
-            return item;
-        }));
-        if (!matches.length) {
-            const item = element("li", "No matching kites.");
-            node("kite-list").append(item);
-        }
-        node("kite-more").hidden = matches.length <= displayLimit;
+    function searchKites(query) {
+        return kites.filter((kite) => `${linkTitle(kite)} ${kite.contributor} ${kite.argument}`.toLowerCase().includes(query))
+            .map((kite) => button(`Kite: ${linkTitle(kite)} — ${kite.contributor}: ${snippet(kite.argument)}`, () => { void openKite(kite.id); }));
     }
 
     async function refresh() {
@@ -237,7 +227,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             } else {
                 kites = result.kites;
                 drawMap();
-                renderList();
+                onKitesChanged();
             }
         } catch (error) {
             if (revision === state.revision && seq === refreshSequence) node(historyPage ? "history-status" : "kite-status").textContent = error.message;
@@ -268,7 +258,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             (focusId && document.getElementById(`kw-contribution-${focusId}`) || host).focus();
         } catch (error) {
             if (revision !== state.revision || seq !== detailSequence) return;
-            host.replaceChildren(element("p", error.message), button("Back to kites", () => { closeKite(); node("kite-search").focus(); }));
+            host.replaceChildren(element("p", error.message), button("Back to search", () => { closeKite(); node("search").focus(); }));
             host.focus();
         }
     }
@@ -400,17 +390,14 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         }
     }
 
-    node("kite-search").addEventListener("input", () => { displayLimit = 12; renderList(); });
-    node("kite-more").addEventListener("click", () => { displayLimit += 12; renderList(); });
     node("refresh-kites").addEventListener("click", () => { void refresh(); if (active) void openKite(active); });
     node("refresh-reports").addEventListener("click", () => { void reports(); });
     return {
-        drawMap, refresh, reports, openEditor, openKite, closeKite, converted: (id) => converted.has(id),
+        drawMap, refresh, reports, openEditor, openKite, closeKite, searchKites, converted: (id) => converted.has(id),
         reset() {
-            kites = []; converted = new Set(); displayLimit = 12; closeKite();
-            for (const id of ["kite-list", "kite-editor", "kite-status", "kite-map-note", "contribution-list", "history-status", "report-list", "report-status"]) node(id).replaceChildren();
+            kites = []; converted = new Set(); closeKite();
+            for (const id of ["kite-editor", "kite-status", "kite-map-note", "contribution-list", "history-status", "report-list", "report-status"]) node(id).replaceChildren();
             node("kite-editor").hidden = true;
-            node("kite-search").value = "";
         }
     };
 }

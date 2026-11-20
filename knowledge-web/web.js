@@ -15,14 +15,16 @@
     const proposalForm = node("proposal-form");
     const state = {
         clouds: [], positions: new Map(), selected: null, editing: null, editingProposal: null, proposalParentId: null,
-        proposals: [], canPropose: false, canContribute: false, zoom: 1, token: null, revision: 0,
+        proposals: [], canPropose: false, canContribute: false, canManage: false, zoom: 1, token: null, revision: 0,
         dirty: false, proposalDirty: false, saving: false, duplicatesAcknowledgedTitle: "",
         timelineView: "year", timelineYear: "", timelineDay: ""
     };
+    const searchPageSize = 6;
+    let searchLimit = searchPageSize;
     const formatDate = (value) => value ? new Date(value).toLocaleDateString("en-NZ", { timeZone: "Pacific/Auckland" }) : "";
     const contributions = createKnowledgeContributions({
         node, request, element, button, state, showCloud, resizeTextareas, formatDate, historyPage, exploreUrl,
-        onProposalsChanged: renderStudentProposals
+        onProposalsChanged: renderStudentProposals, onKitesChanged: renderSearch
     });
     const formatHistoricalDate = (value) => {
         const match = String(value || "").match(/^(\d{4})-(\d{2})(?:-(\d{2}))?$/);
@@ -98,17 +100,23 @@
 
     function renderTimeline() {
         const cloud = state.clouds.find((entry) => entry.id === state.selected);
-        const controls = node("timeline-controls");
         const caption = node("timeline-caption");
         const message = node("timeline-message");
         const list = node("timeline-events");
         const scroll = node("timeline-scroll");
         list.replaceChildren();
         const entries = cloud ? timelineEntries(cloud) : [];
-        controls.hidden = !entries.length;
+        const year = node("timeline-year");
+        const day = node("timeline-day");
+        const dayView = state.timelineView === "day";
+        node("timeline-year-view").disabled = node("timeline-day-view").disabled = year.disabled = !entries.length;
+        node("timeline-year-view").setAttribute("aria-pressed", String(!dayView));
+        node("timeline-day-view").setAttribute("aria-pressed", String(dayView));
+        node("timeline-day-label").hidden = true;
         scroll.hidden = !entries.length;
         message.textContent = "";
         caption.textContent = cloud ? `Timeline for ${cloud.title}` : "Select a cloud to see its timeline.";
+        if (!entries.length) year.replaceChildren();
         if (!cloud) return;
         if (!entries.length) {
             message.textContent = "This cloud has no dated events or dated sources yet.";
@@ -117,7 +125,6 @@
 
         const years = [...new Set(entries.map((entry) => entry.date.slice(0, 4)))].sort();
         if (!years.includes(state.timelineYear)) state.timelineYear = years[0];
-        const year = node("timeline-year");
         year.replaceChildren(...years.map((value) => {
             const option = element("option", value);
             option.value = value;
@@ -127,17 +134,13 @@
         const events = entries.filter((entry) => entry.date.startsWith(`${state.timelineYear}-`));
         const days = [...new Set(events.filter((entry) => entry.date.length === 10).map((entry) => entry.date))].sort();
         if (!days.includes(state.timelineDay)) state.timelineDay = days[0] || "";
-        const day = node("timeline-day");
         day.replaceChildren(...days.map((value) => {
             const option = element("option", formatHistoricalDate(value));
             option.value = value;
             return option;
         }));
         day.value = state.timelineDay;
-        const dayView = state.timelineView === "day";
         node("timeline-day-label").hidden = !dayView || !days.length;
-        node("timeline-year-view").setAttribute("aria-pressed", String(!dayView));
-        node("timeline-day-view").setAttribute("aria-pressed", String(dayView));
         list.classList.toggle("kw-timeline-day", dayView);
 
         if (dayView) {
@@ -184,6 +187,7 @@
             state.timelineDay = "";
         }
         state.selected = cloud.id;
+        updateAddMenu();
         renderTimeline();
         const detail = node("detail");
         detail.replaceChildren(
@@ -223,15 +227,32 @@
         const query = node("search").value.trim().toLowerCase();
         const list = node("results");
         list.replaceChildren();
-        for (const cloud of state.clouds.filter((entry) => entry.title.toLowerCase().includes(query))) {
-            const li = element("li");
-            const link = button(cloud.title, () => showCloud(cloud, true));
+        const matches = state.clouds.filter((cloud) =>
+            `${cloud.title} ${cloud.description} ${cloud.significance}`.toLowerCase().includes(query)).map((cloud) => {
+            const link = button(`Cloud: ${cloud.title}`, () => { showCloud(cloud, true); node("detail").focus(); });
             link.dataset.cloudId = cloud.id;
-            li.append(link);
-            list.append(li);
+            return link;
+        }).concat(contributions.searchKites(query));
+        for (const match of matches.slice(0, searchLimit)) {
+            const row = element("li");
+            row.append(match);
+            list.append(row);
         }
-        if (!list.children.length) list.append(element("li", "No cloud titles match."));
+        if (!matches.length) list.append(element("li", "No matching clouds or kites."));
+        node("more-results").hidden = matches.length <= searchLimit;
         updatePressed();
+    }
+
+    function updateAddMenu() {
+        node("add-menu").hidden = !state.canContribute && !state.canPropose && !state.canManage;
+        node("add-kite").hidden = !state.canContribute;
+        node("add-proposal").hidden = !state.canPropose;
+        node("add-cloud").hidden = !state.canManage;
+        node("add-kite").disabled = node("add-proposal").disabled = !state.selected;
+        const cloud = state.clouds.find(({ id }) => id === state.selected);
+        node("add-help").hidden = !state.canContribute && !state.canPropose;
+        node("add-help").textContent = cloud ? `Current cloud: ${cloud.title}`
+            : "Select a published cloud first to add a kite or propose a connected cloud.";
     }
 
     function zoom(value) {
@@ -269,7 +290,13 @@
     function renderExplore() {
         node("empty").hidden = state.clouds.length !== 0;
         node("clouds").hidden = state.clouds.length === 0;
+        node("refresh-kites").hidden = !state.clouds.length;
+        node("zoom-out").disabled = !state.clouds.length || state.zoom === .5;
+        node("zoom-in").disabled = !state.clouds.length || state.zoom === 1.75;
+        node("reset").disabled = !state.clouds.length;
+        updateAddMenu();
         renderTimeline();
+        renderSearch();
         if (!state.clouds.length) return;
         const board = node("board");
         state.positions = layoutClouds(state.clouds);
@@ -288,7 +315,7 @@
             item.append(element("span", cloud.title));
             board.append(item);
         }
-        renderSearch();
+        updatePressed();
         contributions.drawMap();
         node("detail").replaceChildren(element("h2", "Explore the Knowledge Web"),
             element("p", "Select a cloud or kite on the canvas or in a list to read more."));
@@ -754,6 +781,10 @@
         state.proposalParentId = null;
         state.canPropose = false;
         state.canContribute = false;
+        state.canManage = false;
+        searchLimit = searchPageSize;
+        node("search").value = "";
+        node("add-menu").open = false;
         state.saving = state.dirty = form.inert = false;
         form.reset();
         form.hidden = true;
@@ -786,12 +817,14 @@
                 renderManagement();
                 renderReviews();
                 void contributions.reports();
-                if (state.clouds.length) editCloud(state.clouds.find((cloud) => !cloud.publishedAt) || state.clouds[0], false);
+                if (query.get("new") === "1") editCloud(null);
+                else if (state.clouds.length) editCloud(state.clouds.find((cloud) => !cloud.publishedAt) || state.clouds[0], false);
                 if (location.hash === "#web-moderation") node("moderation").scrollIntoView();
             } else {
                 node("manage-link").hidden = !result.canManage;
                 state.canPropose = result.canPropose;
                 state.canContribute = result.canContribute;
+                state.canManage = result.canManage;
                 if (historyPage) {
                     node("explore-link").hidden = false;
                     node("my-proposals").hidden = !state.canContribute;
@@ -828,7 +861,29 @@
     node("new").addEventListener("click", () => editCloud(null));
     node("add-source").addEventListener("click", () => addRow("source", {}, true));
     node("add-event").addEventListener("click", () => addRow("event", {}, true));
-    node("search").addEventListener("input", renderSearch);
+    node("search").addEventListener("input", () => { searchLimit = searchPageSize; renderSearch(); });
+    node("more-results").addEventListener("click", () => {
+        const firstNew = searchLimit;
+        searchLimit += searchPageSize;
+        renderSearch();
+        node("results").children[firstNew]?.querySelector("button")?.focus();
+    });
+    node("add-kite").addEventListener("click", () => {
+        const cloud = state.clouds.find(({ id }) => id === state.selected);
+        if (state.canContribute && cloud) {
+            node("add-menu").open = false;
+            showCloud(cloud, false);
+            contributions.openEditor(cloud);
+        }
+    });
+    node("add-proposal").addEventListener("click", () => {
+        const cloud = state.clouds.find(({ id }) => id === state.selected);
+        if (state.canPropose && cloud) {
+            node("add-menu").open = false;
+            showCloud(cloud, false);
+            beginProposal(cloud);
+        }
+    });
     node("timeline-year-view").addEventListener("click", () => { state.timelineView = "year"; renderTimeline(); });
     node("timeline-day-view").addEventListener("click", () => { state.timelineView = "day"; renderTimeline(); });
     node("timeline-year").addEventListener("change", (event) => {
