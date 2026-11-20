@@ -8,7 +8,14 @@ CREATE TABLE IF NOT EXISTS knowledge_web_layout_positions (
     x INTEGER NOT NULL CHECK (x BETWEEN 0 AND 6000),
     y INTEGER NOT NULL CHECK (y BETWEEN 0 AND 6000),
     PRIMARY KEY (owner,item_type,item_id)
-);`;
+);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='knowledge_web_layout_positions'::regclass
+        AND conname='knowledge_web_layout_item_types') THEN
+        ALTER TABLE knowledge_web_layout_positions DROP CONSTRAINT IF EXISTS knowledge_web_layout_positions_item_type_check,
+            ADD CONSTRAINT knowledge_web_layout_item_types CHECK (item_type IN ('cloud','kite','balloon'));
+    END IF;
+END $$;`;
 
 function registerLayout(app, { base, pool, route, ensureSchema, UUID, problem }) {
     async function readLayout(email) {
@@ -27,7 +34,7 @@ function registerLayout(app, { base, pool, route, ensureSchema, UUID, problem })
         return route({ staffOnly: defaultLayout }, async (req, res, { email }) => {
             const { type, id } = req.params;
             const { x, y } = req.body || {};
-            if (!["cloud", "kite"].includes(type) || !UUID.test(id)) throw problem(400, "Choose a cloud or kite.");
+            if (!["cloud", "kite", "balloon"].includes(type) || !UUID.test(id)) throw problem(400, "Choose a cloud, kite or balloon.");
             if (![x, y].every((value) => Number.isInteger(value) && value >= 0 && value <= 6000)) {
                 throw problem(400, "Choose a position within the canvas.");
             }

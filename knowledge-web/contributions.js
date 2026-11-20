@@ -1,10 +1,10 @@
 function createKnowledgeContributions({ node, request, element, button, state, showCloud, resizeTextareas, formatDate,
     historyPage, exploreUrl, onProposalsChanged, onKitesChanged, layoutPosition, searchResult }) {
-    let kites = [], connections = [], converted = new Set(), active = null, activeType = null, detailSequence = 0, refreshSequence = 0, reportSequence = 0;
+    let kites = [], balloons = [], connections = [], converted = new Set(), active = null, activeType = null, detailSequence = 0, refreshSequence = 0, reportSequence = 0;
     const empty = () => element("p", "Nothing to show yet.");
     const linkTitle = (kite) => kite.titleB ? `${kite.titleA} ↔ ${kite.titleB}` : kite.titleA;
     const send = (path, body, method = "POST") => request(path, { method, body: JSON.stringify(body) });
-    const labels = { kite: "Kite", connection: "Connection", cloud: "Cloud", comment: "Comment", evidence: "Evidence" };
+    const labels = { kite: "Kite", balloon: "Balloon", connection: "Connection", cloud: "Cloud", comment: "Comment", evidence: "Evidence" };
     const endpointKey = ({ type, id }) => `${type}:${id}`;
     const connectionTitle = ({ first, second }) => `${first.label} ↔ ${second.label}`;
     const reasons = { harassment: "Harassment", "personal-information": "Personal information disclosure", spam: "Spam",
@@ -132,15 +132,99 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         argument.focus();
     }
 
+    function itemChoices() {
+        return [
+            ...state.clouds.map(({ id, title }) => ({ type: "cloud", id, label: title })),
+            ...kites.map((kite) => ({ type: "kite", id: kite.id, label: `${linkTitle(kite)}: ${snippet(kite.argument)}` }))
+        ];
+    }
+
+    function itemPicker(fields, label, choices, preset, placeholder) {
+        const filter = labeled(fields, `Search ${label.toLowerCase()}`, element("input"));
+        filter.type = "search";
+        const choice = labeled(fields, label, element("select"));
+        choice.required = true;
+        function update(current) {
+            const query = filter.value.trim().toLowerCase();
+            choice.replaceChildren(new Option(placeholder, ""));
+            for (const item of choices) {
+                const key = endpointKey(item), name = `${labels[item.type]}: ${item.label}`;
+                if (key === current || name.toLowerCase().includes(query)) choice.append(new Option(name, key));
+            }
+            choice.value = current;
+        }
+        update(preset ? endpointKey(preset) : "");
+        filter.addEventListener("input", () => update(choice.value));
+        return choice;
+    }
+
+    function balloonFields(fields, current = {}) {
+        const idea = field(fields, "Idea", 4000, current.idea, { multiline: true });
+        const principle = field(fields, "Theoretical principle", 4000, current.principle, { multiline: true });
+        const explanation = field(fields, "How does the principle relate to the idea?", 4000, current.explanation, { multiline: true });
+        return () => ({ idea: idea.value, principle: principle.value, explanation: explanation.value });
+    }
+
+    function optionalEvidence(fields) {
+        const host = element("div");
+        let source;
+        const add = button("Add optional evidence", () => {
+            source = evidenceFields(host, {}, true);
+            host.append(button("Remove optional evidence", () => {
+                host.replaceChildren();
+                source = undefined;
+                add.hidden = false;
+                add.focus();
+            }));
+            add.hidden = true;
+            host.querySelector("input")?.focus();
+        });
+        fields.append(add, host);
+        return () => source ? [source()] : [];
+    }
+
+    function openBalloonEditor(selected) {
+        if (!state.canContribute) return;
+        const choices = itemChoices(), host = node("connection-editor");
+        closeKite();
+        node("cloud-detail").hidden = true;
+        host.hidden = false;
+        function close() {
+            host.replaceChildren();
+            host.hidden = true;
+            node("cloud-detail").hidden = false;
+            node("add-menu").querySelector("summary").focus();
+        }
+        const fields = editor(host, "Add Hot-Air Balloon", "Publish Balloon", async (revision) => {
+            const origin = choices.find((item) => endpointKey(item) === originChoice.value);
+            if (!origin) throw new Error("Choose an originating cloud or kite.");
+            const result = await send("balloons", { origin, ...read(), evidence: sources() });
+            if (revision !== state.revision) return;
+            close();
+            node("kite-status").textContent = "Balloon published.";
+            await refresh();
+            if (revision === state.revision && !active && host.hidden && !node("cloud-detail").hidden) {
+                locate(mapLocations.get(`balloon:${result.id}`));
+                await openBalloon(result.id);
+            }
+        }, close);
+        const originChoice = itemPicker(fields, "Originating item", choices, selected, "Choose a cloud or kite");
+        const read = balloonFields(fields);
+        const sources = optionalEvidence(fields);
+        resizeTextareas(fields);
+        if (originChoice.value) fields.querySelector("textarea").focus();
+        else originChoice.focus();
+    }
+
     function openConnectionEditor(selected) {
         if (!state.canContribute) return;
         const host = node("connection-editor");
         const choices = [
-            ...state.clouds.map(({ id, title }) => ({ type: "cloud", id, label: title })),
-            ...kites.map((kite) => ({ type: "kite", id: kite.id, label: `${linkTitle(kite)}: ${snippet(kite.argument)}` }))
+            ...itemChoices(),
+            ...balloons.map(({ id, idea }) => ({ type: "balloon", id, label: snippet(idea) }))
         ];
         if (choices.length < 2) {
-            node("kite-status").textContent = "Two published clouds or visible kites are needed. Try refreshing if an item was just added.";
+            node("kite-status").textContent = "Two visible items are needed. Try refreshing if an item was just added.";
             return;
         }
         closeKite();
@@ -165,26 +249,8 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             host.hidden = true;
             node("cloud-detail").hidden = false;
         }
-        function picker(label, preset) {
-            const filter = labeled(fields, `Search ${label.toLowerCase()}`, element("input"));
-            filter.type = "search";
-            const choice = labeled(fields, label, element("select"));
-            choice.required = true;
-            function update(current) {
-                const query = filter.value.trim().toLowerCase();
-                choice.replaceChildren(new Option("Choose a cloud or kite", ""));
-                for (const item of choices) {
-                    const key = endpointKey(item), name = `${labels[item.type]}: ${item.label}`;
-                    if (key === current || name.toLowerCase().includes(query)) choice.append(new Option(name, key));
-                }
-                choice.value = [...choice.options].some((option) => option.value === current) ? current : "";
-            }
-            update(preset ? endpointKey(preset) : "");
-            filter.addEventListener("input", () => update(choice.value));
-            return choice;
-        }
-        const firstSelect = picker("First item", selected);
-        const secondSelect = picker("Second item");
+        const firstSelect = itemPicker(fields, "First item", choices, selected, "Choose a cloud, kite or balloon");
+        const secondSelect = itemPicker(fields, "Second item", choices, null, "Choose a cloud, kite or balloon");
         const explanation = field(fields, "How are these items related?", 4000, "", { multiline: true });
         const sourceHost = element("div");
         let source = null;
@@ -214,7 +280,9 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         mapLocations = new Map();
         connectionLocations = new Map();
         const count = node("kite-map-note");
-        const shown = kites.filter((kite) => state.positions.has(kite.cloudA) && (!kite.cloudB || state.positions.has(kite.cloudB))).slice(0, 24);
+        const origins = new Set(balloons.filter(({ origin }) => origin.type === "kite").map(({ origin }) => origin.id));
+        const shown = kites.filter((kite) => state.positions.has(kite.cloudA) && (!kite.cloudB || state.positions.has(kite.cloudB)))
+            .filter((kite, index) => index < 24 || origins.has(kite.id));
         count.textContent = kites.length > shown.length ? `Showing ${shown.length} of ${kites.length} kites on the map. All kites and connections are searchable.`
             : `${shown.length} kite${shown.length === 1 ? "" : "s"} on the map.`;
         const layer = element("div");
@@ -228,6 +296,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
         const boardWidth = Math.max(390, ...originalClouds.map(({ x }) => x + width + 22));
         const boardHeight = Math.max(260, ...originalClouds.map(({ y }) => y + height + 68));
         const placed = [];
+        const baseKites = new Map();
         let extentX = boardWidth, extentY = boardHeight;
         const grow = (x, y) => { extentX = Math.max(extentX, x); extentY = Math.max(extentY, y); };
         for (const { x, y } of state.positions.values()) grow(x + width + 100, y + height + 100);
@@ -261,7 +330,11 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                         }
                     }
                 }
-                if (position) placed.push(position);
+                if (!position && origins.has(kite.id)) position = { x: boardWidth + 32, y: 30 + baseKites.size * 48 };
+                if (position) {
+                    placed.push(position);
+                    baseKites.set(kite.id, position);
+                }
                 position = layoutPosition("kite", kite.id) || position;
                 if (!position) {
                     count.textContent = "Some kites do not fit on this map. All kites and connections are searchable.";
@@ -287,9 +360,41 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                 item.title = `${kite.contributor}: ${snippet(kite.argument)}`;
                 layer.append(item);
             }
-            board.style.width = `${extentX}px`;
-            board.style.height = `${extentY}px`;
         }
+        const originCounts = new Map();
+        for (const balloon of balloons) {
+            const key = endpointKey(balloon.origin), anchor = mapLocations.get(key);
+            if (!anchor) continue;
+            const base = balloon.origin.type === "kite" ? baseKites.get(balloon.origin.id) :
+                state.basePositions.get(balloon.origin.id);
+            const index = originCounts.get(key) || 0;
+            originCounts.set(key, index + 1);
+            const point = layoutPosition("balloon", balloon.id) || {
+                x: Math.max(34, base.x + (balloon.origin.type === "cloud" ? width : 60) + index % 4 * 72),
+                y: Math.max(38, base.y + Math.floor(index / 4) * 86)
+            };
+            const { x, y } = point;
+            grow(x + 100, y + 100);
+            mapLocations.set(`balloon:${balloon.id}`, point);
+            const string = document.createElementNS(svg.namespaceURI, "polyline");
+            string.dataset.balloon = balloon.id;
+            string.dataset.origin = key;
+            string.setAttribute("points", `${anchor.x},${anchor.y} ${x},${y + 28}`);
+            svg.append(string);
+            const item = button("", () => { void openBalloon(balloon.id); });
+            item.className = "kw-balloon";
+            item.dataset.layoutType = "balloon";
+            item.dataset.layoutId = balloon.id;
+            item.setAttribute("aria-label", `Balloon: ${snippet(balloon.idea)}. Principle: ${snippet(balloon.principle)}`);
+            item.setAttribute("aria-keyshortcuts", "Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight");
+            item.title = `${snippet(balloon.idea)} · Principle: ${snippet(balloon.principle)}`;
+            item.style.left = `${x}px`;
+            item.style.top = `${y}px`;
+            layer.append(item);
+        }
+        if (balloons.length) count.textContent += ` ${balloons.length} balloon${balloons.length === 1 ? "" : "s"} on the map.`;
+        board.style.width = `${extentX}px`;
+        board.style.height = `${extentY}px`;
         board.prepend(layer);
         drawConnections(board, svg.namespaceURI);
         highlightSelection();
@@ -312,7 +417,9 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
             const attachedKite = keys[1].startsWith("kite:") && keys[0].startsWith("cloud:")
                 ? kites.find(({ id }) => keys[1] === `kite:${id}`) : null;
-            const overlapsAttachment = attachedKite && [attachedKite.cloudA, attachedKite.cloudB].some((id) => keys[0] === `cloud:${id}`);
+            const attachedBalloon = balloons.find(({ id }) => keys.includes(`balloon:${id}`));
+            const overlapsAttachment = (attachedKite && [attachedKite.cloudA, attachedKite.cloudB].some((id) => keys[0] === `cloud:${id}`)) ||
+                (attachedBalloon && keys.includes(endpointKey(attachedBalloon.origin)));
             for (const [index, connection] of items.entries()) {
                 let offset = (index - (items.length - 1) / 2) * 34;
                 if (overlapsAttachment) offset += offset < 0 ? -24 : 24;
@@ -360,6 +467,9 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             string.classList.toggle("kw-related", key === `kite:${string.dataset.kite}` ||
                 string.dataset.clouds.split(" ").some((id) => key === `cloud:${id}`));
         }
+        for (const string of board.querySelectorAll("polyline[data-balloon]")) {
+            string.classList.toggle("kw-related", key === `balloon:${string.dataset.balloon}` || key === string.dataset.origin);
+        }
         for (const group of groups) {
             group.setAttribute("aria-pressed", String(group === selectedConnection));
             group.classList.toggle("kw-related", group.dataset.endpoints.split(" ").includes(key));
@@ -380,11 +490,18 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             }, item.contributor));
     }
 
+    function searchBalloons(query) {
+        return balloons.filter(({ idea, principle, explanation }) => `${idea} ${principle} ${explanation}`.toLowerCase().includes(query))
+            .map((balloon) => searchResult("Balloon", snippet(balloon.idea), () => {
+                locate(mapLocations.get(`balloon:${balloon.id}`)); void openBalloon(balloon.id);
+            }, `Principle: ${snippet(balloon.principle)}`));
+    }
+
     async function refresh() {
         const seq = ++refreshSequence, revision = state.revision;
         try {
             const result = historyPage ? await request("contributions") :
-                await Promise.all([request("kites"), request("connections")]);
+                await Promise.all([request("kites"), request("connections"), request("balloons")]);
             if (revision !== state.revision || seq !== refreshSequence) return;
             if (historyPage) {
                 node("history-status").textContent = "";
@@ -403,6 +520,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             } else {
                 kites = result[0].kites;
                 connections = result[1].connections;
+                balloons = result[2].balloons;
                 drawMap();
                 onKitesChanged();
             }
@@ -425,6 +543,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
 
     const openKite = (id, focusId) => openDetail("kite", id, focusId);
     const openConnection = (id, focusId) => openDetail("connection", id, focusId);
+    const openBalloon = (id, focusId) => openDetail("balloon", id, focusId);
     async function openDetail(kind, id, focusId) {
         closeKite();
         const seq = ++detailSequence, revision = state.revision;
@@ -452,7 +571,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
 
     function renderDetail(kind, result) {
         const { comments, evidence } = result, kite = result[kind];
-        const isConnection = kind === "connection", path = `${kind}s/${kite.id}`;
+        const isConnection = kind === "connection", isBalloon = kind === "balloon", path = `${kind}s/${kite.id}`;
         const host = node("kite-detail");
         const actionHost = element("div");
         const changed = async (revision, id) => {
@@ -488,6 +607,7 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                 });
             let read;
             if (kind === "evidence") read = evidenceFields(fields, item || {}, item?.initial);
+            else if (kind === "balloon") read = balloonFields(fields, item);
             else {
                 const input = field(fields, kind === "connection" ? "Connection explanation" :
                     kind === "kite" ? (kite.cloudB ? "Connection argument" : "Kite idea") : "Comment (citations optional)",
@@ -528,26 +648,49 @@ function createKnowledgeContributions({ node, request, element, button, state, s
             actions.addEventListener("click", () => { menu.open = false; });
             top.append(menu);
         }
-        host.replaceChildren(top, element("h2", isConnection ? "Connection" : linkTitle(kite)), meta(kite),
-            element("p", isConnection ? kite.explanation : kite.argument));
-        const endpoints = isConnection ? [kite.first, kite.second] :
+        host.replaceChildren(top, element("h2", isBalloon ? "Hot-Air Balloon" : isConnection ? "Connection" : linkTitle(kite)), meta(kite));
+        if (isBalloon) {
+            host.append(element("h3", "Idea"), element("p", kite.idea),
+                element("h3", "Theoretical principle"), element("p", kite.principle),
+                element("h3", "How the contributor relates them"), element("p", kite.explanation));
+        } else host.append(element("p", isConnection ? kite.explanation : kite.argument));
+        const endpoints = isBalloon ? [kite.origin] : isConnection ? [kite.first, kite.second] :
             [{ type: "cloud", id: kite.cloudA, label: kite.titleA }, ...(kite.cloudB ? [{ type: "cloud", id: kite.cloudB, label: kite.titleB }] : [])];
         const links = element("ul");
         links.className = "kw-endpoint-links";
         for (const endpoint of endpoints) {
             const row = element("li");
-            const link = element("a", `${endpoint.type === "cloud" ? "Cloud" : "Kite"}: ${endpoint.label}`);
+            const link = element("a", `${labels[endpoint.type]}: ${endpoint.label}`);
             link.href = exploreUrl({ [endpoint.type]: endpoint.id });
             link.addEventListener("click", (event) => {
                 if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
                 event.preventDefault();
                 if (endpoint.type === "cloud") goToCloud(endpoint.id);
-                else { locate(mapLocations.get(endpointKey(endpoint))); void openKite(endpoint.id); }
+                else { locate(mapLocations.get(endpointKey(endpoint))); void openDetail(endpoint.type, endpoint.id); }
             });
             row.append(link);
             links.append(row);
         }
-        host.append(element("h3", "Linked items"), links, actionHost, element("h3", "Supporting evidence"));
+        host.append(element("h3", isBalloon ? "Originating item" : "Linked items"), links);
+        if (isBalloon) {
+            host.append(element("h3", "Connections"));
+            const related = element("ul");
+            for (const connection of result.connections) {
+                const row = element("li");
+                const link = element("a", `${connectionTitle(connection)}: ${snippet(connection.explanation)}`);
+                link.href = exploreUrl({ connection: connection.id });
+                link.addEventListener("click", (event) => {
+                    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+                    event.preventDefault();
+                    locate(connectionLocations.get(connection.id));
+                    void openConnection(connection.id);
+                });
+                row.append(link);
+                related.append(row);
+            }
+            host.append(related.childElementCount ? related : element("p", "No explained connections yet."));
+        }
+        host.append(actionHost, element("h3", "Supporting evidence"));
         if (state.canContribute) host.append(button("Add evidence", () => compose("evidence")));
         if (!evidence.length) host.append(element("p", "No evidence is currently visible for this argument."));
         for (const item of evidence) {
@@ -598,10 +741,11 @@ function createKnowledgeContributions({ node, request, element, button, state, s
                 const moderate = (action) => {
                     const fields = editor(target, action === "hide" ? "Hide this contribution" : "Dismiss this report",
                         action === "hide" ? "Confirm hide" : "Confirm dismissal", async (current) => {
-                            await send(`manage/${report.subject === "connection" ? "connection-reports" : "reports"}/${report.id}`, { action, note: note.value });
+                            await send(`manage/${report.subject === "kite" ? "reports" : `${report.subject}-reports`}/${report.id}`, { action, note: note.value });
                             if (current === state.revision) await reports();
                         });
                     if (action === "hide" && report.kind === "kite") fields.append(element("p", "Hiding the kite also hides its discussion and evidence."));
+                    if (action === "hide" && report.kind === "balloon") fields.append(element("p", "Hiding the balloon also hides its discussion, evidence and connections."));
                     const note = field(fields, "Private moderation note", 1000, "", { multiline: true });
                     note.focus();
                 };
@@ -617,9 +761,11 @@ function createKnowledgeContributions({ node, request, element, button, state, s
     node("refresh-reports").addEventListener("click", () => { void reports(); });
     return {
         drawMap, highlightSelection, refresh, reports, openEditor, openKite, closeKite, searchKites, searchConnections, openConnection, openConnectionEditor,
-        selectedKite: () => activeType === "kite" ? active : null, converted: (id) => converted.has(id),
+        openBalloon, openBalloonEditor, searchBalloons,
+        selectedItem: () => activeType ? { type: activeType, id: active } : state.selected ? { type: "cloud", id: state.selected } : null,
+        converted: (id) => converted.has(id),
         reset() {
-            kites = []; connections = []; converted = new Set(); closeKite();
+            kites = []; balloons = []; connections = []; converted = new Set(); closeKite();
             mapLocations.clear(); connectionLocations.clear();
             for (const id of ["kite-editor", "kite-status", "kite-map-note", "contribution-list", "history-status", "report-list", "report-status"]) node(id).replaceChildren();
             node("kite-editor").hidden = true;

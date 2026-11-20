@@ -253,13 +253,13 @@
             const link = searchResult("Cloud", cloud.title, () => { showCloud(cloud, true); node("detail").focus(); });
             link.dataset.cloudId = cloud.id;
             return link;
-        }).concat(contributions.searchKites(query), contributions.searchConnections(query));
+        }).concat(contributions.searchKites(query), contributions.searchBalloons(query), contributions.searchConnections(query));
         for (const match of matches.slice(0, searchLimit)) {
             const row = element("li");
             row.append(match);
             list.append(row);
         }
-        if (!matches.length) list.append(element("li", "No matching clouds, kites or connections."));
+        if (!matches.length) list.append(element("li", "No matching clouds, kites, balloons or connections."));
         node("more-results").hidden = matches.length <= searchLimit;
         updatePressed();
     }
@@ -267,6 +267,7 @@
     function updateAddMenu() {
         node("add-menu").hidden = !state.canContribute && !state.canPropose && !state.canManage;
         node("add-kite").hidden = !state.canContribute;
+        node("add-balloon").hidden = !state.canContribute;
         node("add-connection").hidden = !state.canContribute;
         node("add-proposal").hidden = !state.canPropose;
         node("add-cloud").hidden = !state.canManage;
@@ -341,7 +342,7 @@
         updatePressed();
         redrawLayout();
         node("detail").replaceChildren(element("h2", "Explore the Knowledge Web"),
-            element("p", "Select a cloud, kite or connection on the canvas or in search to read more."));
+            element("p", "Select a cloud, kite, balloon or connection on the canvas or in search to read more."));
     }
 
     function redrawLayout() {
@@ -877,6 +878,7 @@
                     if (revision !== state.revision) return;
                     const cloud = query.get("cloud");
                     const kite = query.get("kite");
+                    const balloon = query.get("balloon");
                     const connection = query.get("connection");
                     const item = query.get("item");
                     if (cloud) {
@@ -893,6 +895,10 @@
                     if (connection) {
                         if (validId(connection) && state.clouds.length) void contributions.openConnection(connection, validId(item) ? item : undefined);
                         else node("status").textContent = "This connection is not available.";
+                    }
+                    if (balloon) {
+                        if (validId(balloon) && state.clouds.length) void contributions.openBalloon(balloon, validId(item) ? item : undefined);
+                        else node("status").textContent = "This balloon is not available.";
                     }
                     if (state.clouds.length) void contributions.refresh();
                 }
@@ -947,10 +953,15 @@
     });
     node("add-connection").addEventListener("click", () => {
         if (!state.canContribute) return;
-        const kite = contributions.selectedKite();
-        const first = kite ? { type: "kite", id: kite } : state.selected ? { type: "cloud", id: state.selected } : null;
+        const selected = contributions.selectedItem();
         node("add-menu").open = false;
-        contributions.openConnectionEditor(first);
+        contributions.openConnectionEditor(selected?.type !== "connection" ? selected : null);
+    });
+    node("add-balloon").addEventListener("click", () => {
+        if (!state.canContribute) return;
+        const selected = contributions.selectedItem();
+        node("add-menu").open = false;
+        contributions.openBalloonEditor(["cloud", "kite"].includes(selected?.type) ? selected : null);
     });
     node("add-proposal").addEventListener("click", () => {
         const cloud = state.clouds.find(({ id }) => id === state.selected);

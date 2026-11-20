@@ -8,7 +8,7 @@
     <title>Computing History Knowledge Web | DTECH-HUB</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/knowledge-web/web.css?v=14">
+    <link rel="stylesheet" href="/knowledge-web/web.css?v=15">
 </head>
 <body>
     <div class="page-shell">
@@ -41,13 +41,14 @@
                 <p id="web-empty" hidden>No clouds have been published yet. Check back after your teacher releases one.</p>
                 <section class="kw-explore" aria-label="Find or add to the Knowledge Web">
                     <div class="kw-toolbar">
-                        <input id="web-search" type="search" autocomplete="off" aria-label="Search clouds, kites and connections"
-                            placeholder="Search clouds, kites and connections" aria-controls="web-search-results">
+                        <input id="web-search" type="search" autocomplete="off" aria-label="Search clouds, kites, balloons and connections"
+                            placeholder="Search the Knowledge Web" aria-controls="web-search-results">
                         <button id="web-browse" type="button" aria-expanded="false" aria-controls="web-search-results">Browse</button>
                         <details id="web-add-menu" class="kw-menu" hidden>
                             <summary>+ Add</summary>
                             <div class="kw-add-options">
                                 <button id="web-add-kite" type="button" hidden>Add a Kite</button>
+                                <button id="web-add-balloon" type="button" hidden>Add Hot-Air Balloon</button>
                                 <button id="web-add-connection" type="button" hidden>Connect Ideas</button>
                                 <button id="web-add-proposal" type="button" hidden>Propose a new cloud</button>
                                 <a id="web-add-cloud" href="/knowledge-web/?manage=1&amp;new=1" hidden>New draft cloud</a>
@@ -76,7 +77,7 @@
                                 <div class="kw-menu-items">
                                     <button type="button" id="web-reset-layout" disabled>Reset Layout</button>
                                     <button type="button" id="web-edit-default" aria-pressed="false" hidden>Edit default layout</button>
-                                    <button id="web-refresh-kites" type="button" hidden>Refresh kites and connections</button>
+                                    <button id="web-refresh-kites" type="button" hidden>Refresh contributions</button>
                                 </div>
                             </details>
                         </div>
@@ -86,7 +87,7 @@
                         </div>
                         <details class="kw-map-help">
                             <summary>Map help</summary>
-                            <p id="web-pan-help">Scroll or focus the canvas and use the arrow keys to pan. Drag a cloud or kite to move it, or focus it and use Shift + arrow keys. Solid strings attach kites to clouds; dashed strings link related ideas.</p>
+                            <p id="web-pan-help">Scroll or focus the canvas and use the arrow keys to pan. Drag an object to move it, or focus it and use Shift + arrow keys. Solid strings show original attachments; dashed strings link related ideas.</p>
                             <p id="web-kite-map-note"></p>
                         </details>
                     </section>
@@ -213,8 +214,8 @@
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="/script.js?v=knowledge-web-2"></script>
-    <script src="/knowledge-web/contributions.js?v=9"></script>
-    <script src="/knowledge-web/layout.js?v=1"></script>
-    <script src="/knowledge-web/web.js?v=19"></script>
+    <script src="/knowledge-web/contributions.js?v=10"></script>
+    <script src="/knowledge-web/layout.js?v=2"></script>
+    <script src="/knowledge-web/web.js?v=20"></script>
 </body>
 </html>

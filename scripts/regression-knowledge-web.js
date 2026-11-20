@@ -661,6 +661,93 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal((await post(`manage/connection-reports/${stringReportId}`, { action: "hide", note: "Test moderation." }, teacher)).status, 200);
         assert.equal((await call(`connections/${cloudString}`, { student: true })).status, 404);
         assert.equal((await showString(opposing)).connection.id, opposing);
+
+        // Recreate the two Stage 2 constraints before opening a fresh app instance.
+        await pool.query(`ALTER TABLE knowledge_web_connections DROP CONSTRAINT knowledge_web_connections_endpoint_types,
+            DROP COLUMN first_balloon, DROP COLUMN second_balloon,
+            ADD CHECK (num_nonnulls(first_cloud,first_kite)=1 AND num_nonnulls(second_cloud,second_kite)=1);
+            ALTER TABLE knowledge_web_layout_positions DROP CONSTRAINT knowledge_web_layout_item_types,
+            ADD CHECK (item_type IN ('cloud','kite'));`);
+        host = await startApp();
+        assert.equal((await showString(opposing)).connection.first.id, cloudPair.second.id);
+        assert.deepEqual(await get("layout", studentB), secondLayout);
+        const balloonBody = { origin: cloudNode(id), idea: "Make cancellation easy", principle: "Informed consent",
+            explanation: "Users need a clear way to withdraw consent." };
+        for (const field of ["idea", "principle", "explanation"]) {
+            assert.equal((await post("balloons", { ...balloonBody, [field]: " " })).status, 400);
+        }
+        assert.equal((await post("balloons", balloonBody, "junior@test.invalid")).status, 403);
+        assert.equal((await post("balloons", balloonBody, " ")).status, 401);
+        assert.equal((await post("balloons", { ...balloonBody, origin: cloudNode(seed.id) })).status, 404);
+        const publishBalloon = async (data, account) => {
+            const response = await post("balloons", data, account);
+            assert.equal(response.status, 201);
+            return (await response.json()).id;
+        };
+        const balloon = await publishBalloon(balloonBody);
+        const teacherBalloon = await publishBalloon({ ...balloonBody, origin: kiteNode(anchoredId),
+            principle: "Consumer autonomy", evidence: [teacherDraft.evidence[0]] }, teacher);
+        const balloonNode = (id) => ({ type: "balloon", id });
+        const pathBalloon = `balloons/${balloon}`;
+        const originalBalloon = (await get(pathBalloon, studentB)).balloon;
+        assert.equal(originalBalloon.contributor, "Changed Display Name");
+        assert.doesNotMatch(JSON.stringify(originalBalloon), /@test\.invalid/);
+        assert.equal(originalBalloon.origin.id, id);
+        assert.equal(originalBalloon.principle, balloonBody.principle);
+        const teacherBalloonDetail = await get(`balloons/${teacherBalloon}`);
+        assert.equal(teacherBalloonDetail.balloon.origin.type, "kite");
+        assert.equal(teacherBalloonDetail.balloon.contributor, "Test Teacher");
+        assert.equal(teacherBalloonDetail.evidence.length, 1);
+        assert.equal((await post("balloons", { ...balloonBody, origin: balloonNode(balloon) })).status, 400);
+        const mixedBalloon = await publishConnection(connectionBody(cloudNode(id), balloonNode(balloon)));
+        const kiteBalloon = await publishConnection(connectionBody(balloonNode(balloon), kiteNode(anchoredId)), studentB);
+        const otherBalloon = await publishConnection(connectionBody(balloonNode(teacherBalloon), balloonNode(balloon)));
+        const competingBalloon = await publishConnection(connectionBody(balloonNode(balloon), cloudNode(id), "I see a different relationship."), studentB);
+        assert.equal((await post("connections", connectionBody(balloonNode(balloon), balloonNode(balloon)))).status, 400);
+        assert.deepEqual(new Set((await get(pathBalloon)).connections.map(({ id }) => id)),
+            new Set([mixedBalloon, kiteBalloon, otherBalloon, competingBalloon]));
+        const balloonLayout = `layout/balloon/${balloon}`;
+        assert.equal((await put(balloonLayout, { x: 420, y: 380 })).status, 200);
+        assert.equal((await put(balloonLayout, { x: 310, y: 260 }, studentB)).status, 200);
+        assert.equal((await put(`manage/default-${balloonLayout}`, { x: 200, y: 220 }, teacher)).status, 200);
+        host = await startApp();
+        assert.equal((await get("layout")).personal.find(({ id }) => id === balloon).x, 420);
+        assert.equal((await get("layout", studentB)).personal.find(({ id }) => id === balloon).x, 310);
+        assert.equal((await get("layout")).defaults.find(({ id }) => id === balloon).x, 200);
+        assert.deepEqual((await get(pathBalloon, studentB)).balloon, originalBalloon);
+        assert.equal((await call("layout", { student: true, method: "DELETE" })).status, 200);
+        assert.equal((await get("layout")).personal.length, 0);
+        const editBalloon = `${pathBalloon}/contributions/balloon/${balloon}`;
+        assert.equal((await put(editBalloon, balloonBody, studentB)).status, 403);
+        assert.equal((await put(editBalloon, { ...balloonBody, principle: "Reversible consent", origin: kiteNode(anchoredId) })).status, 200);
+        const balloonComment = await post(`${pathBalloon}/comments`, { body: "How is consent withdrawn?" }, studentB);
+        assert.equal(balloonComment.status, 201);
+        assert.equal((await post(`${pathBalloon}/comments`, { body: "Through a clear control.", replyTo: (await balloonComment.json()).id })).status, 201);
+        assert.equal((await post(`${pathBalloon}/evidence`, teacherDraft.evidence[0], studentB)).status, 201);
+        const updatedBalloon = await get(pathBalloon);
+        assert.equal(updatedBalloon.balloon.principle, "Reversible consent");
+        assert.deepEqual(updatedBalloon.balloon.origin, originalBalloon.origin);
+        assert.equal(updatedBalloon.comments.length, 2);
+        assert.equal(updatedBalloon.evidence[0].contributor, "Test Student Two");
+        assert.ok((await get("contributions")).contributions.some(({ id, kind }) => id === balloon && kind === "balloon"));
+        const reportBalloonString = await post(`connections/${mixedBalloon}/reports`, {
+            kind: "connection", targetId: mixedBalloon, reason: "spam"
+        }, studentB);
+        assert.equal((await post(`manage/connection-reports/${(await reportBalloonString.json()).id}`, { action: "hide", note: "Test moderation." }, teacher)).status, 200);
+        assert.equal((await get(pathBalloon)).connections.length, 3);
+        const reportBalloon = await post(`${pathBalloon}/reports`, { kind: "balloon", targetId: balloon, reason: "spam" }, studentB);
+        assert.equal(reportBalloon.status, 201);
+        const balloonReportId = (await reportBalloon.json()).id;
+        assert.ok((await get("manage/reports", teacher)).reports.some(({ id, subject }) => id === balloonReportId && subject === "balloon"));
+        assert.equal((await post(`manage/balloon-reports/${balloonReportId}`, { action: "hide", note: "Test moderation." }, studentB)).status, 403);
+        assert.equal((await post(`manage/balloon-reports/${balloonReportId}`, { action: "hide", note: "Test moderation." }, teacher)).status, 200);
+        assert.equal((await call(pathBalloon, { student: true })).status, 404);
+        assert.equal((await call(`connections/${kiteBalloon}`, { student: true })).status, 404);
+        assert.ok((await list("clouds", true)).some((cloud) => cloud.id === id));
+        assert.equal((await get(`kites/${anchoredId}`)).kite.id, anchoredId);
+        assert.equal((await get(`balloons/${teacherBalloon}`)).connections.length, 0);
+        assert.equal((await pool.query("SELECT id FROM knowledge_web_connections WHERE id=$1", [kiteBalloon])).rowCount, 1);
+        assert.equal((await pool.query("SELECT id FROM knowledge_web_balloon_moderation_actions WHERE report_id=$1", [balloonReportId])).rowCount, 1);
         assert.ok((await list("clouds", true)).some((cloud) => cloud.id === id));
         const anchoredReport = await post(`kites/${anchoredId}/reports`, {
             kind: "kite", targetId: anchoredId, reason: "spam"
@@ -673,6 +760,6 @@ test("PostgreSQL persists drafts, sources and positions; only published clouds r
         assert.equal((await call(`connections/${kiteString}`, { account: studentB })).status, 404);
         assert.equal((await call(`connections/${mixedString}`, { account: studentB })).status, 404);
         assert.deepEqual((await get("connections")).connections.map(({ id }) => id), [opposing]);
-        assert.equal((await pool.query("SELECT id FROM knowledge_web_connections")).rowCount, 5);
-        assert.equal((await pool.query("SELECT id FROM knowledge_web_connection_moderation_actions")).rowCount, 1);
+        assert.equal((await pool.query("SELECT id FROM knowledge_web_connections WHERE first_balloon IS NULL AND second_balloon IS NULL")).rowCount, 5);
+        assert.equal((await pool.query("SELECT id FROM knowledge_web_connection_moderation_actions WHERE report_id=$1", [stringReportId])).rowCount, 1);
     });

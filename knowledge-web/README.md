@@ -43,6 +43,14 @@ Drag clouds and kites on the canvas, or focus one and use **Shift + arrow keys**
 
 Search opens a list of matching clouds, kites and connections; use **Browse** to open the list without typing. Select a result to inspect it beside the map (below it on narrow screens). Expand **Timeline** below the workspace for the selected cloud's dates and sources. The map toolbar has separate **Reset view** and **Layout** controls; **Map help** lists the keyboard shortcuts and explains the two kinds of strings.
 
+### Hot-Air Balloons
+
+Select a published cloud or visible kite, then choose **+ Add → Add Hot-Air Balloon**. Each balloon pairs one idea with one theoretical principle and a contributor's explanation of how they relate. Evidence is optional and can be added later. Publication is immediate; the selected principle is the contributor's interpretation, not a verified historical claim.
+
+The solid attachment string stays tied to the original item. **Connect Ideas** adds independent, explained strings between any two different clouds, kites or balloons. Search balloon ideas, principles and explanations; use **My Contributions** to revisit your balloon, evidence or discussion. Drag it or use **Shift + arrow keys** to move it in your personal layout.
+
+The existing transactional PostgreSQL setup adds separate balloon, discussion, evidence, revision and moderation tables, and extends the connection and layout constraints without rewriting existing records. Hiding a balloon (or its origin) makes its dependent connections unavailable without deleting them. Hiding a connection on its own does not hide either endpoint.
+
 ### Stage 3 (planned): Upgrade to Cloud
 
 **Upgrade to Cloud** starts a separate historical cloud draft; it does not convert the kite or approve its interpretation. Only staff authorised to manage Knowledge Web clouds can start the draft or publish it. The draft stays private until explicitly published.

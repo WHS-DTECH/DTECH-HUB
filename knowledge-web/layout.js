@@ -7,7 +7,10 @@ function createKnowledgeLayout({ node, request, state, redraw }) {
     const toMap = (rows) => new Map(rows.map((item) => [keyOf(item), { x: item.x, y: item.y }]));
     const status = (message) => { node("layout-status").textContent = message; };
     const clamp = (number, min) => Math.round(Math.min(6000, Math.max(min, number)));
-    const bounded = (type, x, y) => ({ x: clamp(x, type === "kite" ? 23 : 0), y: clamp(y, type === "kite" ? 23 : 0) });
+    const bounded = (type, x, y) => ({
+        x: clamp(x, type === "balloon" ? 34 : type === "kite" ? 23 : 0),
+        y: clamp(y, type === "balloon" ? 38 : type === "kite" ? 23 : 0)
+    });
     const boardItem = (target) => target.closest?.("button[data-layout-type]");
     const fromItem = (item) => ({ type: item.dataset.layoutType, id: item.dataset.layoutId });
     const currentPoint = (item) => ({ x: parseFloat(item.style.left), y: parseFloat(item.style.top) });

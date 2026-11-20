@@ -55,6 +55,7 @@
 .kw-result small { display: block; color: #426174; margin-top: .15rem; }
 .kw-type { flex: none; padding: .12em .5em; border-radius: 1em; background: #deedf5; font-size: .78rem; font-weight: 700; }
 .kw-type-kite { background: #faedc8; }
+.kw-type-balloon { background: #f9ddd5; }
 .kw-type-connection { background: #eee3f6; }
 #web-clouds { grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr); gap: .75rem; --kw-map-height: clamp(23rem, 64vh, 50rem); }
 .kw-map-panel, .kw-selection { background: #fff; border: 1px solid #b6cdd5; border-radius: .75rem; min-width: 0; }
@@ -83,6 +84,15 @@
 .kw-string-layer g.kw-related .kw-string-line { stroke-width: 3; }
 .kw-string-layer g[aria-pressed="true"] .kw-string-line { stroke-width: 4; }
 .kw-kite-layer polyline.kw-related { stroke-width: 3; }
+.knowledge-web button.kw-balloon {
+    position: absolute; width: 62px; height: 74px; padding: 0; border: 0;
+    transform: translate(-50%, -50%); pointer-events: auto;
+    background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 62 74' stroke='%2375382c' stroke-width='2'%3E%3Cpath fill='%23f8ad94' d='M31 3C10 3 4 17 6 29c2 11 9 19 17 25h16c8-6 15-14 17-25C58 17 52 3 31 3Z'/%3E%3Cpath fill='none' d='M31 3c-15 0-19 30-4 51M31 3c15 0 19 30 4 51M23 54l2 9m14-9-2 9'/%3E%3Cpath fill='%23f5d490' d='M23 62h16l-2 10H25Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.knowledge-web button.kw-balloon:is(:focus-visible, :hover, [aria-pressed="true"], .kw-linked) { outline: 2px solid var(--kw-accent); outline-offset: 1px; }
+@media (forced-colors: active) {
+    .knowledge-web button.kw-balloon { forced-color-adjust: none; outline: 1px solid ButtonText; }
+}
 @media (forced-colors: active) {
     .kw-string-line { stroke: LinkText; }
     .kw-string-hit { forced-color-adjust: none; }
