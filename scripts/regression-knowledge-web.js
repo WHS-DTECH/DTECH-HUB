@@ -16,6 +16,33 @@ const { getSourceMetadata, parseMetadata, isPublicIPv4 } = require("../knowledge
 
 const connectionString = process.env.KNOWLEDGE_WEB_TEST_DATABASE_URL;
 
+test("Replay and PDF use the same verified Google sign-in as My Contributions", async () => {
+    const source = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
+    const start = source.lastIndexOf("app.use(", source.indexOf("  req.auth_identity = {"));
+    const end = source.indexOf("\n});", start);
+    assert.ok(start >= 0 && end > start);
+    const middleware = vm.runInNewContext(source.slice(start, end + 4), {
+        app: { use: (fn) => fn },
+        effectiveAuthMode: "google",
+        extractBearerToken: (req) => req.token,
+        verifyGoogleAccessTokenAndExtractIdentity: async (token) => ({ ok: token === "current-oauth", email: "student@test.invalid" }),
+        verifyGoogleIdTokenAndExtractIdentity: async (token) => ({ ok: token === "header.payload.signature", email: "student@test.invalid" })
+    });
+    const identity = async (path, token, method = "GET") => {
+        const req = { path, token, method };
+        await middleware(req, {}, () => {});
+        return req.auth_identity;
+    };
+    for (const suffix of ["", "/replay", "/pdf"]) {
+        const route = `/api/knowledge-web/contributions${suffix}`;
+        assert.equal((await identity(route, "current-oauth")).source, "google_access_token", route);
+        assert.equal((await identity(route, "header.payload.signature")).source, "google_id_token", route);
+        assert.equal((await identity(route, "expired-oauth")).verified, false, route);
+        assert.equal((await identity(route, "")).verified, false, route);
+        assert.equal((await identity(route, "current-oauth", "POST")).verified, false, route);
+    }
+});
+
 test("Timeline includes dated source publications alongside events without inventing dates or times", () => {
     const script = fs.readFileSync(path.join(__dirname, "../knowledge-web/web.js"), "utf8");
     const start = script.indexOf("    function timelineEntries(");
