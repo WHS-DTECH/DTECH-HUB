@@ -125,12 +125,22 @@ yet and does not appear on the shared web. Check the history and dated events,
 add at least one source with a note about what it supports, then use
 **Publish to shared web** when ready. Save Draft keeps it private.
 
-The shared web supports title search, keyboard navigation, pan and zoom. This
-phase does not add student contributions or change DO Kit completion. In later
-phases only new historical clouds will require approval. Kites must include
-evidence but publish immediately; ordinary discussion comments and questions
-will not require individual citations. Moderation will be reactive, through
-reports and hide/remove controls, not routine review of student arguments.
+The shared web supports title search, keyboard navigation, pan and zoom.
+In Phase 2, students start from an existing published cloud. To submit a new
+historical cloud proposal, they must provide historical sources and a
+free-form argument with evidence explaining how the two topics relate.
+Students can save unfinished drafts, and only teachers can create and publish
+clouds without a proposed connection.
+
+Teacher approval publishes the historical cloud; it does not endorse the
+student's interpretation. The student's argument and evidence are retained
+privately for later kite publication by the student. Approval does not publish
+a kite. Phase 2 does not change DO Kit completion.
+
+When kites are introduced, they must include evidence but will publish without
+teacher approval. Ordinary discussion comments and questions will not require
+individual citations. Moderation will be reactive, through reports and
+hide/remove controls, not routine review of student arguments.
 
 Run `node --test scripts/regression-knowledge-web.js` for access checks. Set
 `KNOWLEDGE_WEB_TEST_DATABASE_URL` to an isolated PostgreSQL test database to also
