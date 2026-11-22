@@ -40,6 +40,30 @@ test("other kits do not receive Minecraft or Windows Desktop instructions", () =
     renderer.renderKitOverview(host, { bannerTitle: "Other", worksheets: [] }, {});
     assert.doesNotMatch(host.innerHTML, /Minecraft Exports|Videos|Unity/);
 });
+test("Google Drive Setup shows the Windows search screenshots inside its first step only", () => {
+    const context = vm.createContext({ window: { ActivityBlocks: blocks }, URL });
+    for (const script of ["activity-block-view.js", "kit-worksheet-render.js"]) {
+        vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", script), "utf8"), context);
+    }
+    context.window.ActivityBlockView.bind = () => {};
+    const host = { style: { setProperty() {} } };
+    const content = { bannerTitle: "Google Drive Setup", blocks: [
+        { id: "open-drive", kind: "text", title: "1. Open Google Drive", text: "Search for Google Drive." },
+        { id: "next", kind: "text", title: "2. Sign in", text: "Sign in." }
+    ] };
+    const render = (kitId, page = content) => {
+        context.window.KitWorksheetRender.renderWorksheet(host, page, { kitId, readOnly: true });
+        return host.innerHTML;
+    };
+    const html = render("kit-minecraft");
+    assert.match(html, /data-content-block="open-drive"[\s\S]*Search for Google Drive\.[\s\S]*search-drive\.png[\s\S]*search-result-drive\.png[\s\S]*<\/section>\s*<section[^>]*data-content-block="next"/);
+    assert.doesNotMatch(render("kit-other"), /search-result-drive\.png/);
+    assert.doesNotMatch(render("kit-minecraft", { ...content, bannerTitle: "Another Activity" }), /search-result-drive\.png/);
+    for (const name of ["search-drive", "search-result-drive"]) {
+        const file = fs.readFileSync(path.join(__dirname, "..", "images", "activities", "minecraft-drive-setup", `${name}.png`));
+        assert.equal(file.subarray(1, 4).toString(), "PNG");
+    }
+});
 test("a required setup folder link must be supplied before automatic completion", () => {
     const activity = {
         completionMode: "auto",

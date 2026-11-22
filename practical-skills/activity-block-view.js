@@ -8,7 +8,7 @@
             <span>In OneDrive: open your document, choose <strong>Share</strong> &rarr; <strong>Copy link</strong>, then paste that link here.</span>
         </div>`;
     }
-    function markup(blocks, answers, readOnly, { renderImage, unityEditor, noGoogleLinks } = {}) {
+    function markup(blocks, answers, readOnly, { renderImage, renderIllustrations, unityEditor, noGoogleLinks } = {}) {
         return blocks.map((b) => {
             const value = answers[b.id];
             const disabled = readOnly ? "disabled" : "";
@@ -89,6 +89,7 @@
                         <p class="activity-block-status" role="status"></p>`;
                 } catch (error) { body = `<p class="activity-block-status">${e(error.message)}</p>`; }
             }
+            if (renderIllustrations) body += renderIllustrations(b);
             return `<section class="activity-content-block${b.kind === "question" && b.questionType === "checklist" && b.showProgress === true ? " activity-content-block--progress" : ""}" data-content-block="${e(b.id)}">${b.title ? `<h2>${e(b.title)}</h2>` : `<h2>${e(B.types[b.kind])}</h2>`}${b.required ? '<p class="typing-note">Required in automatic-tick activities</p>' : ""}${body}</section>`;
         }).join("");
     }

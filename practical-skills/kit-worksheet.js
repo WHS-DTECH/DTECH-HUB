@@ -808,6 +808,7 @@
             const assessmentKey = `${activityIndex}-${activity?.assessment?.id || "login-sites-readiness-v1"}`;
 
             window.KitWorksheetRender.renderWorksheet(host, activityContent, {
+                kitId: state.kitId,
                 responses: state.responses,
                 readOnly: preview || !state.email,
                 blocksReadOnly: !state.progressLoaded,

@@ -796,8 +796,19 @@
         (blocks || []).forEach((block) => {
             if (block.responseKey && blockAnswers[block.id] === undefined) blockAnswers[block.id] = responses[block.responseKey];
         });
-        const blockMarkup = (items) => window.ActivityBlockView.markup(items, blockAnswers, readOnly || options.blocksReadOnly,
-            { renderImage: (image) => renderWorksheetImage(image), unityEditor: content.unityEditor, noGoogleLinks: content.noGoogleLinks === true });
+        const blockMarkup = (items) => window.ActivityBlockView.markup(items, blockAnswers, readOnly || options.blocksReadOnly, {
+            renderImage: (image) => renderWorksheetImage(image),
+            renderIllustrations: (block) => {
+                if (options.kitId !== "kit-minecraft" || content.bannerTitle !== "Google Drive Setup" ||
+                    !["text", "tasks"].includes(block.kind) ||
+                    !/^(?:step\s*)?1\s*[.\-:]\s*open google drive$/i.test(String(block.title || "").trim())) return "";
+                return [
+                    { url: "/images/activities/minecraft-drive-setup/search-drive.png", alt: "Windows Start search box with Drive typed in it.", caption: "Search for Drive in Windows." },
+                    { url: "/images/activities/minecraft-drive-setup/search-result-drive.png", alt: "Google Drive app shown as the best match in Windows search.", caption: "Select the Google Drive app." }
+                ].map((image) => renderWorksheetImage(image)).join("");
+            },
+            unityEditor: content.unityEditor, noGoogleLinks: content.noGoogleLinks === true
+        });
         const imageInformationLayout = Boolean(content?.information && images.length);
         const juniorLoginSites = [7, 8].includes(options.huntProfile?.year);
         const siteLevel = options.huntProfile?.courseIds?.includes("STAFF") ? "staff" : juniorLoginSites ? "junior"
