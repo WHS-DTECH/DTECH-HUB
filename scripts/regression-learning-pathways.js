@@ -337,9 +337,18 @@ async function main() {
     assert.deepEqual(unitJumpLinks, [...unitPlan.matchAll(/<h2 id="([^"]+)"/g)].map((match) => match[1])
         .filter((id) => !["overview", "on-this-page"].includes(id)), "Unit Plan section pills follow page order");
     for (const heading of ["Context and Rationale", "Aims of Theme", "Contexts of Learning",
-        "School Values in this Theme", "Practical Learning Sequence"]) {
+        "School Values in this Theme", "Big Ideas", "Practical Learning Sequence"]) {
         assert.ok(unitPlan.includes(`>${heading}</h2>`), `Unit Plan includes ${heading}`);
     }
+    assert.ok(unitPlan.indexOf('id="school-values"') < unitPlan.indexOf('id="big-ideas"') &&
+        unitPlan.indexOf('id="big-ideas"') < unitPlan.indexOf('id="learning-sequence"'), "Big Ideas sits between values and the learning sequence");
+    const bigIdeas = unitPlan.match(/<section class="panel-section" aria-labelledby="big-ideas">([\s\S]*?)<\/section>/)[1];
+    for (const year of ["Year 7", "Year 8"]) assert.match(bigIdeas, new RegExp(`<h3>${year}</h3>`));
+    for (const label of ["Understand", "Know", "Do"]) {
+        assert.equal((bigIdeas.match(new RegExp(`<strong>${label}:</strong>`, "g")) || []).length, 2, `${label} is shown for both years`);
+    }
+    assert.match(bigIdeas, /Technology document is proposed/);
+    assert.match(bigIdeas, /ASCII and Unicode activities are planned/);
     for (const removed of ["Curriculum Connections", "Evidence and Curriculum Coverage", "Resources and Equipment", "Health &amp; Safety", "Theme Evaluation"]) {
         assert.ok(!unitPlan.includes(`>${removed}</h2>`), `Unit Plan no longer includes ${removed}`);
     }
