@@ -102,7 +102,7 @@
             const activity = activities[index];
             if (!worksheet || worksheet.hidden || worksheet.mergedInto !== undefined ||
                 !activity?.blocks?.some((block) => block.kind === "studentlink" && block.id === BLUEPRINT_LINK_ID)) return;
-            const text = "Share your slideshow so your teacher can open it. Paste the sharing link here, then select Submit to Teacher. Your teacher will mark this activity Completed after review.";
+            const text = "Share your slideshow so your teacher can open it. Paste the sharing link here, then select Submit to Teacher. Your teacher confirms the slideshow. This activity completes automatically when the slideshow is confirmed and your own team details are ready.";
             const blocks = activity.blocks.map((block) => block.id === BLUEPRINT_LINK_ID && (!block.required || block.text !== text)
                 ? { ...block, text, required: true } : block);
             if (activity.documentCheck === BLUEPRINT_REVIEW_POLICY && activity.completionMode === "auto" &&
@@ -364,7 +364,7 @@
                     (activity.documentCheck === GOOGLE_DRAWING_POLICY
                         ? "Link saved. Press Submit so your teacher can review your drawing and mark it Completed."
                         : activity.documentCheck === BLUEPRINT_REVIEW_POLICY
-                            ? "Link saved. Select Submit to Teacher so your slideshow can be reviewed and marked Completed."
+                            ? "Link saved. Select Submit to Teacher so your slideshow can be confirmed. The activity also needs your own team details."
                         : "Link saved. Use Check my document to check your typed text, or ask your teacher to review it.");
             }
             if (b.kind === "checkbox") passed = value === true;

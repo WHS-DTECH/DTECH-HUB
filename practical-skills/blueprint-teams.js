@@ -6,7 +6,7 @@ const active = (member) => ["pending", "accepted"].includes(member.status);
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 
 function createBlueprintTeams({ pool, hasDatabase, getStudents, getRequestUserEmail, normalizeEmail,
-    schoolDomain, requireAdminAccess, canReview, now = () => new Date() }) {
+    schoolDomain, requireAdminAccess, canReview, onChange, now = () => new Date() }) {
     let schema;
     const year = () => Number(new Intl.DateTimeFormat("en", { year: "numeric", timeZone: "Pacific/Auckland" }).format(now()));
     function schoolEmail(value) {
@@ -266,10 +266,12 @@ function createBlueprintTeams({ pool, hasDatabase, getStudents, getRequestUserEm
                 `${item.name} ${item.email}`.toLowerCase().includes(search))
                 .slice(0, 20).map(({ id, name, email }) => ({ id, name, email })) };
         }));
-        app.post(base, endpoint(async (req, email) => ({ team: await registerTeam(email, req.body) })));
+        app.post(base, endpoint(async (req, email) => ({ team: await registerTeam(email, req.body),
+            ...(onChange ? await onChange(req, email) : {}) })));
         app.put(`${base}/:teamId/acknowledgement`, endpoint(async (req, email) => {
             if (!UUID.test(req.params.teamId)) throw fail("Choose a valid team.");
-            return { team: await acknowledge(email, req.params.teamId, req.body) };
+            return { team: await acknowledge(email, req.params.teamId, req.body),
+                ...(onChange ? await onChange(req, email) : {}) };
         }));
         const admin = "/api/admin/practical-skills/blueprint-teams";
         app.get(admin, requireAdminAccess, endpoint(async () => {

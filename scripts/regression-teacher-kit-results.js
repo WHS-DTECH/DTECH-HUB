@@ -97,6 +97,56 @@ test("teacher course groups require enrolment, not just a year-level folder", ()
     assert.doesNotMatch(provider, /getResearchReportProgrammeFolder|yearNumber/);
 });
 
+test("Blueprint review ticks Confirmed independently of completion while drawing ticks stay Completed", async () => {
+    const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "teacher-results.js"), "utf8");
+    function element(tag) {
+        return { tag, children: [], events: {}, textContent: "", classList: { add() {}, remove() {} },
+            append(child) { this.children.push(child); }, replaceChildren() { this.children = []; },
+            setAttribute(name, value) { this[name] = value; }, addEventListener(type, handler) { this.events[type] = handler; } };
+    }
+    const host = element("div"), status = element("p");
+    const student = { email: "student@school.nz", name: "Student", homeroom: "JVE" };
+    const blueprint = { url: "https://docs.google.com/presentation/d/slides/edit", documentKey: "google-file:slides",
+        submittedAt: "2026-11-24", confirmed: false, completed: false };
+    const drawing = { url: "https://docs.google.com/drawings/d/drawing/edit", documentKey: "google-file:drawing",
+        filed: true, completed: false };
+    const data = { kits: [], submissions: [
+        { id: "kit-minecraft-builder-kit", activities: [{ index: 0, title: "The Blueprint Mission", submissionType: "slideshow" }],
+            students: { [student.email]: { 0: blueprint } } },
+        { id: "kit-google-drawings", activities: [{ index: 0, title: "Ship" }], students: { [student.email]: { 0: drawing } } }
+    ] };
+    const context = vm.createContext({
+        document: { createElement: element }, classData: data, submissionsHost: host, submissionStatus: status,
+        pendingSubmissions: new Set(), kitFilter: { value: "" }, submissionStatusFilter: { value: "" },
+        filteredStudents: () => [student], date: (value) => value, saveDrawingComment() {},
+        fetchDocumentReview: async (url, options) => {
+            const approved = JSON.parse(options.body).approved;
+            return { ok: true, json: async () => ({ verification: url.includes("minecraft")
+                ? { confirmed: approved, passed: false } : { passed: approved }, kitCompleted: false }) };
+        }
+    });
+    vm.runInContext(source.slice(source.indexOf("    function node("), source.indexOf("    function date(")) +
+        source.slice(source.indexOf("    async function saveSubmissionCompleted("), source.indexOf("    async function saveDrawingComment(")) +
+        source.slice(source.indexOf("    function renderSubmissions("), source.indexOf("    async function saveBookSignature(")), context);
+    const all = (node) => [node, ...node.children.flatMap(all)];
+    const find = (label) => all(host).find((node) => node["aria-label"] === label);
+    context.renderSubmissions([student]);
+    assert.ok(all(host).some((node) => node.tag === "th" && node.textContent === "Confirmed"));
+    const confirm = find("Confirmed for Student - The Blueprint Mission");
+    assert.equal(confirm.disabled, false);
+    confirm.checked = true;
+    await confirm.events.change();
+    assert.equal(blueprint.confirmed, true);
+    assert.equal(blueprint.completed, false);
+    assert.equal(find("Confirmed for Student - The Blueprint Mission").checked, true, "Confirmation remains checked while team details are unfinished");
+    assert.match(status.textContent, /complete automatically.*team details/);
+    const complete = find("Completed for Student - Ship");
+    complete.checked = true;
+    await complete.events.change();
+    assert.equal(drawing.completed, true);
+    assert.equal(find("Completed for Student - Ship").checked, true);
+});
+
 test("typing weekly table follows filters and persists independent per-week book signatures", async () => {
     function element() {
         return { value: "", children: [], events: {}, textContent: "", checked: false,
@@ -777,7 +827,7 @@ test("submissions list follows the class filters, links drawings and saves teach
     const reviewHtml = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "teacher-results.html"), "utf8");
     assert.match(reviewHtml, /<select id="class-submission-status-filter" aria-describedby="class-submission-status-filter-help">/);
     assert.match(reviewHtml, /<option value="saved">Saved - not submitted or sync needed<\/option>/);
-    assert.match(reviewHtml, /<option value="awaiting-completion">Submitted - not ticked Completed<\/option>/);
+    assert.match(reviewHtml, /<option value="awaiting-completion">Submitted - awaiting teacher sign-off<\/option>/);
     function element() {
         return {
             value: "", children: [], events: {}, textContent: "",
@@ -833,7 +883,8 @@ test("submissions list follows the class filters, links drawings and saves teach
                 if (puts.length === 2) return { ok: false, status: 401, json: async () => ({ error: "Verify sign-in" }) };
                 const body = JSON.parse(options.body);
                 return { ok: true, json: async () => Object.hasOwn(body, "comment") ? { teacherComment: body.comment }
-                    : { verification: { passed: body.approved }, completedActivities: {} } };
+                    : { verification: { passed: body.approved,
+                        ...(url.includes("kit-minecraft-builder-kit") ? { confirmed: body.approved } : {}) }, completedActivities: {} } };
             }
             return { ok: true, json: async () => url.includes("kit-submissions") ? submissions
                 : url.includes("preview-users") ? { users: [] } : { students, kits } };
@@ -926,7 +977,7 @@ test("submissions list follows the class filters, links drawings and saves teach
     await blueprintTick.events.change();
     assert.deepEqual(puts.at(-1), { url: `/api/admin/kit-document-review/${builder}/0`,
         body: { email: "ana@school.nz", documentKey: "google-file:synthetic-slideshow", approved: true } });
-    assert.match(el("submission-status").textContent, /Ticked Completed for Ana - The Blueprint Mission/);
+    assert.match(el("submission-status").textContent, /Slideshow confirmed for Ana - The Blueprint Mission/);
 });
 
 test("read-only review suppresses the shared sidebar's mutating progress fetch", async () => {

@@ -8,7 +8,7 @@ const vm = require("node:vm");
 const { createBlueprintTeams } = require("../practical-skills/blueprint-teams");
 const B = require("../practical-skills/activity-blocks");
 
-async function fixture(t) {
+async function fixture(t, { onChange } = {}) {
     let teams = new Map(), members = new Map(), tail = Promise.resolve();
     const statements = [];
     const students = ["a", "b", "c", "d", "e"].map((id) => ({
@@ -82,7 +82,7 @@ async function fixture(t) {
             release() {}
         };
     } };
-    const deps = { pool, hasDatabase: true, getStudents: async () => students, now: () => new Date("2026-11-24T00:00:00Z"),
+    const deps = { pool, hasDatabase: true, getStudents: async () => students, onChange, now: () => new Date("2026-11-24T00:00:00Z"),
         normalizeEmail: (email) => String(email || "").trim().toLowerCase(), schoolDomain: "school.nz",
         getRequestUserEmail: (req) => req.headers["x-user-email"],
         requireAdminAccess: (req, res, next) => req.headers["x-user-email"] === "teacher@school.nz" ? next() : res.sendStatus(403),
@@ -199,4 +199,20 @@ test("team panel follows Step 2 for separate blocks and numbered lists; later ac
     }
     render({ ...content, bannerTitle: "Another activity" });
     assert.doesNotMatch(host.innerHTML, /data-blueprint-team/);
+});
+
+test("saving own team details recalculates completion after persistence without waiting for other members", async (t) => {
+    let f;
+    let confirmed = false;
+    f = await fixture(t, { onChange: async (_req, email) => {
+        const ready = await f.service.getReadiness(email);
+        return { completedActivities: confirmed && ready.passed ? { 0: "2026-11-24" } : {} };
+    } });
+    const saved = await f.request("", "a@school.nz", "POST", { mode: "team", building: "Tower", teammateIds: ["b"] });
+    assert.deepEqual(saved.body.completedActivities, {});
+    confirmed = true;
+    const accepted = await f.request(`/${saved.body.team.id}/acknowledgement`, "a@school.nz", "PUT",
+        { decision: "accept", version: 1, area: "Roof", contribution: "Build the roof." });
+    assert.equal(accepted.body.completedActivities[0], "2026-11-24");
+    assert.equal((await f.service.getReadiness("b@school.nz")).passed, false);
 });

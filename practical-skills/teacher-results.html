@@ -29,7 +29,7 @@
       <a class="button button-secondary" href="./licence-kit-setup.html">Licence Kit Setup</a>
       <a class="button button-secondary" href="./blueprint-teams.html">Minecraft Blueprint Teams</a>
     </nav>
-    <p>Admin access required. Reading saved results does not change answers, completion or certificates, and sends no emails. Chocolate and submission Completed checkboxes save separately. In Student Review, verified teaching staff can explicitly approve document text checks after opening the student's document; this recalculates its activity tick and kit completion.</p>
+    <p>Admin access required. Reading saved results does not change answers, completion or certificates, and sends no emails. Chocolate and submission sign-off checkboxes save separately. In Student Review, verified teaching staff can explicitly approve document text checks after opening the student's document; this recalculates its activity tick and kit completion.</p>
     <div class="teacher-results-tabs" role="tablist" aria-label="Teacher review pages">
       <button id="class-progress-tab" type="button" role="tab" aria-selected="true" aria-controls="class-progress-panel">Class Kit Progress</button>
       <button id="student-review-tab" type="button" role="tab" aria-selected="false" aria-controls="student-review-panel" tabindex="-1">Student Review</button>
@@ -39,7 +39,7 @@
         <div class="class-progress-heading">
           <div>
             <h2>Class Kit Completion</h2>
-            <p>See which active Licence Kits students have completed. Tick Chocolate when given; unchecked means No. Changes save automatically. Submitted drawings and Blueprint Mission slideshows are listed under the table: open each link and tick Completed when the work is done. If Google verification has expired, allow the Google sign-in window to renew it; keep the same school account selected.</p>
+            <p>See which active Licence Kits students have completed. Tick Chocolate when given; unchecked means No. Changes save automatically. Open submitted links below: tick Completed for drawings or Confirmed for Blueprint Mission slideshows. Slideshow confirmation is independent of team details; the mission completes automatically when both are ready. If Google verification has expired, allow the Google sign-in window to renew it; keep the same school account selected.</p>
           </div>
           <button id="class-progress-refresh" class="button button-primary" type="button">Refresh list</button>
         </div>
@@ -122,14 +122,14 @@
           <div id="class-typing-table-host" class="class-progress-table-host" tabindex="0" role="region" aria-label="Typing kit weekly results table"></div>
         </section>
         <p>Drawing links: Saved - sync needed means the link is saved but filing is not confirmed. Submitted - synced means DTECH-HUB successfully filed the drawing in the student's DTECH folder. Completed is the separate teacher review tick. Syncing does not change Google sharing permissions.</p>
-        <p>Blueprint Mission: Saved - not submitted means the student still needs to select Submit to Teacher. The slideshow stays in its current location.</p>
-        <p>Enter feedback beside a link and select Save feedback. The student sees it in the activity. Feedback is separate from the Completed tick and is linked to the current submission; save or clear it before refreshing the page.</p>
+        <p>Blueprint Mission: Saved - not submitted means the student still needs to select Submit to Teacher. The slideshow stays in its current location. Tick Confirmed after reviewing it, even if team details are unfinished. The mission auto-completes once the slideshow is confirmed and the student's own membership, building area and contribution are ready; other teammates do not block completion.</p>
+        <p>Enter feedback beside a link and select Save feedback. The student sees it in the activity. Feedback is separate from teacher sign-off and is linked to the current submission; save or clear it before refreshing the page.</p>
         <div class="class-progress-filters">
           <label class="sites-field">Submission status
             <select id="class-submission-status-filter" aria-describedby="class-submission-status-filter-help">
               <option value="">All submissions</option>
               <option value="saved">Saved - not submitted or sync needed</option>
-              <option value="awaiting-completion">Submitted - not ticked Completed</option>
+              <option value="awaiting-completion">Submitted - awaiting teacher sign-off</option>
             </select>
           </label>
         </div>
@@ -151,6 +151,6 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="../script.js?v=teacher-review-refresh-1"></script>
   <script src="./typing-week-labels.js?v=1"></script>
-  <script src="./teacher-results.js?v=28"></script>
+  <script src="./teacher-results.js?v=29"></script>
 </body>
 </html>

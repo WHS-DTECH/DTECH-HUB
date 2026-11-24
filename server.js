@@ -16562,6 +16562,15 @@ async function fileKitDrawingSubmission({ studentEmail, documentKey, activityTit
 const blueprintTeams = require("./practical-skills/blueprint-teams").createBlueprintTeams({
   pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
   requireAdminAccess, canReview: canManagePracticalSchedule,
+  onChange: async (req, email) => {
+    const kitId = "kit-minecraft-builder-kit";
+    const content = await getStoredPracticalSkillsKitContent(kitId);
+    const index = content.activities?.findIndex((activity) => activity?.documentCheck === ActivityBlocks.BLUEPRINT_REVIEW_POLICY);
+    const progress = await syncPracticalSkillsKitCompletion(email, kitId, content, { recheckDocumentIndex: index });
+    if (progress.completed) void autoEmailKitCertificate(req, kitId, undefined, email);
+    return { completedActivities: progress.completed_activities, kitCompleted: Boolean(progress.completed),
+      verification: index >= 0 ? await documentVerification.get(email, kitId, index, content.activities[index], progress.responses) : null };
+  },
   getStudents: async () => dedupeToLatestStudentRows((await getStudentDirectoryRows()).map(buildStudentClassManagementRow))
     .filter((row) => String(row.status || "").toLowerCase() !== "not current")
     .map((row) => ({

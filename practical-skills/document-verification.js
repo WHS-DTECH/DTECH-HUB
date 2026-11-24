@@ -130,10 +130,6 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
         if (!POLICIES.has(policy)) return null;
         const { documentKey } = submission(activity, index, responses);
         if (!documentKey) return null;
-        if (policy === BLUEPRINT_POLICY && blueprintTeams) {
-            const ready = await blueprintTeams.getReadiness(student);
-            if (!ready.passed) return { documentKey, policy, passed: false, feedback: { message: ready.message } };
-        }
         if (!(await pool.query("SELECT to_regclass('practical_skills_document_checks') AS checks_table")).rows[0]?.checks_table) return null;
         const result = await pool.query(`SELECT document_key, policy, passed, method, feedback, reviewed_by, checked_at
             FROM practical_skills_document_checks WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3
@@ -145,8 +141,19 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             const submitted = await getSubmission(student, kit, index, documentKey);
             if (!submitted || new Date(row.checked_at) < new Date(submitted.submittedAt)) return null;
         }
-        return row ? { documentKey: row.document_key, policy: row.policy, passed: row.passed,
-            method: row.method, feedback: row.feedback, reviewedBy: row.reviewed_by, checkedAt: row.checked_at } : null;
+        if (!row) return null;
+        const verification = { documentKey: row.document_key, policy: row.policy, passed: row.passed,
+            method: row.method, feedback: row.feedback, reviewedBy: row.reviewed_by, checkedAt: row.checked_at };
+        if (policy === BLUEPRINT_POLICY) {
+            const ready = blueprintTeams ? await blueprintTeams.getReadiness(student) : { passed: true };
+            return { ...verification, confirmed: row.passed === true, teamDetailsReady: ready.passed,
+                passed: row.passed === true && ready.passed,
+                feedback: { ...row.feedback, message: row.passed
+                    ? ready.passed ? "Slideshow confirmed and your team details are ready. Activity completion is checked automatically."
+                        : `Slideshow confirmed. ${ready.message}`
+                    : row.feedback.message } };
+        }
+        return verification;
     }
     async function save(student, kit, index, documentKey, policy, passed, method, feedback, reviewer = null) {
         await ensureSchema();
@@ -251,7 +258,6 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                 const item = await load(req, email);
                 if (!TEACHER_ONLY.has(item.policy)) throw Object.assign(new Error("This activity uses its own completion check."), { status: 404 });
                 const blueprint = item.policy === BLUEPRINT_POLICY;
-                if (blueprint && blueprintTeams) await blueprintTeams.assertReady(email);
                 const answers = B.savedAnswers(item.activity, item.index, item.row.responses);
                 // A stand-in teacher receipt checks everything except the teacher's tick (valid link, other blocks, different file).
                 const ready = B.grade(item.activity, answers, {}, { content: item.content, index: item.index, responses: item.row.responses,
@@ -361,18 +367,20 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                     const students = {};
                     for (const row of progress) {
                         const email = normalizeEmail(row.student_email);
-                        students[email] = Object.fromEntries(activities.map(({ index, activity }) => {
+                        students[email] = Object.fromEntries(await Promise.all(activities.map(async ({ index, activity }) => {
                             const { url, documentKey } = submission(activity, index, row.responses || {});
                             const mine = (list) => list.find((entry) => current(entry, email, row.started_at) &&
                                 Number(entry.activity_index) === index && entry.document_key === documentKey && documentKey);
                             const check = mine(checks.filter((entry) => entry.policy === activity.documentCheck));
                             const submittedAt = mine(submissions)?.submitted_at || null;
                             const blueprint = activity.documentCheck === BLUEPRINT_POLICY;
+                            const confirmed = check?.passed === true && Boolean(submittedAt && new Date(check.checked_at) >= new Date(submittedAt));
                             return [index, { url: documentKey ? url : "", documentKey, submittedAt,
                                 filed: !blueprint && filedDrawings.some((entry) => normalizeEmail(entry.student_email) === email && entry.document_key === documentKey && entry.synced === true),
-                                completed: check?.passed === true && (!blueprint || Boolean(submittedAt && new Date(check.checked_at) >= new Date(submittedAt))),
+                                completed: blueprint ? (await get(email, kit, index, activity, row.responses || {}))?.passed === true : check?.passed === true,
+                                ...(blueprint ? { confirmed } : {}),
                                 teacherComment: mine(comments)?.comment || "" }];
-                        }));
+                        })));
                     }
                     result.push({ id: kit, activities: activities.map(({ worksheet, index, activity }) => ({
                         index, title: worksheet.activity || `Activity ${index + 1}`,
@@ -469,14 +477,13 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                 }
                 if (blueprint && req.body.approved &&
                     !await getSubmission(email, item.kit, item.index, item.documentKey)) {
-                    throw Object.assign(new Error("The student needs to submit this slideshow before it can be marked Completed."), { status: 409 });
+                    throw Object.assign(new Error("The student needs to submit this slideshow before it can be confirmed."), { status: 409 });
                 }
-                if (blueprint && req.body.approved && blueprintTeams) await blueprintTeams.assertReady(email);
                 await save(email, item.kit, item.index, item.documentKey, item.policy, req.body.approved, "teacher",
                     { message: req.body.approved
-                        ? blueprint ? "Teacher reviewed the slideshow and marked it Completed."
+                        ? blueprint ? "Teacher reviewed and confirmed the slideshow."
                             : drawing ? "Teacher reviewed the drawing and marked it Completed." : "Teacher reviewed the document and approved text completion."
-                        : blueprint ? "Teacher removed the Completed tick. Update your slideshow and select Submit to Teacher again."
+                        : blueprint ? "Teacher removed slideshow confirmation. Update your slideshow and select Submit to Teacher again."
                             : drawing ? "Teacher removed the Completed tick. Update your drawing and press Submit again." : "Teacher approval removed. Check the document again or request another review." },
                     normalizeEmail(getRequestUserEmail(req)));
                 if (TEACHER_ONLY.has(item.policy) && !req.body.approved) {

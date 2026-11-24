@@ -295,8 +295,9 @@
         if (!host) return;
         const when = (value) => new Date(value).toLocaleString("en-NZ");
         if (state.content?.activities?.[getCurrentActivityIndex()]?.documentCheck === "blueprint-slideshow-teacher-v1") {
+            host.dataset.teacherComment = teacherComment;
             host.textContent = (verification?.feedback?.message || (submission
-                ? `Submitted ${when(submission.submittedAt)}. Your teacher will review the slideshow and tick Completed.`
+                ? `Submitted ${when(submission.submittedAt)}. Your teacher will review and confirm the slideshow. The mission completes automatically when your team details are ready too.`
                 : "Paste your slideshow sharing link and select Submit to Teacher.")) +
                 (teacherComment ? ` Teacher feedback: ${teacherComment}` : "");
             return;
@@ -352,7 +353,7 @@
                 updateActivityCompleteBar();
                 showDocumentVerification(result.verification, result.submission, result.teacherComment);
                 if (blueprint) {
-                    showStatusMessage("Slideshow submitted. Your teacher will review it and mark the activity Completed.");
+                    showStatusMessage("Slideshow submitted. Your teacher will confirm it; the mission completes automatically when your team details are ready too.");
                     return result;
                 }
                 const filing = result.filing || {};
@@ -437,7 +438,7 @@
         title.textContent = blueprint ? "Submit your Blueprint Mission slideshow" : drawing ? "Submit your Google Drawing"
             : `Finish your ${state.content.worksheets?.[index]?.activity || "typed"} document`;
         const help = document.createElement("p");
-        help.textContent = blueprint ? "Paste the slideshow sharing link and select Submit to Teacher. Saving the link alone does not complete the activity. Your teacher will open the slideshow and tick Completed." : drawing
+        help.textContent = blueprint ? "Paste the slideshow sharing link and select Submit to Teacher. Your teacher confirms the slideshow independently. The mission completes automatically once the slideshow is confirmed and your own team membership, building area and contribution are ready." : drawing
             ? "Save your Google Drawing's sharing link, then press Submit below and allow Google permission. Saved means sync is still needed; Submitted means your drawing has been filed in your DTECH folder. Your teacher receives your link and ticks Completed separately."
             : "Save your document and its sharing link, then use Check my document below. Google Docs and Word (.docx) files in Google Drive can be checked automatically. For other file types or OneDrive, ask your teacher to open the link and approve the completed text in Teacher Review.";
         const note = document.createElement("p");
@@ -813,9 +814,20 @@
                 readOnly: preview || !state.email,
                 blocksReadOnly: !state.progressLoaded,
                 blockAnswers: state.responses[`${activityIndex}-blocks`] || {},
-                onBlueprintTeamRequest: (url, options = {}) => loadJson(url, {
-                    ...options, headers: withAuthHeaders({ "Content-Type": "application/json" }, true), cache: "no-store"
-                }),
+                onBlueprintTeamRequest: async (url, options = {}) => {
+                    const result = await loadJson(url, {
+                        ...options, headers: withAuthHeaders({ "Content-Type": "application/json" }, true), cache: "no-store"
+                    });
+                    if (result.completedActivities) {
+                        state.completedActivities = result.completedActivities;
+                        updateActivityCompleteBar();
+                        if (getCurrentActivityIndex() === activityIndex) {
+                            showDocumentVerification(result.verification, state.submissions[activityIndex],
+                                document.getElementById("worksheet-document-check-status")?.dataset.teacherComment || "");
+                        }
+                    }
+                    return result;
+                },
                 onBlockChange: (answers) => {
                     state.responses[`${activityIndex}-blocks`] = answers;
                     queueBlockAnswerSave(activityIndex);

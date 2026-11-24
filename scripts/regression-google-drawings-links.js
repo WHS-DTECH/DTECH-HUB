@@ -819,7 +819,7 @@ test("Blueprint Mission requires the current slideshow submission and a teacher 
     assert.equal(B.withFilesFoldersLinks(original, "kit-minecraft"), original, "Player Kit is unchanged");
 });
 
-test("Blueprint submission, teacher approval and existing ticks require the student's own current acknowledgement", async (t) => {
+test("Blueprint confirmation is independent; completion needs both sign-off and the student's own current team details", async (t) => {
     let ready = false;
     const blueprintTeams = {
         getReadiness: async () => ({ passed: ready, message: "Acknowledge your own contribution." }),
@@ -832,20 +832,32 @@ test("Blueprint submission, teacher approval and existing ticks require the stud
     const f = await fixture(t, options);
     const shared = "https://docs.google.com/presentation/d/shared-team-slides/edit";
     f.progress.responses["0-blocks"] = { "blueprint-slideshow-link": shared };
-    assert.equal((await f.submit(0)).status, 422);
-    ready = true;
     assert.equal((await f.submit(0)).status, 200);
-    ready = false;
-    assert.equal((await f.approve(0, true, shared)).status, 422);
+    const signedOff = await f.approve(0, true, shared);
+    assert.equal(signedOff.status, 200);
+    assert.equal(signedOff.data.verification.confirmed, true);
+    assert.equal(signedOff.data.verification.passed, false);
+    assert.equal(signedOff.data.kitCompleted, false);
+    const listed = (await f.list()).data.kits[0].students["student@school.nz"][0];
+    assert.equal(listed.confirmed, true);
+    assert.equal(listed.completed, false);
     ready = true;
-    assert.equal((await f.approve(0, true, shared)).data.kitCompleted, true);
+    await f.sync();
+    assert.equal(f.progress.completed, true, "Finishing team details completes the mission without another teacher tick");
     ready = false;
     await f.sync();
     assert.equal(f.progress.completed, false, "Membership corrections invalidate previous Blueprint ticks");
+    assert.equal((await f.status(0)).data.verification.confirmed, true, "Team changes do not discard slideshow sign-off");
     ready = true;
     const second = await fixture(t, options);
     second.progress.responses["0-blocks"] = { "blueprint-slideshow-link": shared };
     assert.equal((await second.submit(0)).status, 200, "The same slideshow is accepted in separate student submission records");
+    assert.equal(second.progress.completed, false, "Team details alone do not complete the mission");
+    assert.equal((await second.approve(0, true, shared)).data.kitCompleted, true, "Team-details-first order also works");
+    assert.equal((await second.approve(0, false, shared)).data.kitCompleted, false);
+    f.progress.responses["0-blocks"] = { "blueprint-slideshow-link": "https://docs.google.com/presentation/d/replaced/edit" };
+    await f.sync();
+    assert.equal(f.progress.completed, false, "A replaced slideshow needs fresh confirmation");
 });
 
 test("teacher submissions list and Completed ticks drive kit completion and the certificate", async (t) => {
