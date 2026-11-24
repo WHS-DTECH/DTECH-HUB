@@ -1,6 +1,18 @@
 (() => {
     "use strict";
     const B = window.ActivityBlocks, e = B.escape;
+    function taskList(text) {
+        const tasks = [];
+        String(text || "").split(/\r?\n/).filter((line) => line.trim()).forEach((line) => {
+            const label = line.trim().replace(/^\d+[.)]\s+/, "");
+            const parent = tasks[tasks.length - 1];
+            if (parent && /^(?: {2,}|\t)\d+[.)]\s+/.test(line)) parent.children.push(label);
+            else tasks.push({ label, children: [] });
+        });
+        return `<ol>${tasks.map(({ label, children }) => `<li class="activity-block-text">${children.length
+            ? `<strong>${e(label)}</strong><ol>${children.map((child) => `<li class="activity-block-text">${e(child)}</li>`).join("")}</ol>`
+            : e(label)}</li>`).join("")}</ol>`;
+    }
     function googleWarning(value) {
         return `<div class="activity-block-onedrive-alert" data-google-link-warning role="alert" ${B.isGoogleLink?.(value) ? "" : "hidden"}>
             <strong>&#9888;&#65039; This is a Google link &mdash; it will NOT earn your tick.</strong>
@@ -15,7 +27,7 @@
             const link = B.safeUrl(b.url);
             let body = "";
             if (b.kind === "text" && b.numbered !== true) body = `<p class="activity-block-text">${e(b.text)}</p>`;
-            if (b.kind === "tasks" || (b.kind === "text" && b.numbered === true)) body = `<ol>${String(b.text || "").split(/\r?\n/).filter((s) => s.trim()).map((s) => `<li class="activity-block-text">${e(s.trim().replace(/^\d+[.)]\s+/, ""))}</li>`).join("")}</ol>`;
+            if (b.kind === "tasks" || (b.kind === "text" && b.numbered === true)) body = taskList(b.text);
             if (unityEditor && b.id === "unity-editor-version") body += `
                 <aside aria-label="Teacher-managed Unity Editor version">
                     <p>Required Unity Editor Version <small>(Teacher managed)</small></p>

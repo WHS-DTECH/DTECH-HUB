@@ -64,6 +64,41 @@ test("numbered text restarts per block, ignores empty lines and preserves existi
     assert.throws(() => B.validate({ blocks: [block("text", { numbered: "true" })] }), /true or false/);
 });
 
+test("numbered substeps stay inside Step 2 and leave six main steps", async () => {
+    const { parseDocument } = await import("htmlparser2");
+    const context = vm.createContext({ window: { ActivityBlocks: B }, structuredClone });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "activity-block-view.js"), "utf8"), context);
+    const text = "Open the guide.\r\nSign in to SketchUp for Schools\r\n" +
+        "  1. Click Open SketchUp and the Starter Model.\r\n" +
+        "  2. Choose Sign in with Google.\r\n\r\n" +
+        "  3. Click the Pop-up blocked icon.\r\n" +
+        "  4. Always allow pop-ups from edu.sketchup.com.\r\n" +
+        "  5. Click Sign in with Google again.\r\n" +
+        "Save your copy.\r\nBuild your cabin.\r\nShare the link.\r\nMark complete.";
+    const html = context.window.ActivityBlockView.markup([block("tasks", { text })], {}, true);
+    const section = parseDocument(html).children[0];
+    const mainSteps = section.children.find((node) => node.name === "ol").children;
+    assert.equal(mainSteps.length, 6);
+    assert.equal(mainSteps[1].children[0].name, "strong");
+    assert.equal(mainSteps[1].children[0].children[0].data, "Sign in to SketchUp for Schools");
+    const substeps = mainSteps[1].children.find((node) => node.name === "ol").children;
+    assert.equal(substeps.length, 5);
+    assert.equal(substeps[0].children[0].data, "Click Open SketchUp and the Starter Model.");
+    assert.equal(substeps[4].children[0].data, "Click Sign in with Google again.");
+    assert.equal(mainSteps[2].children[0].data, "Save your copy.");
+    assert.equal(mainSteps[5].children[0].data, "Mark complete.");
+});
+
+test("substeps escape content, accept tabs and preserve orphan or ordinary indented lines", () => {
+    const context = vm.createContext({ window: { ActivityBlocks: B }, structuredClone });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "activity-block-view.js"), "utf8"), context);
+    const html = context.window.ActivityBlockView.markup([block("text", {
+        numbered: true, text: "  1. Orphan\n  Ordinary indented step\n\t1) Open <Google>\nNext step"
+    })], {}, true);
+    assert.match(html, /<ol><li class="activity-block-text">Orphan<\/li><li class="activity-block-text"><strong>Ordinary indented step<\/strong><ol><li class="activity-block-text">Open &lt;Google&gt;<\/li><\/ol><\/li><li class="activity-block-text">Next step<\/li><\/ol>/);
+    assert.doesNotMatch(html, /<Google>/);
+});
+
 test("student links require a safe HTTPS string and cannot earn ticks with unsafe or missing URLs", () => {
     const activity = { completionMode: "auto", blocks: [block("studentlink", { required: true })] };
     B.validate(activity);
