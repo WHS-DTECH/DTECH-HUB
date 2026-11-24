@@ -966,7 +966,7 @@
 
         if (teamRole) window.BlueprintTeams.bind(host, {
             request: options.onBlueprintTeamRequest, registration: teamRole === "registration",
-            readOnly: readOnly || options.blocksReadOnly
+            readOnly: readOnly || options.blocksReadOnly, syncSlide: options.onBlueprintSlideSync
         });
         if (blocks && window.ActivityBlockView) window.ActivityBlockView.bind(host, blocks, {
             answers: blockAnswers, readOnly: readOnly || options.blocksReadOnly,

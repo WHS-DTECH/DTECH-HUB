@@ -6,9 +6,10 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const { createBlueprintTeams } = require("../practical-skills/blueprint-teams");
+const { presentationId, slideRequests, updateTeamSlide } = require("../practical-skills/blueprint-team-slide");
 const B = require("../practical-skills/activity-blocks");
 
-async function fixture(t, { onChange } = {}) {
+async function fixture(t, { onChange, updateSlides } = {}) {
     let teams = new Map(), members = new Map(), tail = Promise.resolve();
     const statements = [];
     const students = ["a", "b", "c", "d", "e"].map((id) => ({
@@ -82,7 +83,7 @@ async function fixture(t, { onChange } = {}) {
             release() {}
         };
     } };
-    const deps = { pool, hasDatabase: true, getStudents: async () => students, onChange, now: () => new Date("2026-11-24T00:00:00Z"),
+    const deps = { pool, hasDatabase: true, getStudents: async () => students, onChange, updateSlides, now: () => new Date("2026-11-24T00:00:00Z"),
         normalizeEmail: (email) => String(email || "").trim().toLowerCase(), schoolDomain: "school.nz",
         getRequestUserEmail: (req) => req.headers["x-user-email"],
         requireAdminAccess: (req, res, next) => req.headers["x-user-email"] === "teacher@school.nz" ? next() : res.sendStatus(403),
@@ -215,4 +216,129 @@ test("saving own team details recalculates completion after persistence without 
         { decision: "accept", version: 1, area: "Roof", contribution: "Build the roof." });
     assert.equal(accepted.body.completedActivities[0], "2026-11-24");
     assert.equal((await f.service.getReadiness("b@school.nz")).passed, false);
+});
+
+test("storyboard instructions add three required links and confirmation without replacing existing evidence IDs", () => {
+    const original = { worksheets: [{ activity: "The Blueprint Mission" }, { activity: "Famous Building Challenge" }],
+        activities: [{ blocks: [{ id: "original", kind: "studentlink" }] }, { completionMode: "auto", uniqueDocumentLinks: true, noGoogleLinks: true, taskBrief: { evidenceRequired: "Two links" }, blocks: [
+            { id: "steps", kind: "tasks", title: "Your steps", text: "Old instructions" },
+            { id: "team", kind: "text", title: "Working in a team?", text: "Old instructions" },
+            { id: "video", kind: "studentlink", title: "Minecraft video walkthrough share link", driveOnly: true, required: true },
+            { id: "world", kind: "studentlink", title: "Minecraft world share link", driveOnly: true, required: true }
+        ] }] };
+    const content = B.withFilesFoldersLinks(original, "kit-minecraft-builder-kit");
+    const activity = content.activities[1];
+    assert.equal(B.withFilesFoldersLinks(content, "kit-minecraft-builder-kit"), content);
+    assert.deepEqual(activity.blocks.map((block) => block.id), ["steps", "team", B.STORYBOARD_LINK_ID, B.STORYBOARD_CONFIRM_ID, "video", "world"]);
+    assert.match(activity.blocks[0].text, /screenshots[\s\S]*storyboard[\s\S]*\.mcworld/);
+    const view = { window: { ActivityBlocks: B } };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../practical-skills/activity-block-view.js"), "utf8"), view);
+    const html = view.window.ActivityBlockView.markup(activity.blocks, {}, false);
+    assert.match(html, /<strong>Prepare your building:<\/strong>/);
+    assert.match(html, /<strong>Submit your evidence:<\/strong>/);
+    assert.match(activity.blocks[1].text, /Every team member must submit all three links/);
+    assert.match(activity.taskBrief.evidenceRequired, /three Google Drive share links/);
+    B.validate(activity);
+    const answers = { [B.STORYBOARD_LINK_ID]: "https://docs.google.com/presentation/d/shared/edit",
+        video: "https://drive.google.com/file/d/shared-video/view",
+        world: "https://drive.google.com/file/d/shared-world/view", [B.STORYBOARD_CONFIRM_ID]: true };
+    const grade = () => B.grade(activity, answers, {}, { content, index: 1, responses: {
+        "0-blocks": { original: answers[B.STORYBOARD_LINK_ID] }, "1-blocks": answers } });
+    assert.equal(grade().passed, true);
+    for (const id of [B.STORYBOARD_LINK_ID, "video", "world", B.STORYBOARD_CONFIRM_ID]) {
+        const saved = answers[id];
+        delete answers[id];
+        assert.equal(grade().passed, false, `${id} is required`);
+        answers[id] = saved;
+    }
+});
+
+test("storyboard prefill uses only the submitted current slideshow and preserves existing answers", () => {
+    const content = { activities: [{ documentCheck: B.BLUEPRINT_REVIEW_POLICY, blocks: [] }, { blocks: [] }] };
+    const link = "https://docs.google.com/presentation/d/shared/edit";
+    const responses = { "0-blocks": { "blueprint-slideshow-link": link }, "1-blocks": {} };
+    assert.deepEqual(B.storyboardPrefill(content, 1, responses, null), { link: "", prefilled: false });
+    assert.deepEqual(B.storyboardPrefill(content, 1, responses, { documentKey: "different" }), { link: "", prefilled: false });
+    const submission = { documentKey: B.documentLinkKey(link) };
+    assert.deepEqual(B.storyboardPrefill(content, 1, responses, submission), { link, prefilled: true });
+    responses["1-blocks"][B.STORYBOARD_LINK_ID] = "https://drive.google.com/file/d/other/view";
+    assert.deepEqual(B.storyboardPrefill(content, 1, responses, submission), { link, prefilled: false });
+    assert.match(responses["1-blocks"][B.STORYBOARD_LINK_ID], /other/);
+});
+
+test("slide updates require a verified active member", async (t) => {
+    const calls = [];
+    const f = await fixture(t, { updateSlides: async (_req, email, team) => { calls.push({ email, team }); return { updated: 1 }; } });
+    await f.service.registerTeam("a@school.nz", { mode: "team", teammateIds: ["b"], building: "Tower" });
+    assert.equal((await f.request("/slides", "a@school.nz", "POST", {}, { "x-verified": "no" })).status, 401);
+    assert.equal((await f.request("/slides", "c@school.nz", "POST", {})).status, 409);
+    assert.equal((await f.request("/slides", "b-old@school.nz", "POST", {})).status, 200);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].team.building, "Tower");
+});
+
+test("team slide refresh serializes with contribution changes and a decline refreshes the old team", async (t) => {
+    let started, release;
+    const entered = new Promise((resolve) => { started = resolve; });
+    const paused = new Promise((resolve) => { release = resolve; });
+    const seen = [];
+    const f = await fixture(t, { updateSlides: async (_req, _email, team) => {
+        seen.push(team);
+        if (seen.length === 1) { started(); await paused; }
+        return { updated: 1, total: 1, failures: [] };
+    } });
+    const team = await f.service.registerTeam("a@school.nz", { mode: "team", teammateIds: ["b"], building: "Tower" });
+    const sync = f.request("/slides", "a@school.nz", "POST", {});
+    await entered;
+    const acknowledgement = f.request(`/${team.id}/acknowledgement`, "b@school.nz", "PUT",
+        { decision: "accept", version: team.version, area: "Roof", contribution: "Build roof" });
+    release();
+    assert.equal((await sync).status, 200);
+    assert.equal((await acknowledgement).status, 200);
+    const declined = await f.request(`/${team.id}/acknowledgement`, "b@school.nz", "PUT",
+        { decision: "decline", version: team.version, driveAccessToken: "token" });
+    assert.equal(declined.status, 200);
+    assert.match(declined.body.slideStatus, /up to date/);
+    assert.equal(seen[1].members.find((member) => member.id === "b").status, "declined");
+});
+
+test("team slide updates only its managed objects, excludes unconfirmed members and emails, and checks edit permission", async () => {
+    const team = { id: "a7e2561b-001c-4017-9e03-bc1775c5a7b2", mode: "team", version: 1, building: "A Tower",
+        members: [{ name: "Ana", email: "private@school.nz", status: "accepted", acknowledgementVersion: 1,
+            area: "Roof", contribution: "Build the roof; contact private@school.nz" },
+        { name: "Ben", email: "other@school.nz", status: "pending", area: "", contribution: "" }] };
+    const created = slideRequests({ slides: [{ objectId: "student_page" }] }, team);
+    assert.equal(created[0].createSlide.slideLayoutReference.predefinedLayout, "BLANK");
+    const slideId = created[0].createSlide.objectId, shapeId = created[1].createShape.objectId;
+    const text = created[2].insertText.text;
+    assert.match(text, /Our Building Team[\s\S]*A Tower[\s\S]*Ana[\s\S]*Roof[\s\S]*Build the roof/);
+    assert.doesNotMatch(text, /school\.nz|Ben/);
+    const presentation = { revisionId: "rev", slides: [{ objectId: "student_page" }, { objectId: slideId, pageElements: [
+        { objectId: shapeId, shape: { text: { textElements: [{ textRun: { content: `${text}\n` } }] } } },
+        { objectId: "student_element" }
+    ] }] };
+    assert.deepEqual(slideRequests(presentation, team), []);
+    assert.throws(() => slideRequests({ slides: [{ objectId: "manual", pageElements: [
+        { shape: { text: { textElements: [{ textRun: { content: "Our Building Team\n" } }] } } }
+    ] }] }, team), /Update it manually/);
+    team.members[0].contribution = "Build the roof and tower";
+    const changed = slideRequests(presentation, team);
+    assert.deepEqual(changed.map((request) => Object.keys(request)[0]), ["deleteText", "insertText"]);
+    assert.equal(changed[0].deleteText.objectId, shapeId, "Never delete a student slide or shape");
+    let writes = 0;
+    const deps = { team, fileId: "slides", token: "token",
+        driveApiRequest: async () => ({ mimeType: "application/vnd.google-apps.presentation", capabilities: { canEdit: false } }),
+        googleSlidesApiRequest: async () => presentation,
+        googleSlidesApiBatchUpdate: async (_id, requests, _token, revision) => { writes++; assert.equal(revision, "rev"); assert.deepEqual(requests, changed); } };
+    await assert.rejects(updateTeamSlide(deps), /Editor access/);
+    assert.equal(writes, 0);
+    deps.driveApiRequest = async () => ({ mimeType: "application/vnd.google-apps.presentation", capabilities: { canEdit: true } });
+    assert.deepEqual(await updateTeamSlide(deps), { updated: true });
+    assert.equal(writes, 1);
+    deps.googleSlidesApiBatchUpdate = async () => { throw new Error("Google update failed"); };
+    await assert.rejects(updateTeamSlide(deps), /Google update failed/, "Never claim success after failed Google writes");
+    assert.equal(presentationId("https://docs.google.com/presentation/d/abc-123/edit"), "abc-123");
+    assert.equal(presentationId("https://drive.google.com/file/d/abc-123/view"), "abc-123");
+    assert.equal(presentationId("https://drive.google.com/open?id=abc-123"), "abc-123");
+    assert.equal(presentationId("https://docs.google.com.evil.example/presentation/d/abc/edit"), "");
 });

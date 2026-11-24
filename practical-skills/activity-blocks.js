@@ -119,8 +119,69 @@
     const GOOGLE_DRAWING_POLICY = "google-drawing-teacher-v1";
     const BLUEPRINT_REVIEW_POLICY = "blueprint-slideshow-teacher-v1";
     const BLUEPRINT_LINK_ID = "blueprint-slideshow-link";
+    const STORYBOARD_LINK_ID = "blueprint-storyboard-link";
+    const STORYBOARD_CONFIRM_ID = "blueprint-storyboard-confirm";
+    function storyboardPrefill(content, index, responses, submission) {
+        const blueprintIndex = (content.activities || []).findIndex((activity) => activity?.documentCheck === BLUEPRINT_REVIEW_POLICY);
+        const original = blueprintIndex < 0 ? "" : savedAnswers(content.activities[blueprintIndex], blueprintIndex, responses)[BLUEPRINT_LINK_ID];
+        const link = submission?.documentKey && submission.documentKey === documentLinkKey(original) ? studentUrl(original, true) : "";
+        const answers = responses[`${index}-blocks`];
+        const prefilled = Boolean(link && answers && !Object.hasOwn(answers, STORYBOARD_LINK_ID));
+        if (prefilled) answers[STORYBOARD_LINK_ID] = link;
+        return { link, prefilled };
+    }
+    function withBlueprintStoryboard(content, kitId) {
+        if (kitId !== "kit-minecraft-builder-kit") return content;
+        const index = (content.worksheets || []).findIndex((worksheet) =>
+            !worksheet?.hidden && worksheet?.mergedInto === undefined &&
+            String(worksheet?.activity || "").trim().toLowerCase() === "famous building challenge");
+        const activity = content.activities?.[index];
+        if (!activity || !Array.isArray(activity.blocks)) return content;
+        const steps = [
+            "Prepare your building: Open your Minecraft world and your original Blueprint Slideshow. Decide which parts of your building you want to show.",
+            "Capture your building: Take a sequence of screenshots showing the important features of your completed Minecraft construction. If working in a team, include the areas each team member contributed to.",
+            "Create your storyboard: Add your screenshots to the end of your Blueprint Slideshow. Arrange them in the order you intend to visit them during your video walkthrough. Label the screenshots to identify the building features and who contributed to them.",
+            "Record your walkthrough: Use your storyboard to guide your video tour. Move around your building while recording the screen. If working in a team, show the contributions of every team member.",
+            "Save your video: Save the recording in your Google Drive-backed Videos folder.",
+            "Export your world: Export the latest version of your Minecraft construction as a .mcworld file.",
+            "Share your work: Check that your teacher can access your updated Blueprint Slideshow, video walkthrough and exported Minecraft world.",
+            "Submit your evidence: Paste all three Google Drive share links into the Licence Kit."
+        ].join("\n");
+        const teamText = "Your team may share a Blueprint Slideshow, Minecraft world and walkthrough video, provided each student's contribution is identified and shown.\n\nEvery team member must submit all three links in their own activity.";
+        const change = (block, values) => Object.entries(values).every(([key, value]) => block[key] === value)
+            ? block : { ...block, ...values };
+        let blocks = activity.blocks.map((block) =>
+            block.kind === "tasks" && /^your steps$/i.test(block.title || "") ? change(block, { text: steps, boldHeadings: true }) :
+            block.kind === "text" && /^working in a team\?$/i.test(block.title || "") ? change(block, { text: teamText }) : block);
+        const additions = [
+            { id: STORYBOARD_LINK_ID, kind: "studentlink", title: "Updated Blueprint Slideshow share link",
+                text: "Paste the Google sharing link to your updated Blueprint Slideshow. Make sure your teacher can open it.",
+                required: true, driveOnly: true },
+            { id: STORYBOARD_CONFIRM_ID, kind: "checkbox", title: "Storyboard confirmation",
+                text: "I have added and labelled my building screenshots at the end of the Blueprint Slideshow.", required: true }
+        ];
+        for (const addition of additions) {
+            const existing = blocks.find((block) => block.id === addition.id);
+            if (existing) blocks = blocks.map((block) => block === existing ? change(block, addition) : block);
+            else {
+                const position = blocks.findIndex((block) => block.kind === "studentlink" && block.id !== STORYBOARD_LINK_ID);
+                const at = position < 0 ? blocks.length : position;
+                blocks = [...blocks.slice(0, at), addition, ...blocks.slice(at)];
+            }
+        }
+        const brief = activity.taskBrief || {};
+        const evidence = "Submit three Google Drive share links: your updated Blueprint Slideshow, Minecraft video walkthrough and latest exported .mcworld file. Confirm that you updated the slideshow.";
+        const taskBrief = brief.evidenceRequired === evidence ? brief : { ...brief, evidenceRequired: evidence };
+        if (activity.completionMode === "auto" && !activity.uniqueDocumentLinks && !activity.noGoogleLinks && taskBrief === activity.taskBrief &&
+            blocks.length === activity.blocks.length && blocks.every((block, i) => block === activity.blocks[i])) return content;
+        const activities = [...content.activities];
+        activities[index] = { ...activity, taskBrief, blocks, completionMode: "auto",
+            uniqueDocumentLinks: false, noGoogleLinks: false };
+        return { ...content, activities };
+    }
     function withBlueprintReview(content, kitId) {
         if (kitId !== "kit-minecraft-builder-kit") return content;
+        content = withBlueprintStoryboard(content, kitId);
         const activities = [...(content?.activities || [])];
         let changed = false;
         (content?.worksheets || []).forEach((worksheet, index) => {
@@ -425,5 +486,6 @@
     }
     return { types, interactive, escape, safeUrl, studentUrl, specialised, initialBlocks, savedAnswers, publicActivity, entries, puzzle, validate, grade,
         withFilesFoldersLinks, withGoogleDrawingsLinks, documentLinkKey, reviewLinkBlock, isGoogleLink, GOOGLE_LINK_MESSAGE,
+        STORYBOARD_LINK_ID, STORYBOARD_CONFIRM_ID, storyboardPrefill,
         GOOGLE_DRAWING_POLICY, BLUEPRINT_REVIEW_POLICY };
 });

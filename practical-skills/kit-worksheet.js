@@ -260,6 +260,9 @@
             if (getSignedInEmail() !== email || revision !== state.blockRevision) return result;
             state.completedActivities = result.completedActivities;
             updateActivityCompleteBar();
+            if (state.content.activities[index]?.documentCheck === window.ActivityBlocks.BLUEPRINT_REVIEW_POLICY) {
+                document.querySelector("[data-blueprint-team]")?.dispatchEvent(new Event("blueprint-link-saved"));
+            }
             const auto = state.content.activities[index].completionMode === "auto" && !window.ActivityBlocks.specialised(state.content.activities[index]);
             showStatusMessage(auto
                 ? result.passed ? state.completedActivities[index] ? "Activity complete! Your answers and automatic tick are saved."
@@ -828,6 +831,15 @@
                     }
                     return result;
                 },
+                onBlueprintSlideSync: async (askPermission) => {
+                    let token = window.getActiveHubDriveAccessToken?.();
+                    if (!token && askPermission) token = await getResearchReportDriveToken();
+                    if (!token) throw new Error("Google Drive permission is needed to update the team slide. Select Update team slide, or add the details manually.");
+                    return loadJson("/api/practical-skills/blueprint-team/slides", {
+                        method: "POST", headers: withAuthHeaders({ "Content-Type": "application/json" }, true),
+                        body: JSON.stringify({ driveAccessToken: token }), cache: "no-store"
+                    });
+                },
                 onBlockChange: (answers) => {
                     state.responses[`${activityIndex}-blocks`] = answers;
                     queueBlockAnswerSave(activityIndex);
@@ -1231,12 +1243,51 @@
             }
             let siteGrade;
             const index = getCurrentActivityIndex();
+            let storyboardPrefilled = false;
+            let blueprintLink = "";
+            let blueprintLinkError = "";
+            if (state.kitId === "kit-minecraft-builder-kit" &&
+                state.content.worksheets?.[index]?.activity === "Famous Building Challenge") {
+                const blueprintIndex = state.content.activities.findIndex((activity) =>
+                    activity?.documentCheck === window.ActivityBlocks.BLUEPRINT_REVIEW_POLICY);
+                if (blueprintIndex >= 0) {
+                    try {
+                        const review = await loadJson(`${blockPath(blueprintIndex)}/document-check`,
+                            { headers: withAuthHeaders({}, true), cache: "no-store" });
+                        if (session !== state.sessionRevision) return;
+                        const prefill = window.ActivityBlocks.storyboardPrefill(state.content, index, state.responses, review.submission);
+                        blueprintLink = prefill.link;
+                        storyboardPrefilled = prefill.prefilled;
+                    } catch (error) {
+                        if (session !== state.sessionRevision) return;
+                        blueprintLinkError = error.message || "Could not load your submitted Blueprint Slideshow.";
+                    }
+                }
+            }
             const savedSiteAnswers = state.responses[`${index}-login-sites-readiness-v1`];
             if (!progressPayload.certificateRevoked && currentActivity?.loginSites && !state.completedActivities[index] && savedSiteAnswers &&
                 window.KitWorksheetRender.visibleLoginSites(currentActivity.loginSites, state.huntProfile).some((site) => site.readinessQuestion)) {
                 siteGrade = await checkLoginSiteCompletion(index, savedSiteAnswers);
             }
             renderPage();
+            if (state.kitId === "kit-minecraft-builder-kit" &&
+                state.content.worksheets?.[index]?.activity === "Famous Building Challenge") {
+                const panel = document.querySelector("[data-blueprint-team]");
+                if (panel) {
+                    const note = document.createElement(blueprintLink ? "a" : "p");
+                    if (blueprintLink) {
+                        note.href = blueprintLink;
+                        note.target = "_blank";
+                        note.rel = "noopener noreferrer";
+                        note.className = "worksheet-btn worksheet-btn-secondary";
+                        note.textContent = "Open My Blueprint Slideshow";
+                    } else note.textContent = blueprintLinkError ||
+                        "Submit your Blueprint Slideshow in The Blueprint Mission to open it here.";
+                    panel.append(note);
+                }
+                if (blueprintLinkError) showStatusMessage(blueprintLinkError, true);
+                if (storyboardPrefilled) queueBlockAnswerSave(index);
+            }
             updateCompleteBar(progressPayload?.kit);
             if (progressPayload.certificateRevoked) {
                 showStatusMessage("Your previous certificate was revoked. Your work is still saved. Complete each activity again to earn a new certificate.");

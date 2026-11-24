@@ -6246,7 +6246,7 @@ app.use(async (req, _res, next) => {
     (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/document-check$/.test(req.path)) ||
     (req.method === "POST" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/submit$/.test(req.path)) ||
     (["GET", "POST", "PUT"].includes(req.method) &&
-      /^\/api\/practical-skills\/blueprint-team(?:\/students|\/[a-f0-9-]{36}\/acknowledgement)?\/?$/.test(req.path)) ||
+      /^\/api\/practical-skills\/blueprint-team(?:\/students|\/slides|\/[a-f0-9-]{36}\/acknowledgement)?\/?$/.test(req.path)) ||
     (["GET", "PUT"].includes(req.method) &&
       /^\/api\/admin\/practical-skills\/blueprint-teams(?:\/[a-f0-9-]{36})?\/?$/.test(req.path)) ||
     (["GET", "PUT"].includes(req.method) && /^\/api\/admin\/kit-document-review\/kit-[a-z0-9-]+\/\d+$/.test(req.path)) ||
@@ -8481,11 +8481,12 @@ async function googleSlidesApiRequest(presentationId, accessToken) {
   return payload;
 }
 
-async function googleSlidesApiBatchUpdate(presentationId, requests, accessToken) {
+async function googleSlidesApiBatchUpdate(presentationId, requests, accessToken, requiredRevisionId = "") {
   const response = await fetch(`https://slides.googleapis.com/v1/presentations/${encodeURIComponent(presentationId)}:batchUpdate`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ requests: Array.isArray(requests) ? requests : [] })
+    body: JSON.stringify({ requests: Array.isArray(requests) ? requests : [],
+      ...(requiredRevisionId ? { writeControl: { requiredRevisionId } } : {}) })
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -16562,6 +16563,42 @@ async function fileKitDrawingSubmission({ studentEmail, documentKey, activityTit
 const blueprintTeams = require("./practical-skills/blueprint-teams").createBlueprintTeams({
   pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
   requireAdminAccess, canReview: canManagePracticalSchedule,
+  updateSlides: async (req, email, team) => {
+    const token = String(req.body?.driveAccessToken || "").trim();
+    if (!token) throw Object.assign(new Error("Allow Google Drive access to update the team slide, or add the details manually."), { status: 401 });
+    await verifyDriveTokenForStudent(token, email);
+    const content = await getStoredPracticalSkillsKitContent("kit-minecraft-builder-kit");
+    const index = (content.activities || []).findIndex((activity) => activity?.documentCheck === ActivityBlocks.BLUEPRINT_REVIEW_POLICY);
+    if (index < 0) throw Object.assign(new Error("The Blueprint Mission could not be found. Ask your teacher for help."), { status: 409 });
+    const activeKeys = new Set(team.members.filter((member) => ["pending", "accepted"].includes(member.status)).map((member) => member.id));
+    const directory = dedupeToLatestStudentRows((await getStudentDirectoryRows()).map(buildStudentClassManagementRow));
+    const emails = [...new Set([email, ...directory.filter((row) => activeKeys.has(getStudentIdentityKey(row)))
+      .flatMap((row) => (row.linked_emails || []).map(normalizeEmail).filter((value) => isSchoolEmail(value)))])];
+    const result = await pool.query(`SELECT student_email, responses FROM practical_skills_progress
+      WHERE kit_id = $1 AND student_email = ANY($2::text[])`, ["kit-minecraft-builder-kit", emails]);
+    const { presentationId, updateTeamSlide } = require("./practical-skills/blueprint-team-slide");
+    const ids = [...new Set(result.rows.map((row) => {
+      const url = ActivityBlocks.savedAnswers(content.activities[index], index, row.responses || {})["blueprint-slideshow-link"];
+      return presentationId(url);
+    }).filter(Boolean))];
+    if (!ids.length) throw Object.assign(new Error("Save a Google Slides link in The Blueprint Mission first, or add the team details manually."), { status: 409 });
+    const failures = [];
+    let updated = 0;
+    for (const fileId of ids) {
+      try {
+        await updateTeamSlide({ team, fileId, token, driveApiRequest, googleSlidesApiRequest, googleSlidesApiBatchUpdate });
+        updated++;
+      } catch (error) {
+        console.error("[blueprint-team-slide] Could not update slideshow:", error.message);
+        failures.push(error.code === "team_slide_conflict" ? error.message :
+          error.status === 401 || error.status === 403 ?
+            "Could not access a linked slideshow. Grant Drive access and ask its owner for Editor access, then retry or add the team details manually." :
+            "Could not update a linked slideshow. Retry, or add the team details manually.");
+      }
+    }
+    if (!updated) throw Object.assign(new Error(failures.join(" ")), { status: 422 });
+    return { updated, total: ids.length, failures };
+  },
   onChange: async (req, email) => {
     const kitId = "kit-minecraft-builder-kit";
     const content = await getStoredPracticalSkillsKitContent(kitId);

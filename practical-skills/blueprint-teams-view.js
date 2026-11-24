@@ -32,7 +32,7 @@
             ? `<textarea name="${name}" maxlength="${limit}" required>${e(value)}</textarea>`
             : `<input name="${name}" maxlength="${limit}" value="${e(value)}" required>`}</label>`;
     }
-    function bind(host, { request, registration, readOnly }) {
+    function bind(host, { request, registration, readOnly, syncSlide }) {
         const panel = host.querySelector("[data-blueprint-team]");
         if (!panel) return;
         const body = panel.querySelector("[data-team-body]");
@@ -40,6 +40,32 @@
         const refresh = panel.querySelector("[data-team-refresh]");
         let loading = false;
         let current;
+        let slideSync = Promise.resolve();
+        function updateSlide(askPermission = false) {
+            if (!registration || !current?.team || !syncSlide) return;
+            slideSync = slideSync.then(async () => {
+                if (!panel.isConnected) return;
+                const slideStatus = panel.querySelector("[data-team-slide-status]");
+                const button = panel.querySelector("[data-team-slide-sync]");
+                if (!slideStatus || !button) return;
+                slideStatus.textContent = "Updating your team slide...";
+                button.disabled = true;
+                try {
+                    const result = await syncSlide(askPermission);
+                    if (!panel.isConnected) return;
+                    const target = panel.querySelector("[data-team-slide-status]");
+                    if (target) target.textContent = result.failures.length
+                        ? `${result.updated} of ${result.total} linked slideshows are up to date. ${result.failures.join(" ")}`
+                        : `Our Building Team is up to date in ${result.updated} linked slideshow(s).`;
+                } catch (failure) {
+                    const target = panel.querySelector("[data-team-slide-status]");
+                    if (panel.isConnected && target) target.textContent = failure.message || "Could not update the team slide. Add the details manually.";
+                } finally {
+                    const target = panel.querySelector("[data-team-slide-sync]");
+                    if (panel.isConnected && target) target.disabled = false;
+                }
+            });
+        }
         function error(error) {
             status.textContent = error.message || "Team registration could not be loaded. Please retry.";
             status.classList.add("is-error");
@@ -49,10 +75,10 @@
             status.classList.remove("is-error");
             status.textContent = "Saving registration...";
             try {
-                await request(url, { method: url === BASE ? "POST" : "PUT", body: JSON.stringify(data) });
+                const result = await request(url, { method: url === BASE ? "POST" : "PUT", body: JSON.stringify(data) });
                 if (!panel.isConnected) return;
                 if (!await load()) throw new Error("The save response was received, but refreshed membership could not be loaded. Refresh before retrying.");
-                if (panel.isConnected) status.textContent = "Registration saved.";
+                if (panel.isConnected) status.textContent = `Registration saved.${result.slideStatus ? ` ${result.slideStatus}` : ""}`;
             } catch (failure) { if (panel.isConnected) error(failure); }
             finally { if (button.isConnected) button.disabled = false; }
         }
@@ -119,6 +145,9 @@
                 return;
             }
             body.innerHTML = details(team);
+            if (registration) body.insertAdjacentHTML("beforeend", `<p data-team-slide-status role="status">Checking team slide...</p>
+                <button type="button" class="worksheet-btn worksheet-btn-secondary" data-team-slide-sync>Update team slide</button>`);
+            if (registration) body.querySelector("[data-team-slide-sync]").addEventListener("click", () => updateSlide(true));
             const own = team.members.find((member) => member.id === current.student.id);
             if (!registration || team.mode !== "team" || !own) return;
             body.insertAdjacentHTML("beforeend", `<p>Confirm only your own membership and responsibility.
@@ -137,7 +166,8 @@
             });
             form.querySelector("[data-team-decline]").addEventListener("click", (event) => {
                 if (!window.confirm("Decline this team membership? You can then register independently or join another team.")) return;
-                void mutation(event.target, `${BASE}/${team.id}/acknowledgement`, { decision: "decline", version: team.version });
+                void mutation(event.target, `${BASE}/${team.id}/acknowledgement`, { decision: "decline", version: team.version,
+                    driveAccessToken: window.getActiveHubDriveAccessToken?.() || "" });
             });
         }
         async function load() {
@@ -149,6 +179,7 @@
                 current = await request(BASE);
                 if (!panel.isConnected) return;
                 show();
+                updateSlide();
                 status.textContent = "";
                 return true;
             } catch (failure) { if (panel.isConnected) error(failure); return false; }
@@ -161,6 +192,7 @@
             return;
         }
         refresh.addEventListener("click", load);
+        panel.addEventListener("blueprint-link-saved", () => updateSlide());
         void load();
     }
     async function teacher(host, request) {

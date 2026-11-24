@@ -6,7 +6,7 @@ const active = (member) => ["pending", "accepted"].includes(member.status);
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 
 function createBlueprintTeams({ pool, hasDatabase, getStudents, getRequestUserEmail, normalizeEmail,
-    schoolDomain, requireAdminAccess, canReview, onChange, now = () => new Date() }) {
+    schoolDomain, requireAdminAccess, canReview, onChange, updateSlides, now = () => new Date() }) {
     let schema;
     const year = () => Number(new Intl.DateTimeFormat("en", { year: "numeric", timeZone: "Pacific/Auckland" }).format(now()));
     function schoolEmail(value) {
@@ -73,6 +73,14 @@ function createBlueprintTeams({ pool, hasDatabase, getStudents, getRequestUserEm
         const students = await directory();
         const student = findStudent(students, email);
         return { student, students: students.filter((item) => item.courseInstance === student.courseInstance) };
+    }
+    async function withTeamForStudent(email, work) {
+        const { student } = await context(email);
+        return transaction(student.courseInstance, async (db) => {
+            const member = await membership(db, student);
+            if (!member) throw fail("Register your building before updating the team slide.", 409);
+            return work(publicTeam(await readTeam(db, member.team_id)));
+        });
     }
     async function transaction(scope, work) {
         await ensureSchema();
@@ -268,10 +276,37 @@ function createBlueprintTeams({ pool, hasDatabase, getStudents, getRequestUserEm
         }));
         app.post(base, endpoint(async (req, email) => ({ team: await registerTeam(email, req.body),
             ...(onChange ? await onChange(req, email) : {}) })));
+        app.post(`${base}/slides`, endpoint(async (req, email) => {
+            if (!updateSlides) throw fail("Team slide updates are unavailable. Add the team details manually.", 503);
+            return withTeamForStudent(email, (team) => updateSlides(req, email, team));
+        }));
         app.put(`${base}/:teamId/acknowledgement`, endpoint(async (req, email) => {
             if (!UUID.test(req.params.teamId)) throw fail("Choose a valid team.");
-            return { team: await acknowledge(email, req.params.teamId, req.body),
-                ...(onChange ? await onChange(req, email) : {}) };
+            const team = await acknowledge(email, req.params.teamId, req.body);
+            const result = { team, ...(onChange ? await onChange(req, email) : {}) };
+            if (req.body.decision === "decline") {
+                result.slideStatus = "Ask a remaining teammate to refresh the team details and update the team slide.";
+                if (updateSlides && req.body.driveAccessToken) {
+                    try {
+                        const { student } = await context(email);
+                        const sync = await transaction(student.courseInstance, async (db) => {
+                            const updatedTeam = await readTeam(db, req.params.teamId);
+                            if (updatedTeam.course_instance !== student.courseInstance ||
+                                !updatedTeam.members.some((member) => member.student_key === student.id && member.status === "declined")) {
+                                throw fail("Team membership changed. Ask a teammate to refresh the team slide.", 409);
+                            }
+                            return updateSlides(req, email, publicTeam(updatedTeam));
+                        });
+                        result.slideStatus = sync.failures.length
+                            ? `${sync.updated} of ${sync.total} linked slideshows are up to date. ${sync.failures.join(" ")}`
+                            : "The team slide is up to date.";
+                    } catch (error) {
+                        console.error("[blueprint-teams] Could not update slide after decline:", error.message);
+                        result.slideStatus = "Membership was declined, but the team slide could not be updated. Ask a remaining teammate to refresh it, or update it manually.";
+                    }
+                }
+            }
+            return result;
         }));
         const admin = "/api/admin/practical-skills/blueprint-teams";
         app.get(admin, requireAdminAccess, endpoint(async () => {

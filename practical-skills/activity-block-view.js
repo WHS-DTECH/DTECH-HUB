@@ -1,7 +1,7 @@
 (() => {
     "use strict";
     const B = window.ActivityBlocks, e = B.escape;
-    function taskList(text, afterTask) {
+    function taskList(text, afterTask, boldHeadings) {
         const tasks = [];
         String(text || "").split(/\r?\n/).filter((line) => line.trim()).forEach((line) => {
             const label = line.trim().replace(/^\d+[.)]\s+/, "");
@@ -11,6 +11,7 @@
         });
         return `<ol>${tasks.map(({ label, children }, index) => `<li class="activity-block-text">${children.length
             ? `<strong>${e(label)}</strong><ol>${children.map((child) => `<li class="activity-block-text">${e(child)}</li>`).join("")}</ol>`
+            : boldHeadings && label.includes(": ") ? `<strong>${e(label.slice(0, label.indexOf(":") + 1))}</strong>${e(label.slice(label.indexOf(":") + 1))}`
             : e(label)}${afterTask?.(label, index) || ""}</li>`).join("")}</ol>`;
     }
     function googleWarning(value) {
@@ -28,7 +29,7 @@
             let body = "";
             if (b.kind === "text" && b.numbered !== true) body = `<p class="activity-block-text">${e(b.text)}</p>`;
             if (b.kind === "tasks" || (b.kind === "text" && b.numbered === true)) body = taskList(b.text,
-                renderAfterTask ? (label, index) => renderAfterTask(b, label, index) : null);
+                renderAfterTask ? (label, index) => renderAfterTask(b, label, index) : null, b.boldHeadings);
             if (unityEditor && b.id === "unity-editor-version") body += `
                 <aside aria-label="Teacher-managed Unity Editor version">
                     <p>Required Unity Editor Version <small>(Teacher managed)</small></p>
