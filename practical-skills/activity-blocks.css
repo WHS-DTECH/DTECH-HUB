@@ -60,3 +60,23 @@
 .activity-content-block a:focus-visible, .activity-content-block button:focus-visible, .activity-content-block input:focus-visible, .activity-content-block textarea:focus-visible { outline: 3px solid #ad6200; outline-offset: 2px; }
 @media(max-width: 760px) { .activity-block-columns { grid-template-columns: 1fr; gap: 0; } }
 @media(max-width: 560px) { .block-palette { grid-template-columns: 1fr; } .activity-content-block { padding: 14px; } }
+.blueprint-team form {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+.blueprint-team label {
+    display: grid;
+    gap: .4rem;
+}
+.blueprint-team input, .blueprint-team textarea, .blueprint-team select {
+    box-sizing: border-box;
+    width: 100%;
+    padding: .6rem;
+    font: inherit;
+    border: 1px solid #b7c7bc;
+    border-radius: .4rem;
+}
+.blueprint-team textarea { min-height: 6rem; }
+.blueprint-team td { white-space: pre-wrap; }
+.blueprint-team .is-error { color: #a21d27; }

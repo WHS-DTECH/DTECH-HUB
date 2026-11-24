@@ -813,6 +813,9 @@
                 readOnly: preview || !state.email,
                 blocksReadOnly: !state.progressLoaded,
                 blockAnswers: state.responses[`${activityIndex}-blocks`] || {},
+                onBlueprintTeamRequest: (url, options = {}) => loadJson(url, {
+                    ...options, headers: withAuthHeaders({ "Content-Type": "application/json" }, true), cache: "no-store"
+                }),
                 onBlockChange: (answers) => {
                     state.responses[`${activityIndex}-blocks`] = answers;
                     queueBlockAnswerSave(activityIndex);

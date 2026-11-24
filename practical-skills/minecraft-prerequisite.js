@@ -46,7 +46,8 @@ function createMinecraftPrerequisite({ getVerifiedEmail, getProgress, isStaff })
         const match = kitRoute.exec(path);
         let kit;
         try {
-            kit = match ? decodeURIComponent(match[1]).trim().toLowerCase() : "";
+            kit = match ? decodeURIComponent(match[1]).trim().toLowerCase() :
+                /^\/api\/practical-skills\/blueprint-team(?:\/|$)/i.test(path) ? BUILDER : "";
         } catch {
             return res.status(400).json({ error: "Invalid kit link." });
         }

@@ -98,6 +98,7 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
         let kitId;
         try {
             kitId = match ? decodeURIComponent(match[1]).trim()
+                : /^\/api\/practical-skills\/blueprint-team(?:\/|$)/.test(path) ? "kit-minecraft-builder-kit"
                 : /^\/api\/practical-skills\/minecraft-exports-folder\/?$/.test(path) ? "kit-minecraft"
                 : /^\/api\/practical-skills\/typing-kit(?:\/|$)/.test(path) ? "kit-typing" : null;
         } catch (_error) {

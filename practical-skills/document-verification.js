@@ -11,7 +11,7 @@ const TEACHER_ONLY = new Set([DRAWING_POLICY, BLUEPRINT_POLICY]);
 function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
     syncCompletion, getRequestUserEmail, normalizeEmail, schoolDomain, verifyDriveTokenForStudent,
     driveApiRequest, requireAdminAccess, canReview, autoEmailKitCertificate, notifySubmission = async () => false,
-    fileSubmission = async () => ({ filed: false }), fetchFile = fetch }) {
+    fileSubmission = async () => ({ filed: false }), fetchFile = fetch, blueprintTeams }) {
     let schema, submissionSchema, commentSchema;
     async function ensureCommentSchema() {
         if (!commentSchema) commentSchema = pool.query(`CREATE TABLE IF NOT EXISTS practical_skills_drawing_comments (
@@ -130,6 +130,10 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
         if (!POLICIES.has(policy)) return null;
         const { documentKey } = submission(activity, index, responses);
         if (!documentKey) return null;
+        if (policy === BLUEPRINT_POLICY && blueprintTeams) {
+            const ready = await blueprintTeams.getReadiness(student);
+            if (!ready.passed) return { documentKey, policy, passed: false, feedback: { message: ready.message } };
+        }
         if (!(await pool.query("SELECT to_regclass('practical_skills_document_checks') AS checks_table")).rows[0]?.checks_table) return null;
         const result = await pool.query(`SELECT document_key, policy, passed, method, feedback, reviewed_by, checked_at
             FROM practical_skills_document_checks WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3
@@ -247,6 +251,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                 const item = await load(req, email);
                 if (!TEACHER_ONLY.has(item.policy)) throw Object.assign(new Error("This activity uses its own completion check."), { status: 404 });
                 const blueprint = item.policy === BLUEPRINT_POLICY;
+                if (blueprint && blueprintTeams) await blueprintTeams.assertReady(email);
                 const answers = B.savedAnswers(item.activity, item.index, item.row.responses);
                 // A stand-in teacher receipt checks everything except the teacher's tick (valid link, other blocks, different file).
                 const ready = B.grade(item.activity, answers, {}, { content: item.content, index: item.index, responses: item.row.responses,
@@ -466,6 +471,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                     !await getSubmission(email, item.kit, item.index, item.documentKey)) {
                     throw Object.assign(new Error("The student needs to submit this slideshow before it can be marked Completed."), { status: 409 });
                 }
+                if (blueprint && req.body.approved && blueprintTeams) await blueprintTeams.assertReady(email);
                 await save(email, item.kit, item.index, item.documentKey, item.policy, req.body.approved, "teacher",
                     { message: req.body.approved
                         ? blueprint ? "Teacher reviewed the slideshow and marked it Completed."

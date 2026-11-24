@@ -190,7 +190,7 @@ test("submission email helper sends the activity subject and student name to Lea
     });
     const start = source.indexOf("async function notifyKitSubmission(");
     assert.ok(start > 0);
-    vm.runInContext(source.slice(start, source.indexOf("\nconst documentVerification", start)), ctx);
+    vm.runInContext(source.slice(start, source.indexOf("\nconst blueprintTeams", start)), ctx);
     const emailed = await ctx.notifyKitSubmission({ studentEmail: "student@school.nz", kitId: "kit-google-drawings",
         url: link(0), subject: "Google Drawing - Ship" });
     assert.equal(emailed, true);
@@ -227,7 +227,7 @@ test("a teacher-triggered certificate email is built and sent for the student, n
         ["email", "student@school.nz", "kit-google-drawings", "Aroha Smith"]]);
 });
 
-async function fixture(t, { kitId = "kit-google-drawings", content = base() } = {}) {
+async function fixture(t, { kitId = "kit-google-drawings", content = base(), blueprintTeams } = {}) {
     const kit = B.withFilesFoldersLinks(content, kitId), email = "student@school.nz";
     const progress = { student_email: email, kit_id: kitId, completed: false, completed_activities: {}, started_at: null,
         responses: Object.fromEntries(kit.worksheets.map((_, i) => [`${i}-blocks`, answer(kit, i, link(i))])) };
@@ -310,7 +310,7 @@ async function fixture(t, { kitId = "kit-google-drawings", content = base() } = 
         source.indexOf("\nasync function getPracticalSkillsCertificate(")), ctx);
     const sync = async (_email, _kit, _content, options) => Object.assign(progress, await ctx.syncPracticalSkillsKitCompletion(email, kitId, kit, options));
     const deps = {
-        pool, getDefaultPracticalSkillsKitContent: () => ({}), syncCompletion: sync,
+        pool, getDefaultPracticalSkillsKitContent: () => ({}), syncCompletion: sync, blueprintTeams,
         normalizeEmail: (value) => String(value || "").toLowerCase(), schoolDomain: "school.nz",
         getRequestUserEmail: (req) => req.headers["x-user-email"] || email,
         requireAdminAccess(req, res, next) { if (req.headers["x-teacher"] !== "yes") return res.sendStatus(403); next(); },
@@ -701,7 +701,7 @@ test("drawing filing helper moves only owned drawings into KITS > Google Drawing
     });
     const start = source.indexOf("const KIT_DRAWINGS_FOLDER_NAME");
     assert.ok(start > 0);
-    vm.runInContext(`${source.slice(start, source.indexOf("\nconst documentVerification", start))}; this.fileDrawing = fileKitDrawingSubmission;`, ctx);
+    vm.runInContext(`${source.slice(start, source.indexOf("\nconst blueprintTeams", start))}; this.fileDrawing = fileKitDrawingSubmission;`, ctx);
     const run = () => ctx.fileDrawing({ studentEmail: "Student@school.nz", documentKey: "google-file:d1", activityTitle: "Ship", driveAccessToken: "tok" });
 
     file = { id: "d1", name: "Untitled drawing", mimeType: "application/vnd.google-apps.drawing", parents: ["my-drive"], ownedByMe: true };
@@ -817,6 +817,35 @@ test("Blueprint Mission requires the current slideshow submission and a teacher 
     assert.equal((await f.approve(0, false, second)).data.kitCompleted, false);
     assert.equal((await f.status(0)).data.submission, null);
     assert.equal(B.withFilesFoldersLinks(original, "kit-minecraft"), original, "Player Kit is unchanged");
+});
+
+test("Blueprint submission, teacher approval and existing ticks require the student's own current acknowledgement", async (t) => {
+    let ready = false;
+    const blueprintTeams = {
+        getReadiness: async () => ({ passed: ready, message: "Acknowledge your own contribution." }),
+        assertReady: async () => { if (!ready) throw Object.assign(new Error("Acknowledge your own contribution."), { status: 422 }); }
+    };
+    const options = { kitId: "kit-minecraft-builder-kit", blueprintTeams, content: {
+        worksheets: [{ activity: "The Blueprint Mission" }],
+        activities: [{ completionMode: "auto", blocks: [{ id: "blueprint-slideshow-link", kind: "studentlink", required: true }] }]
+    } };
+    const f = await fixture(t, options);
+    const shared = "https://docs.google.com/presentation/d/shared-team-slides/edit";
+    f.progress.responses["0-blocks"] = { "blueprint-slideshow-link": shared };
+    assert.equal((await f.submit(0)).status, 422);
+    ready = true;
+    assert.equal((await f.submit(0)).status, 200);
+    ready = false;
+    assert.equal((await f.approve(0, true, shared)).status, 422);
+    ready = true;
+    assert.equal((await f.approve(0, true, shared)).data.kitCompleted, true);
+    ready = false;
+    await f.sync();
+    assert.equal(f.progress.completed, false, "Membership corrections invalidate previous Blueprint ticks");
+    ready = true;
+    const second = await fixture(t, options);
+    second.progress.responses["0-blocks"] = { "blueprint-slideshow-link": shared };
+    assert.equal((await second.submit(0)).status, 200, "The same slideshow is accepted in separate student submission records");
 });
 
 test("teacher submissions list and Completed ticks drive kit completion and the certificate", async (t) => {

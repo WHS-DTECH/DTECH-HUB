@@ -6245,6 +6245,10 @@ app.use(async (req, _res, next) => {
     (["GET", "POST"].includes(req.method) && req.path === "/api/practical-skills/drawing-filing") ||
     (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/document-check$/.test(req.path)) ||
     (req.method === "POST" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/submit$/.test(req.path)) ||
+    (["GET", "POST", "PUT"].includes(req.method) &&
+      /^\/api\/practical-skills\/blueprint-team(?:\/students|\/[a-f0-9-]{36}\/acknowledgement)?\/?$/.test(req.path)) ||
+    (["GET", "PUT"].includes(req.method) &&
+      /^\/api\/admin\/practical-skills\/blueprint-teams(?:\/[a-f0-9-]{36})?\/?$/.test(req.path)) ||
     (["GET", "PUT"].includes(req.method) && /^\/api\/admin\/kit-document-review\/kit-[a-z0-9-]+\/\d+$/.test(req.path)) ||
     (req.method === "POST" && req.body?.revokeCertificate === true && /^\/api\/admin\/kit-results\/kit-[a-z0-9-]+\/reset\/?$/i.test(req.path))
   );
@@ -16555,11 +16559,27 @@ async function fileKitDrawingSubmission({ studentEmail, documentKey, activityTit
   return { filed: true, moved: !parents.includes(folder.id), name, path: ["WHS-DTECH", programmeFolder, "KITS", KIT_DRAWINGS_FOLDER_NAME] };
 }
 
+const blueprintTeams = require("./practical-skills/blueprint-teams").createBlueprintTeams({
+  pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
+  requireAdminAccess, canReview: canManagePracticalSchedule,
+  getStudents: async () => dedupeToLatestStudentRows((await getStudentDirectoryRows()).map(buildStudentClassManagementRow))
+    .filter((row) => String(row.status || "").toLowerCase() !== "not current")
+    .map((row) => ({
+      id: getStudentIdentityKey(row), name: row.student_name,
+      email: (row.linked_emails || []).map(normalizeEmail).find((email) => email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) || "",
+      emails: (row.linked_emails || []).map(normalizeEmail).filter((email) => email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)),
+      timetableClass: String(row.timetable_class || "").trim(),
+      course: require("./practical-skills/teacher-results-store").getTeacherKitCourse(getHuntProfile(row))
+    }))
+    .filter((row) => row.email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`))
+});
+blueprintTeams.register(app);
+
 const documentVerification = require("./practical-skills/document-verification").createDocumentVerification({
   pool, getDefaultPracticalSkillsKitContent, syncCompletion: syncPracticalSkillsKitCompletion,
   getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
   verifyDriveTokenForStudent, driveApiRequest, requireAdminAccess, autoEmailKitCertificate, canReview: canManagePracticalSchedule,
-  notifySubmission: notifyKitSubmission, fileSubmission: fileKitDrawingSubmission
+  notifySubmission: notifyKitSubmission, fileSubmission: fileKitDrawingSubmission, blueprintTeams
 });
 documentVerification.register(app);
 

@@ -35,6 +35,7 @@ test("Minecraft prerequisite locks Builder and pauses only students with a saved
     assert.equal((await request(builderContent)).status, 401);
     assert.equal((await request(builderContent + "?preview=1", "student")).status, 403);
     assert.equal((await request(`practical-skills/blocks/${builder}/1/submit`, "student", "POST")).status, 403);
+    assert.equal((await request("practical-skills/blueprint-team", "student")).status, 403);
     assert.equal((await request("knowledge-web/clouds", "student")).status, 204, "An unrelated link does not pause the Hub");
     progress.set("student", [{ kit_id: builder, responses: { "1-blocks": {
         "blueprint-slideshow-link": "https://docs.google.com/presentation/d/example/edit"
@@ -53,6 +54,7 @@ test("Minecraft prerequisite locks Builder and pauses only students with a saved
     assert.equal((await (await request(status, "staff")).json()).hubPaused, false);
     progress.get("student").push({ kit_id: player, completed: true });
     assert.equal((await request(builderContent, "student")).status, 204);
+    assert.equal((await request("practical-skills/blueprint-team", "student")).status, 204);
     assert.equal((await request("knowledge-web/clouds", "student")).status, 204);
     assert.equal((await (await request(status, "student")).json()).hubPaused, false);
 });
@@ -246,6 +248,9 @@ test("both teacher library routes require teacher access and hide paused Typing"
 
 test("Not Live blocks direct content, responses, completion, certificates and documents, including for signed-in teachers", async (t) => {
     const f = await fixture(t);
+    for (const method of ["GET", "POST", "PUT"]) {
+        assert.equal((await f.call("/api/practical-skills/blueprint-team", method)).status, 403, "Team access follows Builder publication");
+    }
     await f.service.setLive("kit-minecraft", false, "teacher@school.nz");
     for (const [path, method] of [
         ["/api/practical-skills/progress/kit-minecraft", "GET"],

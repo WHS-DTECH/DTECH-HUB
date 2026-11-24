@@ -796,8 +796,19 @@
         (blocks || []).forEach((block) => {
             if (block.responseKey && blockAnswers[block.id] === undefined) blockAnswers[block.id] = responses[block.responseKey];
         });
+        const teamRole = window.BlueprintTeams?.role(options.kitId, content.bannerTitle);
+        let teamInserted = false;
+        const insertTeam = () => {
+            if (teamInserted || teamRole !== "registration") return "";
+            teamInserted = true;
+            return window.BlueprintTeams.shell();
+        };
         const blockMarkup = (items) => window.ActivityBlockView.markup(items, blockAnswers, readOnly || options.blocksReadOnly, {
             renderImage: (image) => renderWorksheetImage(image),
+            renderAfterTask: (block, label) => !window.BlueprintTeams?.isStepTwo(block.title) &&
+                window.BlueprintTeams?.isStepTwo(label) ? insertTeam() : "",
+            renderAfterBlock: (block) => window.BlueprintTeams?.isStepTwo(block.title) ||
+                block.kind === "text" && !block.numbered && window.BlueprintTeams?.isStepTwo(block.text) ? insertTeam() : "",
             renderIllustrations: (block) => {
                 if (options.kitId !== "kit-minecraft" || content.bannerTitle !== "Google Drive Setup" ||
                     !["text", "tasks"].includes(block.kind) ||
@@ -836,6 +847,7 @@
                 </div>
             ` : ""}
             ${renderTaskBrief(content?.taskBrief)}
+            ${teamRole === "summary" ? window.BlueprintTeams.shell() : ""}
             ${blocks && window.ActivityBlockView ? `
                 <p class="activity-block-completion">${window.ActivityBlocks.specialised(content)
                     ? "Completion: this activity keeps its specialised assessment rules."
@@ -861,6 +873,7 @@
                         <div class="activity-content-blocks">${blockMarkup(blocks.filter((block) => block.column === "right"))}</div>
                     </div>` : `<div class="activity-content-blocks">${renderBlueprintReferences(blocks, blockMarkup)}</div>`}
             ` : ""}
+            ${teamRole === "registration" && !teamInserted ? `<p role="alert">The team-registration position could not be found after Step 2. Ask your teacher to check the activity instructions.</p>${window.BlueprintTeams.shell()}` : ""}
             ${imageInformationLayout ? `<div class="worksheet-image-information-layout">` : ""}
             ${images.length ? `
                 <div class="worksheet-image-panel">
@@ -949,6 +962,10 @@
             ${content?.identityLessonVersion ? `<p class="worksheet-assessment-result" id="identity-result" role="status" aria-live="polite">${options.identityVerified ? "Google sign-in is ready. Click Check your answers to mark all four answers." : "Complete questions 1-4, verify your school email in step 5, then click Check your answers."}</p><button type="button" class="worksheet-btn worksheet-btn-primary" id="identity-retry" ${readOnly ? "disabled" : ""}>Check your answers</button>` : ""}
         `;
 
+        if (teamRole) window.BlueprintTeams.bind(host, {
+            request: options.onBlueprintTeamRequest, registration: teamRole === "registration",
+            readOnly: readOnly || options.blocksReadOnly
+        });
         if (blocks && window.ActivityBlockView) window.ActivityBlockView.bind(host, blocks, {
             answers: blockAnswers, readOnly: readOnly || options.blocksReadOnly,
             onChange: options.onBlockChange, onDocument: options.onBlockDocument, onLegacyChange: options.onBlockLegacyChange,

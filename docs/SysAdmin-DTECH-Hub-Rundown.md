@@ -248,6 +248,16 @@ Strict cutover checklist (go/no-go):
 - A read-only Live Preview below Activity Details uses the student worksheet renderer and updates after edits or question/image additions and removals. Previewing does not save content or student progress.
 - `node --test scripts/regression-activity-task-brief.js` covers editor save/reload, removal of legacy task instructions, preserved activity details/blocks and escaped student output.
 
+### Minecraft Blueprint team registration
+
+- Minecraft Builder Kit displays shared registration after **Step 2: Decide how you will build it** in **The Blueprint Mission**. The step heading must retain that wording. **Build It Better** and **Famous Building Challenge** display the same registration read-only, without repeating entry.
+- Registration uses the verified school account and the existing deduplicated student directory. The searchable selector is restricted to the student's timetabled class and DTECH course. A course instance is the current Auckland school year, DTECH course and timetabled class. Missing/ambiguous class profiles require a teacher directory correction; students cannot supply an arbitrary course or email.
+- One shared UUID registration records the building and independent/team choice. Teams have at most three active members, including the registering student. PostgreSQL transactions and unique active student/email indexes prevent competing invitations or duplicate registrations within an instance. Registration and acknowledgement need the database; there is no memory-only fallback.
+- Every team student, including the registering student, accepts their own membership and records a building area and intended contribution. Students cannot edit anyone else's contribution. Declining releases the active place for another registration while retaining the declined record on the original team.
+- **Kit Results > Minecraft Blueprint Teams** lets verified teacher/admin staff correct the building and roster. Corrections reset team acknowledgements and contributions; stale forms are rejected using the registration version. Move students by removing them from the previous registration before adding them elsewhere. Clear all members to close a registration while retaining its history. Active independent registrations have one member.
+- Blueprint Slideshow submission and teacher review remain unchanged. Team submission/approval additionally checks only the submitting student's acknowledged contribution, never teammates' pending status. Teammates may submit the same slideshow URL. Existing independent submissions do not need retrospective registration. Kit resets do not delete team records.
+- Validation: `node --test scripts/regression-blueprint-teams.js scripts/regression-google-drawings-links.js scripts/regression-kit-publication.js scripts/regression-activity-blocks.js`.
+
 ### Activity Content Block Builder
 
 - Activity Details includes an ordered block builder: Text / Instructions, Image, Task List, Question (written, choice or checklist), Website Link, Student Add a Link, Resource File, Checkbox, Table (static or student-filled), Word Search, Crossword and Create Document. Blocks can repeat, move or be removed; the read-only preview follows the same order.

@@ -1,7 +1,7 @@
 (() => {
     "use strict";
     const B = window.ActivityBlocks, e = B.escape;
-    function taskList(text) {
+    function taskList(text, afterTask) {
         const tasks = [];
         String(text || "").split(/\r?\n/).filter((line) => line.trim()).forEach((line) => {
             const label = line.trim().replace(/^\d+[.)]\s+/, "");
@@ -9,9 +9,9 @@
             if (parent && /^(?: {2,}|\t)\d+[.)]\s+/.test(line)) parent.children.push(label);
             else tasks.push({ label, children: [] });
         });
-        return `<ol>${tasks.map(({ label, children }) => `<li class="activity-block-text">${children.length
+        return `<ol>${tasks.map(({ label, children }, index) => `<li class="activity-block-text">${children.length
             ? `<strong>${e(label)}</strong><ol>${children.map((child) => `<li class="activity-block-text">${e(child)}</li>`).join("")}</ol>`
-            : e(label)}</li>`).join("")}</ol>`;
+            : e(label)}${afterTask?.(label, index) || ""}</li>`).join("")}</ol>`;
     }
     function googleWarning(value) {
         return `<div class="activity-block-onedrive-alert" data-google-link-warning role="alert" ${B.isGoogleLink?.(value) ? "" : "hidden"}>
@@ -20,14 +20,15 @@
             <span>In OneDrive: open your document, choose <strong>Share</strong> &rarr; <strong>Copy link</strong>, then paste that link here.</span>
         </div>`;
     }
-    function markup(blocks, answers, readOnly, { renderImage, renderIllustrations, unityEditor, noGoogleLinks } = {}) {
+    function markup(blocks, answers, readOnly, { renderImage, renderIllustrations, renderAfterTask, renderAfterBlock, unityEditor, noGoogleLinks } = {}) {
         return blocks.map((b) => {
             const value = answers[b.id];
             const disabled = readOnly ? "disabled" : "";
             const link = B.safeUrl(b.url);
             let body = "";
             if (b.kind === "text" && b.numbered !== true) body = `<p class="activity-block-text">${e(b.text)}</p>`;
-            if (b.kind === "tasks" || (b.kind === "text" && b.numbered === true)) body = taskList(b.text);
+            if (b.kind === "tasks" || (b.kind === "text" && b.numbered === true)) body = taskList(b.text,
+                renderAfterTask ? (label, index) => renderAfterTask(b, label, index) : null);
             if (unityEditor && b.id === "unity-editor-version") body += `
                 <aside aria-label="Teacher-managed Unity Editor version">
                     <p>Required Unity Editor Version <small>(Teacher managed)</small></p>
@@ -102,7 +103,7 @@
                 } catch (error) { body = `<p class="activity-block-status">${e(error.message)}</p>`; }
             }
             if (renderIllustrations) body += renderIllustrations(b);
-            return `<section class="activity-content-block${b.kind === "question" && b.questionType === "checklist" && b.showProgress === true ? " activity-content-block--progress" : ""}" data-content-block="${e(b.id)}">${b.title ? `<h2>${e(b.title)}</h2>` : `<h2>${e(B.types[b.kind])}</h2>`}${b.required ? '<p class="typing-note">Required in automatic-tick activities</p>' : ""}${body}</section>`;
+            return `<section class="activity-content-block${b.kind === "question" && b.questionType === "checklist" && b.showProgress === true ? " activity-content-block--progress" : ""}" data-content-block="${e(b.id)}">${b.title ? `<h2>${e(b.title)}</h2>` : `<h2>${e(B.types[b.kind])}</h2>`}${b.required ? '<p class="typing-note">Required in automatic-tick activities</p>' : ""}${body}</section>${renderAfterBlock?.(b) || ""}`;
         }).join("");
     }
     function bind(host, blocks, options) {
