@@ -20,7 +20,9 @@ const base = () => ({
     }))
 });
 const link = (index) => `https://westland-my.sharepoint.com/:w:/g/personal/student_school_nz/unique-file-${index}?e=abc`;
-const answer = (content, index, url) => ({ [content.activities[index].blocks.find((b) => b.kind === "studentlink").id]: url });
+const answer = (content, index, url) => Object.fromEntries(content.activities[index].blocks
+    .filter((b) => b.kind === "studentlink")
+    .map((b) => [b.id, b.driveOnly ? `https://docs.google.com/document/d/google-copy-${index}/edit` : url]));
 const responses = (content) => Object.fromEntries(content.activities.map((_a, i) => [`${i}-blocks`, answer(content, i, link(i))]));
 const policies = ["rattlesnakes-v1", "weathering-storm-v1", "bibliography-v1"];
 const verified = (index = 0) => ({ policy: policies[index], passed: true, documentKey: B.documentLinkKey(link(index)) });
@@ -36,9 +38,57 @@ test("Files & Folders requires all existing links, adds missing submissions and 
         assert.equal(activity.uniqueDocumentLinks, true);
         assert.equal(activity.documentCheck, undefined, "Typing passage checks are retired; a OneDrive link earns the tick");
         assert.equal(activity.noGoogleLinks, true);
-        assert.equal(activity.blocks.filter((b) => b.kind === "studentlink" && b.required).length, 1);
+        assert.equal(activity.blocks.filter((b) => b.kind === "studentlink" && b.required).length, index === 0 ? 2 : 1);
         if (index < 4) assert.equal(activity.blocks[0], original.activities[index].blocks[0]);
         if (index < 3) assert.equal(activity.blocks[1].id, "link");
+    });
+
+    test("Rattlesnakes keeps its Google field, adds OneDrive after MS Word and requires the correct link in each field", () => {
+        const stored = base();
+        stored.activities[0].blocks = [
+            { id: "google-steps", kind: "tasks", title: "Google Browser Using Chromebook or Windows PC:", text: "Type the document.\nName it Rattlesnakes." },
+            { id: "existing-google-link", kind: "studentlink", title: "Share the Google Docs link for Rattlesnakes", required: true },
+            { id: "windows", kind: "tasks", title: "Using Windows PC:", text: "Download your document." },
+            { id: "folders", kind: "tasks", title: "Create Folders - Windows PC", text: "Create your folders." },
+            { id: "word", kind: "tasks", title: "Using MS Word", text: "Add a header and footer.\nSave and reopen." },
+            { id: "resource", kind: "link", title: "Another resource", url: "https://example.test/resource" }
+        ];
+        const before = JSON.stringify(stored);
+        const content = B.withFilesFoldersLinks(stored);
+        const activity = content.activities[0];
+        assert.equal(JSON.stringify(stored), before);
+        assert.deepEqual(activity.blocks.map((block) => block.id), [
+            "google-steps", "existing-google-link", "windows", "folders", "word", "rattlesnakes-onedrive-link", "resource"
+        ]);
+        assert.equal(activity.blocks[5].title, "Share the OneDrive link for Rattlesnakes");
+        assert.equal(B.withFilesFoldersLinks(content), content, "Repeated loading does not add another field");
+        const saved = responses(content);
+        const own = saved["0-blocks"];
+        const grade = () => B.grade(activity, own, {}, { content, index: 0, responses: saved });
+        assert.equal(grade().passed, true);
+        own["existing-google-link"] = link(0);
+        assert.equal(grade().passed, false, "The first field requires a Google share link");
+        own["existing-google-link"] = "https://docs.google.com/document/d/original-google-copy/edit";
+        own["rattlesnakes-onedrive-link"] = "https://docs.google.com/document/d/another-google-copy/edit";
+        assert.equal(grade().passed, false, "The final field rejects Google links");
+        assert.equal(grade().results.find((result) => result.id === "rattlesnakes-onedrive-link")?.message, B.GOOGLE_LINK_MESSAGE);
+        own["rattlesnakes-onedrive-link"] = "";
+        assert.equal(grade().passed, false, "Both sharing links are required");
+        own["rattlesnakes-onedrive-link"] = link(0);
+        assert.equal(grade().passed, true);
+        const context = vm.createContext({ window: { ActivityBlocks: B }, structuredClone });
+        for (const file of ["activity-block-view.js", "kit-worksheet-render.js"]) {
+            vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", file), "utf8"), context);
+        }
+        const googleMarkup = context.window.ActivityBlockView.markup([activity.blocks[1]], own, false, { noGoogleLinks: true });
+        assert.doesNotMatch(googleMarkup, /data-google-link-warning/);
+        const finalMarkup = context.window.ActivityBlockView.markup([activity.blocks[5]],
+            { "rattlesnakes-onedrive-link": "https://docs.google.com/document/d/wrong-copy/edit" }, false, { noGoogleLinks: true });
+        assert.match(finalMarkup, /data-google-link-warning role="alert" >/);
+        const host = { style: { setProperty() {} }, innerHTML: "", querySelector: () => null, querySelectorAll: () => [] };
+        context.window.KitWorksheetRender.renderWorksheet(host, { ...activity, bannerTitle: "Rattlesnakes" }, { readOnly: true });
+        assert.match(host.innerHTML, /Both links are required/);
+        assert.doesNotMatch(host.innerHTML, /Google Docs and Google Drive links are not accepted/);
     });
     assert.equal(B.withFilesFoldersLinks(content), content);
     const other = { ...original, identity: { name: "Unity Setup kit" } };

@@ -861,7 +861,9 @@
                             : content.documentCheck
                             ? "Auto-Completed: save your document sharing link, then use Check my document. Your typed text must pass a check against the worksheet or be explicitly approved by your teacher. Use a different file for each activity. A link alone does not earn this tick."
                             : content.uniqueDocumentLinks && content.noGoogleLinks
-                            ? "Auto-Completed: save this work in your OneDrive, then paste its OneDrive sharing link. Google Docs and Google Drive links are not accepted. Use a different file for every activity. Links are checked, not file contents or sharing permissions."
+                            ? content.blocks?.some((block) => block.kind === "studentlink" && block.driveOnly && block.noGoogleLinks === false)
+                                ? "Auto-Completed: share your Google Docs Rattlesnakes document in the first link field, then share your completed Word document from OneDrive in the final link field. Both links are required. Links are checked, not file contents or sharing permissions."
+                                : "Auto-Completed: save this work in your OneDrive, then paste its OneDrive sharing link. Google Docs and Google Drive links are not accepted. Use a different file for every activity. Links are checked, not file contents or sharing permissions."
                             : content.uniqueDocumentLinks
                             ? "Auto-Completed: submit the required HTTPS sharing link to your document or PDF. Use a different file for every activity. Duplicate files do not earn ticks. Links are checked, not file contents or sharing permissions."
                             : "Automatic tick: complete all required interactive blocks. Written answers are checked for presence, not correctness. A document copy confirms creation only."

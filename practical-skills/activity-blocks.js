@@ -54,7 +54,7 @@
         }
         return answers;
     }
-    // Files & Folders work must be saved in OneDrive; Google Docs/Drive links mean the instructions weren't followed.
+    // OneDrive submissions reject Google links; Rattlesnakes also collects the earlier Google Docs copy.
     const RETIRED_PASSAGE_CHECKS = new Set(["rattlesnakes-v1", "weathering-storm-v1", "bibliography-v1"]);
     const GOOGLE_LINK_MESSAGE = "This is a Google Drive link. Save this document in your OneDrive (Documents > JuniorDTECH > Word Processing) and paste its OneDrive sharing link instead.";
     function isGoogleLink(value) {
@@ -77,6 +77,31 @@
                 title: `Share your link for ${worksheet.activity || activity.title || `Activity ${index + 1}`}`,
                 text: "Paste the OneDrive sharing link to your document or PDF, not a local Windows file path or a Google Drive link. Share it so your teacher can open it. Use a different file for each activity."
             }];
+            if (index === 0 && /^rattlesnakes$/i.test(String(worksheet.activity || "").trim())) {
+                const google = blocks.find((b) => b.kind === "studentlink" &&
+                    b.id !== "rattlesnakes-onedrive-link" && !/onedrive/i.test(b.title || ""));
+                const onedrive = blocks.find((b) => b.kind === "studentlink" &&
+                    (b.id === "rattlesnakes-onedrive-link" || /onedrive/i.test(b.title || "")));
+                if (google) {
+                    const update = (block, fields) => Object.entries(fields).every(([key, value]) => block[key] === value)
+                        ? block : { ...block, ...fields };
+                    blocks = blocks.map((b) => b === google ? update(b, {
+                        title: "Share the Google Docs link for Rattlesnakes",
+                        text: "Share your Google Docs document so your teacher can open it, then paste its Google sharing link here.",
+                        required: true, driveOnly: true, driveFolderOnly: false, noGoogleLinks: false
+                    }) : b);
+                    const submission = update(onedrive || { id: "rattlesnakes-onedrive-link", kind: "studentlink" }, {
+                        title: "Share the OneDrive link for Rattlesnakes",
+                        text: "Save your completed Rattlesnakes Word document in OneDrive. Share it so your teacher can open it, then paste its OneDrive sharing link here.",
+                        required: true, driveOnly: false, driveFolderOnly: false, noGoogleLinks: true
+                    });
+                    const withoutSubmission = blocks.filter((b) => b !== onedrive);
+                    const wordIndex = withoutSubmission.findIndex((b) => /using\s+ms\s+word/i.test(b.title || ""));
+                    const position = wordIndex >= 0 ? wordIndex + 1 : withoutSubmission.length;
+                    const next = [...withoutSubmission.slice(0, position), submission, ...withoutSubmission.slice(position)];
+                    if (next.length !== blocks.length || next.some((b, i) => b !== blocks[i])) blocks = next;
+                }
+            }
             blocks = blocks.map((b) => b.kind === "studentlink" && !b.required ? { ...b, required: true } : b);
             const { documentCheck: previousCheck, ...rest } = activity;
             const documentCheck = RETIRED_PASSAGE_CHECKS.has(previousCheck) ? undefined : previousCheck;
@@ -297,7 +322,7 @@
             for (const key of ["title", "text", "url", "alt", "caption", "attribution", "entries", "fileName", "responseKey"]) {
                 if (b[key] !== undefined && (typeof b[key] !== "string" || b[key].length > (key === "text" ? 20000 : 5000))) throw new Error(`${types[b.kind]}: ${key} must be text within the size limit.`);
             }
-            for (const key of ["required", "editable", "numbered", "driveOnly", "driveFolderOnly"]) if (b[key] !== undefined && typeof b[key] !== "boolean") throw new Error("Block options must be true or false.");
+            for (const key of ["required", "editable", "numbered", "driveOnly", "driveFolderOnly", "noGoogleLinks"]) if (b[key] !== undefined && typeof b[key] !== "boolean") throw new Error("Block options must be true or false.");
             if (["link", "resource", "image"].includes(b.kind) && !safeUrl(b.url)) throw new Error(`${types[b.kind]}: enter a full HTTPS link.`);
             if (b.kind === "image" && !String(b.alt || "").trim()) throw new Error("Images need alternative text.");
             if (b.kind === "document" && (!safeUrl(b.url) || !/^https:\/\/docs\.google\.com\/document\/(?:u\/\d+\/)?d\/[a-zA-Z0-9_-]{20,}(?:[/?#]|$)/.test(b.url || ""))) throw new Error("Create Document needs a Google Docs template link.");
@@ -335,7 +360,7 @@
             let passed = false;
             let message;
             if (b.kind === "studentlink") passed = Boolean(studentUrl(value, b.driveOnly, b.driveFolderOnly));
-            if (b.kind === "studentlink" && passed && activity.noGoogleLinks && isGoogleLink(value)) {
+            if (b.kind === "studentlink" && passed && (b.noGoogleLinks ?? activity.noGoogleLinks) && isGoogleLink(value)) {
                 passed = false;
                 message = GOOGLE_LINK_MESSAGE;
             }
