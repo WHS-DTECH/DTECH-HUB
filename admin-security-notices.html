@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
+  <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
+  <title>Security Vulnerability Notices | Computer Lab</title>
+  <link rel="icon" href="images/favicon.ico">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .notice-layout { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(0, 2fr); gap: 24px; }
+    #notice-form label { display: block; margin: 14px 0; }
+    #notice-form input, #notice-form textarea, #notice-form select { display: block; width: 100%; box-sizing: border-box; padding: 8px; }
+    #notice-form textarea { min-height: 100px; }
+    #notice-list button { display: block; width: 100%; text-align: left; padding: 12px; margin-bottom: 8px; }
+    #notice-image { max-width: 100%; }
+    #notice-history { white-space: pre-wrap; overflow-wrap: anywhere; }
+    @media (max-width: 700px) { .notice-layout { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <nav class="topbar" aria-label="Primary">
+      <a class="brand" href="index.html">Computer Lab</a>
+      <a href="admin-menu.html">Admin Menu</a>
+      <div class="utility-actions">
+        <button id="hub-google-signin" type="button">Sign in with Google</button>
+        <button id="hub-google-signout" type="button" hidden>Sign out</button>
+        <button id="hub-user-badge" type="button" hidden aria-label="Open profile"></button>
+      </div>
+    </nav>
+    <main class="admin-page-wrap">
+      <h1>Security Vulnerability Notices</h1>
+      <p>Admin-only advisory register. A recorded action is not proof of remediation: retain deployment and runtime evidence before closing a notice.</p>
+      <button id="notice-reload" class="button button-secondary" type="button">Reload notices</button>
+      <button id="notice-new" class="button button-secondary" type="button" disabled>New notice</button>
+      <p id="notice-status" role="status" aria-live="polite"></p>
+      <div class="notice-layout">
+        <section aria-label="Saved notices" id="notice-list"></section>
+        <section>
+          <form id="notice-form" hidden>
+            <label>Title<input name="title" maxlength="200" required></label>
+            <label>CVE / reference<input name="reference" maxlength="100"></label>
+            <label>Received on<input name="receivedOn" type="date" required></label>
+            <label>Severity<select name="severity"><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+            <label>Status<select name="status"><option value="verification-required">Verification required</option><option value="in-progress">In progress</option><option value="resolved">Resolved</option><option value="not-affected">Not affected</option></select></label>
+            <label>Notice<textarea name="notice" maxlength="12000" required></textarea></label>
+            <label>Remediation / actions applied<textarea name="remediation" maxlength="12000"></textarea></label>
+            <label>Verification evidence (required to close)<textarea name="verification" maxlength="12000"></textarea></label>
+            <label>Source URL (HTTPS)<input name="sourceUrl" type="url" maxlength="2000"></label>
+            <button id="notice-save" class="button button-primary" type="submit">Save notice</button>
+            <p id="notice-meta"></p>
+          </form>
+          <section id="notice-evidence" hidden>
+            <h2>Original Render notice - Image 1</h2>
+            <button id="notice-load-image" type="button">View original notice</button>
+            <img id="notice-image" alt="Render security notice for services using Ghostscript or ImageMagick" hidden>
+          </section>
+          <details id="notice-history-section" hidden>
+            <summary>Previous versions</summary>
+            <pre id="notice-history"></pre>
+          </details>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="script.js"></script>
+  <script src="admin-security-notices.js"></script>
+</body>
+</html>

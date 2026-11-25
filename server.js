@@ -6231,6 +6231,7 @@ app.use(async (req, _res, next) => {
 
   req.auth_identity.token_present = true;
   const licenceAccessToken = bearerToken.split(".").length !== 3 && (
+    /^\/api\/admin\/security-notices(?:\/|$)/.test(req.path) ||
     (/^\/api\/knowledge-web\/(?:access|clouds|proposals(?:\/duplicates)?|manage\/clouds|manage\/proposals)\/?$/i.test(req.path) && req.method === "GET") ||
     (/^\/api\/knowledge-web\/(?:proposals|manage\/proposals\/[^/]+\/decision|manage\/clouds|manage\/source-metadata)\/?$/i.test(req.path) && req.method === "POST") ||
     (/^\/api\/knowledge-web\/(?:proposals|manage\/clouds)\/[^/]+\/?$/i.test(req.path) && req.method === "PUT") ||
@@ -6452,7 +6453,19 @@ app.use("/practical-skills", (_req, res, next) => {
   res.set("Cache-Control", "no-cache");
   next();
 });
-app.use(express.static(__dirname));
+require("./.security-notices/store").registerSecurityNotices(app, {
+  pool, hasDatabase,
+  getVerifiedEmail: (req) => req.auth_identity?.verified && isSchoolEmail(req.auth_identity.email) ? req.auth_identity.email : "",
+  isAdmin: async (email) => {
+    if (isDeveloperAdminEmail(email)) return true;
+    const user = await getUserRoleByEmail(email);
+    const role = String(user?.additional_role || user?.role_name || "").trim();
+    const permissions = await getMergedRolePermissions();
+    const match = permissions.find((entry) => String(entry.role_name || "").toLowerCase() === role.toLowerCase());
+    return Boolean(match?.admin) || /\badmin\b/i.test(role);
+  }
+});
+app.use(express.static(__dirname, { dotfiles: "ignore" }));
 
 function normalizeEvidenceStepsPayload(value) {
   const rows = Array.isArray(value) ? value : [];
