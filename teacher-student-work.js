@@ -204,6 +204,8 @@ function renderStudentNameOptions() {
     [...buildProcessSummaryRows(), ...buildDigitalMediaSummaryRows()]
         .filter(studentMatchesCourseFilter)
         .forEach((student) => byEmail.set(student.studentEmail, student.studentName));
+    buildProjectEvidenceRows().filter(studentMatchesCourseFilter)
+        .forEach((student) => byEmail.set(student.studentEmail, student.studentName));
     const names = Array.from(new Set(byEmail.values())).filter(Boolean).sort((a, b) => a.localeCompare(b));
     studentNameOptions.innerHTML = names.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("");
 }
@@ -1951,6 +1953,7 @@ function wireExternalAssessmentEvents() {
 }
 
 function renderStudentSummaryGrid() {
+    renderProjectEvidencePackages();
     const host = document.querySelector("#student-summary-grid");
     if (!host) return;
 
@@ -2006,27 +2009,74 @@ function getStudentSummaryRecordsForStandard(student, standard) {
         .filter((record) => !targetStandard || normalizeTrackerStandardValue(record?.processStandard) === targetStandard);
 }
 
-function renderEvidencePackageButton(student) {
-    if (workState.studentCourseByEmail.get(normalizeEmail(student.studentEmail)) !== "SeniorDTECH") return "";
-    return `<br><button type="button" class="student-drive-chip" data-package-student="${escapeHtml(student.studentEmail)}">Package work set</button>`;
+function isEvidencePackageActivity(activity) {
+    return /assessment|project/i.test(String(activity?.activity_category || activity?.category || ""));
 }
 
-function openStudentEvidencePackage(email) {
-    const student = buildProcessSummaryRows().find((row) => row.studentEmail === email);
-    if (!student) { setStatus("The student record changed. Reload the tracker before packaging.", true); return; }
+function getEvidencePackageActivities(email) {
+    return workState.interestRows.filter((interest) => (interest.students || []).some((student) =>
+        normalizeEmail(student.email || student.student_email) === email
+    )).map((interest) => workState.activitiesById.get(String(interest.project_id)))
+        .filter(isEvidencePackageActivity)
+        .map((activity) => ({ activityId: String(activity.id), activityName: String(activity.name || "Work set") }))
+        .sort((a, b) => Number(a.activityId !== PROCESS_ASSESSMENT_ACTIVITY_ID) - Number(b.activityId !== PROCESS_ASSESSMENT_ACTIVITY_ID)
+            || a.activityName.localeCompare(b.activityName));
+}
+
+function buildProjectEvidenceRows() {
+    const rows = new Map();
+    for (const interest of workState.interestRows) {
+        const activity = workState.activitiesById.get(String(interest.project_id));
+        const category = String(activity?.activity_category || activity?.category || "");
+        if (!/project/i.test(category) || /assessment/i.test(category)) continue;
+        for (const student of interest.students || []) {
+            const email = normalizeEmail(student.email || student.student_email);
+            if (!email || workState.studentCourseByEmail.get(email) !== "SeniorDTECH") continue;
+            rows.set(`${email}:${activity.id}`, {
+                studentEmail: email,
+                studentName: workState.studentNameByEmail.get(email) || formatNameFromEmail(email),
+                activityId: String(activity.id),
+                activityName: String(activity.name || "Project")
+            });
+        }
+    }
+    return Array.from(rows.values()).sort((a, b) => a.studentName.localeCompare(b.studentName) || a.activityName.localeCompare(b.activityName));
+}
+
+function renderProjectEvidencePackages() {
+    const host = document.querySelector("#project-evidence-packages");
+    if (!host) return;
+    const search = String(workState.studentSearch || "").trim().toLowerCase();
+    const rows = buildProjectEvidenceRows().filter(studentMatchesCourseFilter)
+        .filter((student) => !search || `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(search));
+    if (!rows.length) { host.replaceChildren(); return; }
+    host.innerHTML = `<h3 class="student-summary-heading">SeniorDTECH project work sets</h3>
+        <p>These are project allocations, including work saved without a Process Assessment record. They are separate from the assessment counts above. An absent assessment record does not establish that a student has never logged in.</p>
+        <div class="work-table-wrap"><table class="student-summary-table">
+        <thead><tr><th>Student</th><th>Project</th><th>Evidence package</th></tr></thead>
+        <tbody>${rows.map((student) => `<tr><td>${escapeHtml(student.studentName)}</td><td>${escapeHtml(student.activityName)}</td><td>${renderEvidencePackageButton(student)}</td></tr>`).join("")}</tbody>
+        </table></div>`;
+}
+
+function renderEvidencePackageButton(student) {
+    if (workState.studentCourseByEmail.get(normalizeEmail(student.studentEmail)) !== "SeniorDTECH") return "";
+    return `<br><button type="button" class="student-drive-chip" data-package-student="${escapeHtml(student.studentEmail)}" data-package-activity="${escapeHtml(student.activityId || "")}">Package work set</button>`;
+}
+
+function openStudentEvidencePackage(email, selectedActivity = "") {
+    const activities = getEvidencePackageActivities(email);
+    if (!activities.length) { setStatus("The student record changed. Reload the tracker before packaging.", true); return; }
+    const studentName = workState.studentNameByEmail.get(email) || formatNameFromEmail(email);
     document.querySelector("#staff-evidence-package")?.remove();
-    const records = student.groups.get("overall")?.records || [];
-    const activities = Array.from(new Map(records.map((record) => [record.activityId, record])).values())
-        .sort((a, b) => Number(/process/i.test(b.activityName)) - Number(/process/i.test(a.activityName)));
     const dialog = document.createElement("dialog");
     dialog.id = "staff-evidence-package";
     dialog.setAttribute("aria-labelledby", "staff-evidence-title");
     dialog.style.cssText = "width:min(720px,90vw);max-height:85vh;overflow:auto;padding:24px;border:1px solid #ccd8e8;border-radius:12px";
     dialog.innerHTML = `
-        <h2 id="staff-evidence-title">Package work set: ${escapeHtml(student.studentName)}</h2>
+        <h2 id="staff-evidence-title">Package work set: ${escapeHtml(studentName)}</h2>
         <p>Download a staff evidence snapshot, including incomplete work. This does not submit work, confirm readiness, email anyone, or change grades.</p>
         <p>Documents must be shared with your staff Google account. For a fresh Trello report, connect your staff Trello account in <a href="settings.html" target="_blank" rel="noreferrer">Settings</a> and ensure you can open the student's board.</p>
-        <p><label>Assessment <select id="staff-evidence-activity">${activities.map((record) => `<option value="${escapeHtml(record.activityId)}">${escapeHtml(record.activityName)} (${escapeHtml(record.activityId)})</option>`).join("")}</select></label></p>
+        <p><label>Assessment / project <select id="staff-evidence-activity">${activities.map((record) => `<option value="${escapeHtml(record.activityId)}"${record.activityId === selectedActivity ? " selected" : ""}>${escapeHtml(record.activityName)} (${escapeHtml(record.activityId)})</option>`).join("")}</select></label></p>
         <p><label>Optional downloaded OneDrive / outcome ZIP (up to 64 MB)<br><input id="staff-evidence-upload" type="file" accept=".zip,application/zip"></label></p>
         <p>Available documents are merged into one PDF and originals retained. Client presentations are included only if available. Missing or inaccessible files are listed in the pack's manifest.</p>
         <button type="button" id="staff-evidence-build">Build evidence pack</button>
@@ -2710,7 +2760,7 @@ function wireStudentSummaryEvents() {
     document.addEventListener("click", (event) => {
         const packageButton = event.target?.closest?.("[data-package-student]");
         if (packageButton) {
-            openStudentEvidencePackage(normalizeEmail(packageButton.dataset.packageStudent));
+            openStudentEvidencePackage(normalizeEmail(packageButton.dataset.packageStudent), packageButton.dataset.packageActivity || "");
             return;
         }
         const button = event.target?.closest?.("[data-student-summary-email][data-student-summary-group]");
@@ -2749,9 +2799,9 @@ async function init() {
         workState.studentNameByEmail = buildStudentNameMap(classManagementPayload?.students);
         workState.studentCourseByEmail = buildStudentCourseMap(classManagementPayload?.students);
         workState.externalAssessmentStudents = buildExternalAssessmentStudents(classManagementPayload?.students);
-        const assessmentActivities = activityRows.filter((activity) => String(activity?.activity_category || activity?.category || "").toLowerCase().includes("assessment"));
+        const workSetActivities = activityRows.filter(isEvidencePackageActivity);
         const interestRows = await Promise.all(
-            assessmentActivities.map(async (activity) => {
+            workSetActivities.map(async (activity) => {
                 const projectId = String(activity?.id || "").trim();
                 if (!projectId) return null;
                 try {
@@ -2760,10 +2810,12 @@ async function init() {
                         project_id: projectId,
                         students: Array.isArray(response?.students) ? response.students : []
                     };
-                } catch (_error) {
+                } catch (error) {
+                    console.error("[student-work-tracker] Could not load work set:", projectId, error);
                     return {
                         project_id: projectId,
-                        students: []
+                        students: [],
+                        loadError: error.message || "Could not load student work."
                     };
                 }
             })
@@ -2806,7 +2858,8 @@ async function init() {
         renderExternalAssessmentGrid();
         renderTaskLinks();
         renderSelectedTaskPage();
-        setStatus("Student work task pages ready.");
+        const failed = workState.interestRows.filter((row) => row.loadError);
+        setStatus(failed.length ? `${failed.length} work set(s) could not be loaded. Reload before treating missing work as absent.` : "Student work task pages ready.", failed.length > 0);
     } catch (error) {
         setStatus(error?.message || "Could not load student work task pages.", true);
     }

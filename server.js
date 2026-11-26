@@ -6484,8 +6484,8 @@ require("./staff-evidence-package").registerStaffEvidencePackages(app, {
     );
     const row = result.rows[0];
     if (!row || isExcludedNonDtechActivity(row.activity)
-      || !String(row.activity.activity_category || row.activity.category || "").toLowerCase().includes("assessment")) {
-      throw Object.assign(new Error("Student assessment allocation not found."), { status: 404 });
+      || !/assessment|project/i.test(String(row.activity.activity_category || row.activity.category || ""))) {
+      throw Object.assign(new Error("Student assessment or project allocation not found."), { status: 404 });
     }
     return { activityName: row.activity.name, evidence: normalizeEvidenceStepsPayload(row.evidence_steps),
       copies: Array.isArray(row.template_copies) ? row.template_copies : [] };

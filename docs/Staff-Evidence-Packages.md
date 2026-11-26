@@ -1,8 +1,8 @@
 # Staff student-work evidence packages
 
-In **Student Work Tracker > Process Assessment**, each SeniorDTECH student's row has a **Package work set** button.
+In **Student Work Tracker > Process Assessment**, each SeniorDTECH student's row has a **Package work set** button. **SeniorDTECH project work sets** appears beneath it for project allocations, including students who have no Process Assessment allocation. These rows do not alter assessment counts. Missing assessment records are not login-history evidence.
 
-1. Select the student's assessment/task-list record.
+1. Select the student's assessment or project/task-list record. Opening from a project row preselects that project; the selector lists the student's allocated assessments and projects.
 2. Optionally attach an already-downloaded OneDrive or other outcome ZIP (up to 64 MB). The ZIP is retained unchanged, not extracted or independently verified.
 3. Choose **Build evidence pack** and allow access to your staff Google Drive account.
 4. Review the included, missing and unavailable sources, then choose **Download ZIP** within 15 minutes.
@@ -18,7 +18,7 @@ This is a staff assessment-evidence snapshot, not the student's final-submission
 - A fresh Trello PDF is generated using the **staff member's** connected Trello account, including archived cards. Connect Trello in Settings and ensure the staff account can open the linked board. Student Trello credentials are not used.
 - `Evidence-Manifest.json` and `READ-ME.txt` list collected files, source failures and missing components. `Task-List-Record.json` preserves the selected record's evidence/checklist and saved source links.
 
-Sources must already be linked to the selected student's assessment. Private OneDrive folders are not fetched automatically: download the web files in OneDrive and attach that ZIP. Files in Google Drive must be shared with the staff account; this feature never impersonates the student or changes sharing.
+Sources must already be linked to the selected student's assessment or project. Private OneDrive folders are not fetched automatically: download the web files in OneDrive and attach that ZIP. Files in Google Drive must be shared with the staff account; this feature never impersonates the student or changes sharing.
 
 ## Access and limits
 

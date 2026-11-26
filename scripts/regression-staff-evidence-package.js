@@ -3,6 +3,8 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
+const path = require("node:path");
+const vm = require("node:vm");
 const express = require("express");
 const JSZip = require("jszip");
 const { PDFDocument } = require("pdf-lib");
@@ -153,6 +155,43 @@ test("an entirely inaccessible work set fails explicitly rather than offering an
   const deps = await dependencies(t);
   await assert.rejects(buildStaffEvidence({ context: { ...context(), copies: [], evidence: [] },
     staffEmail: "teacher@school.nz", token: "staff-drive", dependencies: deps }), /No evidence files could be collected/);
+});
+
+test("project-only evidence is discoverable for packaging without adding project criteria to assessment totals", async () => {
+  const source = await fs.readFile(path.join(__dirname, "..", "teacher-student-work.js"), "utf8");
+  const sandbox = vm.createContext({
+    URLSearchParams, URL, console,
+    window: { location: { search: "", pathname: "/teacher-student-work.html", origin: "http://localhost" } },
+    document: { querySelector: () => null, body: { classList: { add() {} } } }
+  });
+  vm.runInContext(source.replace(/\ninit\(\);\s*$/, "\n"), sandbox);
+  const state = vm.runInContext("workState", sandbox);
+  const projectStudent = "project-student@school.nz";
+  const assessmentStudent = "assessment-student@school.nz";
+  state.studentNameByEmail = new Map([[projectStudent, "Project Student"], [assessmentStudent, "Assessment Student"]]);
+  state.studentCourseByEmail = new Map([[projectStudent, "SeniorDTECH"], [assessmentStudent, "SeniorDTECH"]]);
+  state.activitiesById = new Map([
+    ["30", { id: 30, name: "Resources Catalogue", activity_category: "Project", tasks_list: ["Project Management"] }],
+    ["49", { id: 49, name: "Process Assessment", activity_category: "Assessment", tasks_list: ["Project Management"] }]
+  ]);
+  state.interestRows = [{ project_id: "49", students: [{ email: assessmentStudent, standard_1: "91897" }] }];
+  const before = sandbox.buildAllRecords();
+  state.interestRows.push({ project_id: "30", students: [{ email: projectStudent, template_copies: [
+    { templateId: "project-management", fileUrl: sourceUrl("project-only") }
+  ] }] });
+  state.records = sandbox.buildAllRecords();
+  assert.equal(state.records.length, before.length);
+  assert.equal(sandbox.buildProcessSummaryRows().length, 1);
+  assert.equal(sandbox.buildProcessSummaryRows()[0].studentEmail, assessmentStudent);
+  const projectRows = sandbox.buildProjectEvidenceRows();
+  assert.equal(projectRows.length, 1);
+  assert.equal(projectRows[0].studentEmail, projectStudent);
+  const options = sandbox.getEvidencePackageActivities(projectStudent);
+  assert.equal(options.length, 1);
+  assert.equal(options[0].activityId, "30");
+  assert.match(sandbox.renderEvidencePackageButton(projectRows[0]), /data-package-activity="30"/);
+  state.studentCourseByEmail.set(projectStudent, "MiddleDTECH");
+  assert.equal(sandbox.buildProjectEvidenceRows().length, 0);
 });
 
 test("staff routes deny forged roles, verify Drive ownership and bind downloads to staff/student/assessment", async (t) => {
