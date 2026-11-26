@@ -1612,7 +1612,7 @@ function renderStudentTrackerComments() {
     if (!studentTrackerCommentsGrid) return;
     const rows = getStudentTrackerCommentRows();
     if (!rows.length) {
-        studentTrackerCommentsGrid.innerHTML = `<div class="work-empty">No students match that search.</div>`;
+        studentTrackerCommentsGrid.innerHTML = `<div class="work-empty">No assessment-linked comment records match that search.</div>`;
         return;
     }
 
@@ -1959,7 +1959,7 @@ function renderStudentSummaryGrid() {
 
     const rows = buildProcessSummaryRows();
     if (!rows.length) {
-        host.innerHTML = `<div class="work-empty">No students found yet.</div>`;
+        host.innerHTML = `<div class="work-empty">${getProjectSearchNotice()}No Process Assessment allocations found.</div>`;
         return;
     }
 
@@ -1971,7 +1971,7 @@ function renderStudentSummaryGrid() {
     const filteredRows = visibleRows.filter((student) => studentMatchesStandardSearch(student, standardSearchText));
 
     if (!filteredRows.length) {
-        host.innerHTML = `<div class="work-empty">No students match that search.</div>`;
+        host.innerHTML = `<div class="work-empty">${getProjectSearchNotice()}No Process Assessment allocations match that search.</div>`;
         return;
     }
 
@@ -2043,14 +2043,28 @@ function buildProjectEvidenceRows() {
     return Array.from(rows.values()).sort((a, b) => a.studentName.localeCompare(b.studentName) || a.activityName.localeCompare(b.activityName));
 }
 
-function renderProjectEvidencePackages() {
-    const host = document.querySelector("#project-evidence-packages");
-    if (!host) return;
+function getMatchingProjectEvidenceRows() {
     const search = String(workState.studentSearch || "").trim().toLowerCase();
-    const rows = buildProjectEvidenceRows().filter(studentMatchesCourseFilter)
+    return buildProjectEvidenceRows().filter(studentMatchesCourseFilter)
         .filter((student) => !search || `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(search));
+}
+
+function getProjectSearchNotice() {
+    return String(workState.studentSearch || "").trim() && getMatchingProjectEvidenceRows().length
+        ? "Matching saved project work is shown directly beneath the student search box above. " : "";
+}
+
+function renderProjectEvidencePackages() {
+    const defaultHost = document.querySelector("#project-evidence-packages");
+    const searchHost = document.querySelector("#student-search-results");
+    const searching = Boolean(String(workState.studentSearch || "").trim());
+    const host = searching && searchHost ? searchHost : defaultHost;
+    const otherHost = host === searchHost ? defaultHost : searchHost;
+    otherHost?.replaceChildren();
+    if (!host) return;
+    const rows = getMatchingProjectEvidenceRows();
     if (!rows.length) { host.replaceChildren(); return; }
-    host.innerHTML = `<h3 class="student-summary-heading">SeniorDTECH project work sets</h3>
+    host.innerHTML = `<h3 class="student-summary-heading">${searching ? "Saved project work found" : "SeniorDTECH project work sets"}</h3>
         <p>These are project allocations, including work saved without a Process Assessment record. They are separate from the assessment counts above. An absent assessment record does not establish that a student has never logged in.</p>
         <div class="work-table-wrap"><table class="student-summary-table">
         <thead><tr><th>Student</th><th>Project</th><th>Evidence package</th></tr></thead>

@@ -659,9 +659,9 @@ function extractTaskTopicQualifier(topicText) {
     return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
 }
 
-function resolveTaskTopicMergeDecision(project, shortName, topics) {
-    const canPromptForMerge = hasAllowedSignedInHubAccount() && hubAccessState.canAdmin;
-    if (!canPromptForMerge) {
+function resolveTaskTopicMergeDecision(project, topics) {
+    const canUseMergePreferences = hasAllowedSignedInHubAccount() && hubAccessState.canAdmin;
+    if (!canUseMergePreferences) {
         return false;
     }
 
@@ -679,30 +679,7 @@ function resolveTaskTopicMergeDecision(project, shortName, topics) {
         return existing.merge;
     }
 
-    if (typeof window === "undefined" || typeof window.confirm !== "function") {
-        return false;
-    }
-
-    const promptMessage = [
-        `Possible duplicate Task Topics found for \"${project?.title || "this assessment"}\".`,
-        "",
-        ...topics.map((topic) => `- ${topic}`),
-        "",
-        `Merge into one topic called \"${shortName}\"?`,
-        "",
-        "OK = Merge",
-        "Cancel = Keep separate"
-    ].join("\n");
-
-    const shouldMerge = window.confirm(promptMessage);
-    projectPrefs[signature] = {
-        merge: shouldMerge,
-        updatedAt: new Date().toISOString()
-    };
-    allPrefs[projectId] = projectPrefs;
-    writeTaskTopicMergePrefs(allPrefs);
-
-    return shouldMerge;
+    return false;
 }
 
 function shouldHideStudentAssessmentTask(standard, text) {
@@ -945,7 +922,7 @@ function mapProjectTaskTopicsToLibraryItems(project) {
             return;
         }
 
-        const shouldMerge = resolveTaskTopicMergeDecision(project, shortName, topics);
+        const shouldMerge = resolveTaskTopicMergeDecision(project, topics);
         if (shouldMerge) {
             outputTopics.push({
                 topicText: topics[0],

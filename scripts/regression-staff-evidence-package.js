@@ -159,10 +159,14 @@ test("an entirely inaccessible work set fails explicitly rather than offering an
 
 test("project-only evidence is discoverable for packaging without adding project criteria to assessment totals", async () => {
   const source = await fs.readFile(path.join(__dirname, "..", "teacher-student-work.js"), "utf8");
+  const element = () => ({ innerHTML: "", replaceChildren() { this.innerHTML = ""; } });
+  const elements = new Map([
+    ["#student-summary-grid", element()], ["#project-evidence-packages", element()], ["#student-search-results", element()]
+  ]);
   const sandbox = vm.createContext({
     URLSearchParams, URL, console,
     window: { location: { search: "", pathname: "/teacher-student-work.html", origin: "http://localhost" } },
-    document: { querySelector: () => null, body: { classList: { add() {} } } }
+    document: { querySelector: (selector) => elements.get(selector) || null, body: { classList: { add() {} } } }
   });
   vm.runInContext(source.replace(/\ninit\(\);\s*$/, "\n"), sandbox);
   const state = vm.runInContext("workState", sandbox);
@@ -190,6 +194,18 @@ test("project-only evidence is discoverable for packaging without adding project
   assert.equal(options.length, 1);
   assert.equal(options[0].activityId, "30");
   assert.match(sandbox.renderEvidencePackageButton(projectRows[0]), /data-package-activity="30"/);
+  sandbox.renderStudentSummaryGrid();
+  assert.match(elements.get("#project-evidence-packages").innerHTML, /Project Student/);
+  assert.equal(elements.get("#student-search-results").innerHTML, "");
+  state.studentNameByEmail.set(projectStudent, "Example, Rj");
+  state.studentSearch = "Example, Rj";
+  sandbox.renderStudentSummaryGrid();
+  assert.match(elements.get("#student-search-results").innerHTML, /Saved project work found/);
+  assert.match(elements.get("#student-search-results").innerHTML, /Example, Rj/);
+  assert.match(elements.get("#student-search-results").innerHTML, /data-package-activity="30"/);
+  assert.equal(elements.get("#project-evidence-packages").innerHTML, "");
+  assert.match(elements.get("#student-summary-grid").innerHTML, /Matching saved project work is shown/);
+  assert.doesNotMatch(elements.get("#student-summary-grid").innerHTML, /No students match/);
   state.studentCourseByEmail.set(projectStudent, "MiddleDTECH");
   assert.equal(sandbox.buildProjectEvidenceRows().length, 0);
 });

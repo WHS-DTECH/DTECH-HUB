@@ -2,6 +2,8 @@
 
 In **Student Work Tracker > Process Assessment**, each SeniorDTECH student's row has a **Package work set** button. **SeniorDTECH project work sets** appears beneath it for project allocations, including students who have no Process Assessment allocation. These rows do not alter assessment counts. Missing assessment records are not login-history evidence.
 
+When searching by student name, matching project work appears immediately beneath the student search box, with its **Package work set** action. An empty assessment section means no matching assessment allocation, not no saved project work.
+
 1. Select the student's assessment or project/task-list record. Opening from a project row preselects that project; the selector lists the student's allocated assessments and projects.
 2. Optionally attach an already-downloaded OneDrive or other outcome ZIP (up to 64 MB). The ZIP is retained unchanged, not extracted or independently verified.
 3. Choose **Build evidence pack** and allow access to your staff Google Drive account.
