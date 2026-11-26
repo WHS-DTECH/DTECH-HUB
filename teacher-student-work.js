@@ -1986,7 +1986,7 @@ function renderStudentSummaryGrid() {
                 <tbody>
                     ${filteredRows.map((student) => `
                         <tr>
-                            <td>${escapeHtml(student.studentName)}</td>
+                            <td>${escapeHtml(student.studentName)}${renderEvidencePackageButton(student)}</td>
                             <td>${(Array.isArray(student.processStandards) && student.processStandards.length) ? student.processStandards.map((standard) => `<a class="student-standard-chip" href="teacher-assessment-allocation.html?standard=${encodeURIComponent(standard)}" title="Open assessment allocation data">${escapeHtml(standard)}</a>`).join(" ") : `<span class="student-standard-chip is-empty">-</span>`}</td>
                             <td>${student.processFolderUrl ? `<a class="student-drive-chip" href="${escapeHtml(student.processFolderUrl)}" target="_blank" rel="noreferrer" title="Open Process Assessment folder in Google Drive">Google Drive</a>` : `<span class="student-drive-chip is-empty">-</span>`}</td>
                             ${STUDENT_SUMMARY_GROUPS.map((group) => renderStudentSummaryCell(student, group, student.groups.get(group.key))).join("")}
@@ -2004,6 +2004,113 @@ function getStudentSummaryRecordsForStandard(student, standard) {
     const overall = student?.groups?.get("overall");
     return (Array.isArray(overall?.records) ? overall.records : [])
         .filter((record) => !targetStandard || normalizeTrackerStandardValue(record?.processStandard) === targetStandard);
+}
+
+function renderEvidencePackageButton(student) {
+    if (workState.studentCourseByEmail.get(normalizeEmail(student.studentEmail)) !== "SeniorDTECH") return "";
+    return `<br><button type="button" class="student-drive-chip" data-package-student="${escapeHtml(student.studentEmail)}">Package work set</button>`;
+}
+
+function openStudentEvidencePackage(email) {
+    const student = buildProcessSummaryRows().find((row) => row.studentEmail === email);
+    if (!student) { setStatus("The student record changed. Reload the tracker before packaging.", true); return; }
+    document.querySelector("#staff-evidence-package")?.remove();
+    const records = student.groups.get("overall")?.records || [];
+    const activities = Array.from(new Map(records.map((record) => [record.activityId, record])).values())
+        .sort((a, b) => Number(/process/i.test(b.activityName)) - Number(/process/i.test(a.activityName)));
+    const dialog = document.createElement("dialog");
+    dialog.id = "staff-evidence-package";
+    dialog.setAttribute("aria-labelledby", "staff-evidence-title");
+    dialog.style.cssText = "width:min(720px,90vw);max-height:85vh;overflow:auto;padding:24px;border:1px solid #ccd8e8;border-radius:12px";
+    dialog.innerHTML = `
+        <h2 id="staff-evidence-title">Package work set: ${escapeHtml(student.studentName)}</h2>
+        <p>Download a staff evidence snapshot, including incomplete work. This does not submit work, confirm readiness, email anyone, or change grades.</p>
+        <p>Documents must be shared with your staff Google account. For a fresh Trello report, connect your staff Trello account in <a href="settings.html" target="_blank" rel="noreferrer">Settings</a> and ensure you can open the student's board.</p>
+        <p><label>Assessment <select id="staff-evidence-activity">${activities.map((record) => `<option value="${escapeHtml(record.activityId)}">${escapeHtml(record.activityName)} (${escapeHtml(record.activityId)})</option>`).join("")}</select></label></p>
+        <p><label>Optional downloaded OneDrive / outcome ZIP (up to 64 MB)<br><input id="staff-evidence-upload" type="file" accept=".zip,application/zip"></label></p>
+        <p>Available documents are merged into one PDF and originals retained. Client presentations are included only if available. Missing or inaccessible files are listed in the pack's manifest.</p>
+        <button type="button" id="staff-evidence-build">Build evidence pack</button>
+        <button type="button" id="staff-evidence-download" hidden>Download ZIP</button>
+        <button type="button" id="staff-evidence-close">Close</button>
+        <p id="staff-evidence-status" role="status" aria-live="polite"></p>
+        <ul id="staff-evidence-report"></ul>`;
+    document.body.append(dialog);
+    const activity = dialog.querySelector("#staff-evidence-activity");
+    const upload = dialog.querySelector("#staff-evidence-upload");
+    const build = dialog.querySelector("#staff-evidence-build");
+    const download = dialog.querySelector("#staff-evidence-download");
+    const close = dialog.querySelector("#staff-evidence-close");
+    const status = dialog.querySelector("#staff-evidence-status");
+    const report = dialog.querySelector("#staff-evidence-report");
+    let prepared = null;
+    let busy = false;
+    const endpoint = () => `/api/staff/evidence-packages/${encodeURIComponent(activity.value)}/${encodeURIComponent(email)}`;
+    const reset = () => { prepared = null; download.hidden = true; report.replaceChildren(); status.textContent = ""; };
+    activity.addEventListener("change", reset);
+    upload.addEventListener("change", reset);
+    close.addEventListener("click", () => { if (!busy) { dialog.close(); dialog.remove(); } });
+    dialog.addEventListener("cancel", (event) => { if (busy) event.preventDefault(); });
+    const setBusy = (value) => {
+        busy = value;
+        [activity, upload, build, download, close].forEach((control) => { control.disabled = value; });
+    };
+    async function staffToken() {
+        if (readStoredEmail() !== workState.email) throw new Error("Your Google account changed. Reload the tracker.");
+        const response = await requestHubDriveAccessToken();
+        if (!response?.access_token) throw new Error(response?.error || "Allow staff Google Drive access and try again.");
+        if (readStoredEmail() !== workState.email) throw new Error("Your Google account changed. Reload the tracker.");
+        return response.access_token;
+    }
+    build.addEventListener("click", async () => {
+        reset();
+        setBusy(true);
+        status.textContent = "Connecting staff Google Drive and collecting available work. This may take a few minutes...";
+        try {
+            const file = upload.files[0];
+            if (file && file.size > 64 * 1024 * 1024) throw new Error("The attached ZIP exceeds 64 MB.");
+            const token = await staffToken();
+            const body = new FormData();
+            body.append("driveAccessToken", token);
+            if (file) body.append("outcomeZip", file);
+            const payload = await fetchJson(endpoint(), { method: "POST", headers: { Authorization: `Bearer ${token}` }, body });
+            prepared = payload.snapshot;
+            if (!prepared?.snapshotId) throw new Error("The packager did not return a prepared ZIP. Rebuild before downloading.");
+            for (const item of payload.report || []) {
+                const li = document.createElement("li");
+                li.textContent = `${item.status.toUpperCase()}: ${item.label} — ${item.message}`;
+                report.append(li);
+            }
+            download.hidden = false;
+            status.textContent = `Evidence pack built: ${payload.documentationPages} merged documentation page(s). Review missing/unavailable items below, then download. Download expires in 15 minutes.`;
+        } catch (error) {
+            prepared = null;
+            status.textContent = error.message || "Could not build the evidence pack.";
+        } finally { setBusy(false); }
+    });
+    download.addEventListener("click", async () => {
+        if (!prepared) return;
+        setBusy(true);
+        status.textContent = "Downloading the prepared evidence ZIP...";
+        try {
+            const token = await staffToken();
+            const response = await fetch(`${endpoint()}/download/${encodeURIComponent(prepared.snapshotId)}`, {
+                headers: { Authorization: `Bearer ${token}` }, cache: "no-store"
+            });
+            if (!response.ok) {
+                const payload = await response.json();
+                throw new Error(payload.error || "Could not download the evidence pack.");
+            }
+            const url = URL.createObjectURL(await response.blob());
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = prepared.fileName;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+            status.textContent = "ZIP download started. This evidence snapshot has not been submitted and no student records have been changed.";
+        } catch (error) { status.textContent = error.message || "Could not download the evidence pack."; }
+        finally { setBusy(false); }
+    });
+    dialog.showModal();
 }
 
 function buildProgressSummaryReportHtml(student, standard) {
@@ -2601,6 +2708,11 @@ function wireStudentSummaryEvents() {
     if (window.__dtechStudentSummaryEventsBound) return;
     window.__dtechStudentSummaryEventsBound = true;
     document.addEventListener("click", (event) => {
+        const packageButton = event.target?.closest?.("[data-package-student]");
+        if (packageButton) {
+            openStudentEvidencePackage(normalizeEmail(packageButton.dataset.packageStudent));
+            return;
+        }
         const button = event.target?.closest?.("[data-student-summary-email][data-student-summary-group]");
         if (!button) return;
         const email = String(button.getAttribute("data-student-summary-email") || "").trim().toLowerCase();

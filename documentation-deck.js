@@ -65,4 +65,4 @@ function buildDocumentationMergePlan({ topics = [], copies = [], files = [], exc
   return { sources, missingTopics };
 }
 
-module.exports = { DOCUMENTATION_TEMPLATE_ID, documentationPresentationId, normalizeDocumentationMergeUrl, buildDocumentationMergePlan };
+module.exports = { DOCUMENTATION_TEMPLATE_ID, documentationPresentationId, normalizeDocumentationMergeUrl, isDocumentationTemplateId, buildDocumentationMergePlan };

@@ -6231,6 +6231,7 @@ app.use(async (req, _res, next) => {
 
   req.auth_identity.token_present = true;
   const licenceAccessToken = bearerToken.split(".").length !== 3 && (
+    /^\/api\/staff\/evidence-packages(?:\/|$)/.test(req.path) ||
     /^\/api\/admin\/security-notices(?:\/|$)/.test(req.path) ||
     (/^\/api\/knowledge-web\/(?:access|clouds|proposals(?:\/duplicates)?|manage\/clouds|manage\/proposals)\/?$/i.test(req.path) && req.method === "GET") ||
     (/^\/api\/knowledge-web\/(?:proposals|manage\/proposals\/[^/]+\/decision|manage\/clouds|manage\/source-metadata)\/?$/i.test(req.path) && req.method === "POST") ||
@@ -6463,6 +6464,31 @@ require("./.security-notices/store").registerSecurityNotices(app, {
     const permissions = await getMergedRolePermissions();
     const match = permissions.find((entry) => String(entry.role_name || "").toLowerCase() === role.toLowerCase());
     return Boolean(match?.admin) || /\badmin\b/i.test(role);
+  }
+});
+require("./staff-evidence-package").registerStaffEvidencePackages(app, {
+  getVerifiedEmail: (req) => req.auth_identity?.verified && isSchoolEmail(req.auth_identity.email) ? req.auth_identity.email : "",
+  isStaff: canManagePracticalSchedule,
+  verifyDriveTokenForStudent, driveApiRequest, githubApiRequest, trelloApiRequest, getStoredTrelloConnection,
+  loadContext: async (activityId, email) => {
+    if (!hasDatabase) throw Object.assign(new Error("Evidence packaging requires the assessment database."), { status: 503 });
+    const students = dedupeToLatestStudentRows((await getStudentDirectoryRows()).map(buildStudentClassManagementRow))
+      .filter((row) => (row.linked_emails || []).some((linked) => normalizeEmail(linked) === email));
+    const year = students.length === 1 ? Number(String(students[0].year_level || "").match(/\d+/)?.[0]) : 0;
+    if (![11, 12, 13].includes(year)) throw Object.assign(new Error("Choose a SeniorDTECH student record (Years 11-13)."), { status: 403 });
+    await ensureProjectInterestsSchema();
+    const result = await pool.query(
+      `SELECT to_jsonb(a) AS activity, p.evidence_steps, p.template_copies
+       FROM project_interests p JOIN activities a ON a.id::text = p.project_id::text
+       WHERE p.project_id::text = $1 AND p.student_email = $2 LIMIT 1`, [activityId, email]
+    );
+    const row = result.rows[0];
+    if (!row || isExcludedNonDtechActivity(row.activity)
+      || !String(row.activity.activity_category || row.activity.category || "").toLowerCase().includes("assessment")) {
+      throw Object.assign(new Error("Student assessment allocation not found."), { status: 404 });
+    }
+    return { activityName: row.activity.name, evidence: normalizeEvidenceStepsPayload(row.evidence_steps),
+      copies: Array.isArray(row.template_copies) ? row.template_copies : [] };
   }
 });
 app.use(express.static(__dirname, { dotfiles: "ignore" }));
