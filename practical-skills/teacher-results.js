@@ -360,7 +360,7 @@
         const key = `${student.email}:${weekStart}:${period}`;
         pendingSignatures.add(key);
         signatureStatus.classList.remove("is-error");
-        signatureStatus.textContent = `Saving book signature for ${student.name}, Period ${period}...`;
+        signatureStatus.textContent = `Saving book signature for ${student.name}, Session ${period}...`;
         renderTypingResults(filteredStudents());
         try {
             const response = await fetch("/api/admin/typing-kit-book-signature", {
@@ -373,7 +373,7 @@
             const saved = review.signatures.find(entry => entry.weekStart === weekStart && entry.period === period);
             if (saved) saved.signed = data.signed;
             else review.signatures.push({ weekStart, period, signed: data.signed });
-            signatureStatus.textContent = `Saved book signature: ${data.signed ? "Yes" : "No"} for ${student.name}, Period ${period}, week starting ${weekStart}.`;
+            signatureStatus.textContent = `Saved book signature: ${data.signed ? "Yes" : "No"} for ${student.name}, Session ${period}, week starting ${weekStart}.`;
         } catch (error) {
             if (revision !== classRevision) return;
             signatureStatus.classList.add("is-error");
@@ -485,8 +485,8 @@
             selectedWeeks.forEach(week => {
                 const label = window.TypingWeekLabels.label(week.weekStart, week.week);
                 node("th", `${label} (${week.weekStart}) - Results`, header);
-                node("th", `${label} - Period 1 signed`, header);
-                node("th", `${label} - Period 2 signed`, header);
+                node("th", `${label} - Session 1 signed`, header);
+                node("th", `${label} - Session 2 signed`, header);
             });
             const body = node("tbody", undefined, table);
             for (const student of students) {
@@ -527,7 +527,7 @@
                     }
                     for (const period of [1, 2]) {
                         const attempts = review.attempts.filter(attempt => attempt.weekStart === week.weekStart && attempt.period === period);
-                        node("div", `Period ${period}: ${attempts.length ? "" : "No result yet"}`, cell);
+                        node("div", `Session ${period}: ${attempts.length ? "" : "No result yet"}`, cell);
                         for (const attempt of attempts) node("div", `Saved result: ${attempt.netWpm} WPM - ${attempt.accuracy}% (${date(attempt.submittedAt)})`, cell, "typing-saved-result");
                         const signedCell = node("td", undefined, row);
                         const label = node("label", undefined, signedCell);
@@ -535,7 +535,7 @@
                         checkbox.type = "checkbox";
                         checkbox.checked = review.signatures.some(entry => entry.weekStart === week.weekStart && entry.period === period && entry.signed);
                         checkbox.disabled = pendingSignatures.size > 0;
-                        checkbox.setAttribute("aria-label", `Book signed for ${student.name} - ${window.TypingWeekLabels.label(week.weekStart, week.week)} Period ${period}`);
+                        checkbox.setAttribute("aria-label", `Book signed for ${student.name} - ${window.TypingWeekLabels.label(week.weekStart, week.week)} Session ${period}`);
                         node("span", checkbox.checked ? " Signed" : " No", label);
                         checkbox.addEventListener("change", () => saveBookSignature(student, review, week.weekStart, period, checkbox.checked));
                     }

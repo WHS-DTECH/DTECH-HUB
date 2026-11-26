@@ -7,7 +7,7 @@ const PERIOD_COUNT = 2;
 const TYPING_KIT_CARD = {
     id: "kit-typing",
     title: "Typing Kit",
-    summary: "Keep a seven-week typing log: two periods each week, with every attempt saved. Copy your saved results into your exercise book.",
+    summary: "Keep a seven-week typing log: two sessions each week, with every attempt saved. Copy your saved results into your exercise book.",
     yearLevel: "All Years",
     area: "Skill Kits",
     status: "active",
@@ -225,7 +225,7 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
             const { weekStart, period, signed } = req.body || {};
             if (!/^[^\s@]+@[^\s@]+$/.test(email) || !email.endsWith(`@${schoolDomain}`) ||
                 !isMonday(weekStart) || ![1, 2].includes(period) || typeof signed !== "boolean") {
-                return res.status(400).json({ error: "Choose a school student, valid week, Period 1 or 2 and a signed Yes/No value." });
+                return res.status(400).json({ error: "Choose a school student, valid week, Session 1 or 2 and a signed Yes/No value." });
             }
             try {
                 const directory = await getClassData();
@@ -349,7 +349,7 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
         const { weekStart, period, submissionId } = req.body || {};
         if (!isMonday(weekStart) || ![1, 2].includes(period)
             || typeof submissionId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(submissionId)) {
-            return res.status(400).json({ error: "Choose a valid week and period, then submit your result again." });
+            return res.status(400).json({ error: "Choose a valid week and session, then submit your result again." });
         }
         let result;
         try { result = parseTypingResult(req.body?.resultUrl); }

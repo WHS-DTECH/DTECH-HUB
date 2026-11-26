@@ -531,7 +531,10 @@ test("dashboard renders exactly seven dated weeks and fourteen daily record link
     assert.match(html, /13 Dec 2026/);
     assert.deepEqual([...html.matchAll(/<h3>(Term Week \d+)<\/h3>/g)].map(match => match[1]),
         ["Term Week 3", "Term Week 4", "Term Week 5", "Term Week 6", "Term Week 7", "Term Week 8", "Term Week 9"]);
-    assert.match(html, /0 \/ 14 period records started/);
+    assert.match(html, /0 \/ 14 session records started/);
+    assert.match(html, /<h4>Session 1<\/h4>/);
+    assert.match(html, /<h4>Session 2<\/h4>/);
+    assert.match(html, /aria-label="Open Term Week 3 Session 1 daily record"/);
     assert.equal(ui.get("typing-identity-verification").hidden, true);
     assert.match(html, /week=2026-12-07&amp;period=2|week=2026-12-07&period=2/);
     assert.doesNotMatch(html, /typing-settings-form|Certificate issued|certificate unlocks|Mark Complete/);
@@ -611,7 +614,7 @@ test("latest scorecard shows saved gross speed, accuracy and net speed with an e
         assert.ok(html.includes(`class="typing-score-value">${saved.netWpm}</span>`));
         assert.ok(html.includes(`Net speed: <b>${saved.netWpm} WPM</b>`));
         assert.ok(html.includes(`Accuracy: <b>${saved.accuracy}%</b>`));
-        assert.match(html, /Term Week 3.*Period 1<\/b>.*Week of 26 Oct 2026/);
+        assert.match(html, /Term Week 3.*Session 1<\/b>.*Week of 26 Oct 2026/);
         assert.match(html, /Then show your teacher/);
         assert.match(html, /ask them to sign your exercise book/);
         assert.match(html, /200<\/td>/, "Earlier attempts remain in the history");
@@ -665,7 +668,7 @@ test("archived dated records remain reachable and are read-only; invalid daily r
     const archived = frontend({ snapshot, search: "?week=2026-10-26&period=1" });
     const invalid = frontend({ search: "?week=2026-10-26&period=3" });
     await settle();
-    assert.match(archived.get("typing-content").innerHTML, /Archived period 1/);
+    assert.match(archived.get("typing-content").innerHTML, /Archived session 1/);
     assert.doesNotMatch(archived.get("typing-content").innerHTML, /typing-result-form|typing-launch/);
     assert.match(invalid.get("typing-status").textContent, /Choose a valid daily record/);
 });

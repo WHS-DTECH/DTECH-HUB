@@ -241,8 +241,9 @@ test("typing weekly table follows filters and persists independent per-week book
     selectWeek("current");
     releaseAttendance();
     await settle();
-    assert.deepEqual(header(), ["Student", "Term Week 5 (2026-11-09) - Results", "Term Week 5 - Period 1 signed", "Term Week 5 - Period 2 signed"],
+    assert.deepEqual(header(), ["Student", "Term Week 5 (2026-11-09) - Results", "Term Week 5 - Session 1 signed", "Term Week 5 - Session 2 signed"],
         "Current NZ Monday defaults to the current Typing Kit week");
+    assert.match(tick(2)["aria-label"], /Term Week 5 Session 2$/);
     assert.equal(rows()[0].children.length, 4);
     assert.ok(rows()[0].children[1].children.some(child => /13 Nov 2026 - School P2: Not yet held/.test(child.textContent)),
         "Future lessons are not presented as absent");
@@ -264,7 +265,7 @@ test("typing weekly table follows filters and persists independent per-week book
     assert.ok(rows()[0].children[1].children.some(child => /38 WPM - 98%/.test(child.textContent)), "Both periods show their saved scores");
     assert.equal(rows()[0].children[13].children[0].textContent, "Excused - absent");
     selectWeek("1");
-    assert.deepEqual(header(), ["Student", "Term Week 3 (2026-10-26) - Results", "Term Week 3 - Period 1 signed", "Term Week 3 - Period 2 signed"]);
+    assert.deepEqual(header(), ["Student", "Term Week 3 (2026-10-26) - Results", "Term Week 3 - Session 1 signed", "Term Week 3 - Session 2 signed"]);
     assert.equal(tick(1).checked, false);
     tick(1).checked = true;
     await tick(1).events.change();

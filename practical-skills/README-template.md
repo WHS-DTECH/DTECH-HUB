@@ -16,16 +16,16 @@ This folder is the reusable Practical Skills module for HUB sites.
 - `library.json` - Source-of-truth library card data persisted by admin save
 - `admin.html` - Admin management UI for Practical Skills cards
 - `admin.js` - Admin add/edit/delete/publish logic
-- `typing-kit.html`, `typing-kit.js`, `typing-kit.css` - Typing Kit dashboard and daily period records
+- `typing-kit.html`, `typing-kit.js`, `typing-kit.css` - Typing Kit dashboard and daily session records
 - `typing-kit-store.js` - Typing result validation, calendar and append-only attempt storage
 
 ## Typing Kit
 
 Students open **Typing Kit** from My Licence. Its seven calendar
 weeks initially start on Monday **26 October 2026** and finish on Sunday
-**13 December 2026**. Each week has Period 1 and Period 2, linking to fourteen
+**13 December 2026**. Each week has Session 1 and Session 2, linking to fourteen
 daily records. Every submitted attempt is retained; the dashboard shows the
-latest WPM/accuracy and attempt count for each period. All scores and times
+latest WPM/accuracy and attempt count for each session. All scores and times
 remain available on the underlying daily page.
 
 Students use their existing Hub school Google identity. They launch a public
@@ -45,8 +45,8 @@ the same results link again is a new attempt, not proof of a separate test.
 Teaching staff can expand **Teacher calendar settings** on the dashboard to change
 the Monday starting Week 1. This is one shared calendar for all Typing Kit users,
 not a per-class schedule. Previous results remain attached to their original
-calendar week and period; those outside the new calendar are accessible through
-**Earlier / other dated records**. Periods are chosen by the student; their actual
+calendar week and session; those outside the new calendar are accessible through
+**Earlier / other dated records**. Sessions are chosen by the student; their actual
 lesson day is not preset. Changing the calendar never renumbers stored results.
 
 Storage requires PostgreSQL (`DATABASE_URL`). The module creates
@@ -62,7 +62,7 @@ kit with that name uses a different ID. Its calendar is managed on its own page,
 not through the generic activity builder.
 
 - `GET /api/practical-skills/typing-kit` - Own saved attempts, current calendar and calendar-edit permission
-- `POST /api/practical-skills/typing-kit/attempts` - Append an attempt for a current calendar week and period
+- `POST /api/practical-skills/typing-kit/attempts` - Append an attempt for a current calendar week and session (the API field remains `period`)
 - `PUT /api/practical-skills/typing-kit/settings` - Teaching-staff-only shared start-date update
 
 Validate with `node --test scripts/regression-typing-kit.js` and

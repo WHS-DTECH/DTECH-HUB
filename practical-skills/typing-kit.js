@@ -113,7 +113,7 @@
         return `${attempt.netWpm} WPM &middot; ${attempt.accuracy}% accuracy`;
     }
     function dailyTable(attempts) {
-        if (!attempts.length) return "<p>No attempts saved for this period yet.</p>";
+        if (!attempts.length) return "<p>No attempts saved for this session yet.</p>";
         return `<div class="typing-table-wrap"><table>
             <caption>Every submitted attempt (submission times are New Zealand time)</caption>
             <thead><tr><th scope="col">Attempt</th><th scope="col">Submitted</th><th scope="col">Net WPM</th><th scope="col">Gross WPM</th><th scope="col">Accuracy</th><th scope="col">Duration</th><th scope="col">Evidence</th></tr></thead>
@@ -132,10 +132,10 @@
         content.innerHTML = `<section class="typing-intro">
                 <h2>Typing Kit Dashboard</h2>
                 <p>${dateLabel(starts[0])} &ndash; ${dateLabel(addDays(starts[6], 6))}</p>
-                <p><strong>${recorded} / 14 period records started</strong> &middot; All attempts are kept.</p>
+                <p><strong>${recorded} / 14 session records started</strong> &middot; All attempts are kept.</p>
                 <div id="typing-certificate-notice">${certificateNotice()}</div>
                 <div id="typing-weekly-rules">${weeklyRulesNotice()}</div>
-                <p>Open your week and period. Complete a one-minute test, paste the results link here, save it, then copy your saved result into your exercise book for your teacher to sign.</p>
+                <p>Open your week and session. Complete a one-minute test, paste the results link here, save it, then copy your saved result into your exercise book for your teacher to sign.</p>
                 <p class="typing-note">This is your electronic log, not an electronic sign-off. Scores are student-submitted. Submission dates do not verify when a test was taken.</p>
             </section>
             ${state.snapshot.canManage ? `<details class="typing-settings"><summary>Teacher calendar settings</summary>
@@ -154,17 +154,17 @@
                     <div class="typing-periods">${[1, 2].map((period) => {
                         const rows = periodAttempts(start, period);
                         const latest = rows[rows.length - 1];
-                        return `<section class="typing-period ${latest ? "has-results" : ""}" aria-label="${window.TypingWeekLabels.label(start, index + 1)}, Period ${period}">
-                            <h4>Period ${period}</h4><p>${latest ? `Latest: <strong>${score(latest)}</strong>` : "No result saved yet"}</p>
+                        return `<section class="typing-period ${latest ? "has-results" : ""}" aria-label="${window.TypingWeekLabels.label(start, index + 1)}, Session ${period}">
+                            <h4>Session ${period}</h4><p>${latest ? `Latest: <strong>${score(latest)}</strong>` : "No result saved yet"}</p>
                             <p>${rows.length} saved attempt${rows.length === 1 ? "" : "s"}</p>
-                            <a class="worksheet-btn worksheet-btn-primary" href="${dailyLink(start, period)}" aria-label="Open ${window.TypingWeekLabels.label(start, index + 1)} Period ${period} daily record">Open daily record</a>
+                            <a class="worksheet-btn worksheet-btn-primary" href="${dailyLink(start, period)}" aria-label="Open ${window.TypingWeekLabels.label(start, index + 1)} Session ${period} daily record">Open daily record</a>
                         </section>`;
                     }).join("")}</div>
                 </article>`).join("")}
             </section>
             ${archived.length ? `<section class="typing-archive"><h2>Earlier / other dated records</h2><p>These saved records are outside the current seven-week calendar.</p><ul>${archivedPeriods.map((key) => {
                 const [start, period] = key.split("/");
-                return `<li><a href="${dailyLink(start, period)}">Week starting ${dateLabel(start)}, Period ${period}</a></li>`;
+                return `<li><a href="${dailyLink(start, period)}">Week starting ${dateLabel(start)}, Session ${period}</a></li>`;
             }).join("")}</ul></section>` : ""}`;
         document.getElementById("typing-settings-form")?.addEventListener("submit", async (event) => {
             event.preventDefault();
@@ -186,7 +186,7 @@
     function renderDaily(weekStart, period) {
         const rows = periodAttempts(weekStart, period);
         const index = weeks().indexOf(weekStart);
-        const title = index >= 0 ? `${window.TypingWeekLabels.label(weekStart, index + 1)} \u00b7 Period ${period}` : `Archived period ${period}`;
+        const title = index >= 0 ? `${window.TypingWeekLabels.label(weekStart, index + 1)} \u00b7 Session ${period}` : `Archived session ${period}`;
         const latest = rows[rows.length - 1];
         document.title = `${title} | Typing Kit`;
         content.innerHTML = `<a href="./typing-kit.html">&larr; Back to Typing Kit Dashboard</a>
@@ -308,7 +308,7 @@
         const valid = /^\d{4}-\d{2}-\d{2}$/.test(weekStart || "") && [1, 2].includes(period)
             && (weeks().includes(weekStart) || periodAttempts(weekStart, period).length > 0);
         if (!valid) {
-            content.innerHTML = '<p>That daily record is unavailable. <a href="./typing-kit.html">Choose a week and period from your dashboard.</a></p>';
+            content.innerHTML = '<p>That daily record is unavailable. <a href="./typing-kit.html">Choose a week and session from your dashboard.</a></p>';
             message("Choose a valid daily record from your Typing Kit Dashboard.", true);
             return;
         }
