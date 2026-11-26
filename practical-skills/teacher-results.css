@@ -8,6 +8,7 @@
 
 .sites-editor.teacher-review-page {
     width: calc(100% - 32px);
+    padding-bottom: 90px;
 }
 
 .teacher-review-page .sites-card,
@@ -63,6 +64,14 @@
 
 .class-progress-heading p {
     margin: 0;
+}
+
+#class-progress-refresh {
+    position: fixed;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: calc(68px + env(safe-area-inset-bottom));
+    z-index: 49;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
 }
 
 .class-progress-filters {
@@ -243,8 +252,10 @@
         flex: 1;
         padding: 10px 8px;
     }
+}
 
-    .class-progress-heading .button {
-        width: 100%;
+@media print {
+    #class-progress-refresh {
+        display: none;
     }
 }
