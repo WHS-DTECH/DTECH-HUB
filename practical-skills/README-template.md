@@ -166,12 +166,16 @@ and Licence page; Search reset requests also require explicit confirmation on
 the server. Intentional resets still retain answers and Drive files.
 
 For **The Blueprint Mission** in Minecraft Builder Kit, students paste a
-slideshow sharing link, make sure their teacher can open it, and select
-**Submit to Teacher**. Teachers open the link under **Licence Teacher Review →
-Class Kit Progress → Minecraft Builder Kit → Submissions** and tick **Completed**
-after reviewing it. Saving a link alone no longer earns credit, including for
-students with old automatic ticks. Saved work is retained; slideshows are not
-moved or re-shared by the Hub. Replacing the slideshow requires a new submission.
+Google Slides link, select **Submit to Teacher**, and allow Google Drive access
+using their verified school account. The Hub grants the uniquely configured
+DTECH Lead Teacher viewer access without moving the slideshow. If the student
+cannot share it, its owner must grant the teacher access. Existing submissions
+are not shared retroactively: students can select **Share with teacher again**
+without changing the original submission time or teacher confirmation. Teachers
+open the link under **Licence Teacher Review → Class Kit Progress → Minecraft
+Builder Kit → Submissions** and confirm it after reviewing. A submission is not
+a continuous access check. Saving a link alone does not earn credit; replacing
+the slideshow requires a new submission and confirmation.
 
 To revoke a certificate, open **Licence Teacher Review → Class Kit Progress**,
 select the kit, and choose **Revoke certificate** beside the student's completed

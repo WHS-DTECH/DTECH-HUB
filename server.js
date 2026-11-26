@@ -6943,7 +6943,7 @@ async function buildPracticalSkillsActivityLibraryCards(kitCard) {
     .filter(Boolean);
 }
 
-async function getPracticalSkillsCertificateTeacherRecipients() {
+async function getPracticalSkillsCertificateTeacherRecipients(options = {}) {
   const recipients = new Set();
   const hasDtechHubAccess = (value) => {
     const hubs = value === undefined || value === null || value === ""
@@ -6959,17 +6959,21 @@ async function getPracticalSkillsCertificateTeacherRecipients() {
     }
   };
 
-  for (const row of memoryUserRoles.values()) {
-    addLeadTeacher(row);
+  if (!options.strict) {
+    for (const row of memoryUserRoles.values()) {
+      addLeadTeacher(row);
+    }
   }
 
   if (!hasDatabase) {
+    if (options.strict) throw new Error("Teacher settings require database storage.");
     return Array.from(recipients);
   }
 
   try {
     const columns = await resolveUserRolesColumns();
     if (!columns.email) {
+      if (options.strict) throw new Error("Teacher email settings are unavailable.");
       return Array.from(recipients);
     }
 
@@ -6988,6 +6992,7 @@ async function getPracticalSkillsCertificateTeacherRecipients() {
     const result = await pool.query(`SELECT ${selectColumns.join(", ")} FROM user_additional_roles`);
     result.rows.forEach(addLeadTeacher);
   } catch (error) {
+    if (options.strict) throw error;
     console.error("[kit-certificate-email] Could not load Lead Teacher recipients:", error);
   }
 
@@ -16665,7 +16670,11 @@ const documentVerification = require("./practical-skills/document-verification")
   pool, getDefaultPracticalSkillsKitContent, syncCompletion: syncPracticalSkillsKitCompletion,
   getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
   verifyDriveTokenForStudent, driveApiRequest, requireAdminAccess, autoEmailKitCertificate, canReview: canManagePracticalSchedule,
-  notifySubmission: notifyKitSubmission, fileSubmission: fileKitDrawingSubmission, blueprintTeams
+  notifySubmission: notifyKitSubmission, fileSubmission: fileKitDrawingSubmission, blueprintTeams,
+  shareBlueprint: require("./practical-skills/blueprint-sharing").createBlueprintSharing({
+    verifyDriveTokenForStudent, driveApiRequest, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
+    getTeachers: () => getPracticalSkillsCertificateTeacherRecipients({ strict: true })
+  })
 });
 documentVerification.register(app);
 

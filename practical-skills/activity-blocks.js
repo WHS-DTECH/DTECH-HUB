@@ -188,7 +188,7 @@
             const activity = activities[index];
             if (!worksheet || worksheet.hidden || worksheet.mergedInto !== undefined ||
                 !activity?.blocks?.some((block) => block.kind === "studentlink" && block.id === BLUEPRINT_LINK_ID)) return;
-            const text = "Share your slideshow so your teacher can open it. Paste the sharing link here, then select Submit to Teacher. Your teacher confirms the slideshow. This activity completes automatically when the slideshow is confirmed and your own team details are ready.";
+            const text = "Paste your Google Slides link, then select Submit to Teacher and allow Google Drive permission. The slideshow is shared with the DTECH Lead Teacher as a viewer. Your teacher confirms the slideshow. This activity completes automatically when the slideshow is confirmed and your own team details are ready.";
             const blocks = activity.blocks.map((block) => block.id === BLUEPRINT_LINK_ID && (!block.required || block.text !== text)
                 ? { ...block, text, required: true } : block);
             if (activity.documentCheck === BLUEPRINT_REVIEW_POLICY && activity.completionMode === "auto" &&

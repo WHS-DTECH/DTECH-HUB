@@ -231,7 +231,7 @@ async function fixture(t, { kitId = "kit-google-drawings", content = base(), blu
     const kit = B.withFilesFoldersLinks(content, kitId), email = "student@school.nz";
     const progress = { student_email: email, kit_id: kitId, completed: false, completed_activities: {}, started_at: null,
         responses: Object.fromEntries(kit.worksheets.map((_, i) => [`${i}-blocks`, answer(kit, i, link(i))])) };
-    const checks = new Map(), submissions = new Map(), notices = [], certificateEmails = [], filings = [], filedDrawings = new Map(), comments = new Map();
+    const checks = new Map(), submissions = new Map(), notices = [], certificateEmails = [], filings = [], filedDrawings = new Map(), comments = new Map(), shares = [];
     let tables = false, emailFails = false, fileFails = false, fileReason = "";
     const key = (params) => JSON.stringify([params[0], params[1], Number(params[2]), params[3], params[4]]);
     const subKey = (params) => JSON.stringify([params[0], params[1], Number(params[2])]);
@@ -318,6 +318,10 @@ async function fixture(t, { kitId = "kit-google-drawings", content = base(), blu
         verifyDriveTokenForStudent: async (token) => {
             if (token !== "student-token") throw Object.assign(new Error("Google sign-in expired. Sign in again and retry."), { status: 401 });
         },
+        shareBlueprint: async (request) => {
+            shares.push(request);
+            if (request.driveAccessToken !== "student-token") throw Object.assign(new Error("Google sign-in expired. Sign in again and retry."), { status: 401 });
+        },
         driveApiRequest: async () => { throw new Error("Drawings are never downloaded"); },
         fetchFile: async () => { throw new Error("Drawings are never downloaded"); },
         autoEmailKitCertificate: async (req, kitId, certificate, studentEmail) => {
@@ -358,7 +362,7 @@ async function fixture(t, { kitId = "kit-google-drawings", content = base(), blu
     };
     const teacherHeaders = { "x-teacher": "yes", "x-user-email": "teacher@school.nz" };
     return {
-        kit, progress, sync, request, notices, certificateEmails, filings, verification, failEmail: (value) => { emailFails = value; },
+        kit, progress, sync, request, notices, certificateEmails, filings, shares, verification, failEmail: (value) => { emailFails = value; },
         failFiling: (value) => { fileFails = value; },
         filingReason: (value) => { fileReason = value; },
         legacyFiled: (index) => {
@@ -550,7 +554,7 @@ test("drawing verification panel is visible with appropriate help, while identit
     assert.equal(panel.hidden, true);
 });
 
-test("drawing Submit requests permission before saving and sends a verifiable access bearer", async () => {
+test("drawing and Blueprint Submit request permission before saving and send a verifiable access bearer", async () => {
     const controller = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet.js"), "utf8");
     const extract = (start, end) => controller.slice(controller.indexOf(start), controller.indexOf(end, controller.indexOf(start)));
     const calls = [];
@@ -601,6 +605,10 @@ test("drawing Submit requests permission before saving and sends a verifiable ac
         extract("    async function submitForReview(", "    async function checkMyDocument("), context);
     await context.submitForReview(0);
     assert.deepEqual(calls, ["permission", "save", "submit"]);
+    calls.length = 0;
+    state.content = { activities: [{ documentCheck: "blueprint-slideshow-teacher-v1" }] };
+    await context.submitForReview(0);
+    assert.deepEqual(calls, ["permission", "save", "submit"]);
     assert.equal(state.driveSetupInProgress, false);
     assert.equal(state.documentCheckInProgress, false);
     calls.length = 0;
@@ -609,6 +617,31 @@ test("drawing Submit requests permission before saving and sends a verifiable ac
     assert.deepEqual(calls, ["permission"], "Permission failures are surfaced, never silently submitted");
     assert.equal(state.driveSetupInProgress, false);
     assert.equal(state.documentCheckInProgress, false);
+});
+
+test("submitted and completed Blueprint slideshows remain shareable", () => {
+    const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet.js"), "utf8");
+    const activity = { documentCheck: "blueprint-slideshow-teacher-v1", completionMode: "auto",
+        blocks: [{ id: "blueprint-slideshow-link", kind: "studentlink" }] };
+    const url = "https://docs.google.com/presentation/d/slides-id/edit";
+    const elements = new Map();
+    const el = (id) => {
+        if (!elements.has(id)) elements.set(id, { classList: { toggle() {} }, setAttribute() {}, removeAttribute() {} });
+        return elements.get(id);
+    };
+    const state = { email: "student@school.nz", kitId: "kit-minecraft-builder-kit", content: { activities: [activity] },
+        completedActivities: {}, submissions: {}, progressLoaded: true, responses: { "0-blocks": { "blueprint-slideshow-link": url } } };
+    const context = vm.createContext({ state, preview: false, getCurrentActivityIndex: () => 0,
+        document: { getElementById: el }, window: { ActivityBlocks: B, KitWorksheetRender: { visibleLoginSites: () => [] } } });
+    vm.runInContext(source.slice(source.indexOf("    function updateActivityCompleteBar()"), source.indexOf("    function blockPath(")), context);
+    context.updateActivityCompleteBar();
+    assert.equal(el("worksheet-activity-complete-btn").textContent, "Submit to Teacher");
+    state.submissions[0] = { documentKey: B.documentLinkKey(url) };
+    state.completedActivities[0] = "confirmed";
+    context.updateActivityCompleteBar();
+    assert.equal(el("worksheet-activity-complete-btn").textContent, "Share with teacher again");
+    assert.equal(el("worksheet-activity-complete-btn").disabled, false);
+    assert.equal(el("worksheet-activity-complete-btn").hidden, false);
 });
 
 test("drawing activity shows Saved, permits Sync after Completed, and updates after reminder sync", () => {
@@ -790,13 +823,18 @@ test("Blueprint Mission requires the current slideshow submission and a teacher 
     assert.equal(certificates.buildKitCertificate(f.kit, f.progress, "Student"), null);
     assert.equal((await f.approve(0, true, first)).status, 409);
     assert.equal((await f.list()).data.kits[0].students["student@school.nz"][0].submittedAt, null);
+    assert.equal((await f.submit(0)).status, 401);
+    assert.equal((await f.status(0)).data.submission, null);
     const submitted = await f.submit(0, { driveAccessToken: "student-token" });
     assert.equal(submitted.status, 200);
+    assert.equal(submitted.data.sharedWithTeacher, true);
+    assert.equal(f.shares[0].documentKey, "google-file:synthetic-first");
     assert.ok(submitted.data.submission.submittedAt);
     assert.equal(submitted.data.filing, null);
     assert.equal(f.filings.length, 0);
     assert.equal(f.notices[0].subject, "The Blueprint Mission");
-    assert.equal((await f.submit(0)).data.submission.submittedAt, submitted.data.submission.submittedAt);
+    assert.equal((await f.submit(0)).status, 401);
+    assert.equal((await f.submit(0, { driveAccessToken: "student-token" })).data.submission.submittedAt, submitted.data.submission.submittedAt);
     assert.equal(f.notices.length, 1);
     const listed = (await f.list()).data.kits[0];
     assert.equal(listed.activities[0].submissionType, "slideshow");
@@ -805,6 +843,10 @@ test("Blueprint Mission requires the current slideshow submission and a teacher 
         { answers: { [blockId]: first }, confirmCompletion: true });
     assert.equal(premature.data.passed, false, "Student check cannot award the tick");
     assert.equal((await f.approve(0, true, first)).data.kitCompleted, true);
+    assert.equal((await f.submit(0)).status, 401);
+    const retried = await f.submit(0, { driveAccessToken: "student-token" });
+    assert.equal(retried.data.submission.submittedAt, submitted.data.submission.submittedAt);
+    assert.equal(retried.data.verification.confirmed, true);
     assert.equal(f.progress.completed, true);
     assert.equal(f.certificateEmails[0].studentEmail, "student@school.nz");
     f.progress.responses["0-blocks"] = { [blockId]: second };
@@ -812,7 +854,7 @@ test("Blueprint Mission requires the current slideshow submission and a teacher 
     assert.equal(f.progress.completed, false);
     assert.equal((await f.approve(0, true, first)).status, 409);
     assert.equal((await f.approve(0, true, second)).status, 409);
-    await f.submit(0);
+    await f.submit(0, { driveAccessToken: "student-token" });
     assert.equal((await f.approve(0, true, second)).data.kitCompleted, true);
     assert.equal((await f.approve(0, false, second)).data.kitCompleted, false);
     assert.equal((await f.status(0)).data.submission, null);
@@ -832,7 +874,7 @@ test("Blueprint confirmation is independent; completion needs both sign-off and 
     const f = await fixture(t, options);
     const shared = "https://docs.google.com/presentation/d/shared-team-slides/edit";
     f.progress.responses["0-blocks"] = { "blueprint-slideshow-link": shared };
-    assert.equal((await f.submit(0)).status, 200);
+    assert.equal((await f.submit(0, { driveAccessToken: "student-token" })).status, 200);
     const signedOff = await f.approve(0, true, shared);
     assert.equal(signedOff.status, 200);
     assert.equal(signedOff.data.verification.confirmed, true);
@@ -851,7 +893,7 @@ test("Blueprint confirmation is independent; completion needs both sign-off and 
     ready = true;
     const second = await fixture(t, options);
     second.progress.responses["0-blocks"] = { "blueprint-slideshow-link": shared };
-    assert.equal((await second.submit(0)).status, 200, "The same slideshow is accepted in separate student submission records");
+    assert.equal((await second.submit(0, { driveAccessToken: "student-token" })).status, 200, "The same slideshow is accepted in separate student submission records");
     assert.equal(second.progress.completed, false, "Team details alone do not complete the mission");
     assert.equal((await second.approve(0, true, shared)).data.kitCompleted, true, "Team-details-first order also works");
     assert.equal((await second.approve(0, false, shared)).data.kitCompleted, false);

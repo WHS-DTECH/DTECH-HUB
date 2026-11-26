@@ -233,11 +233,11 @@
             pill.removeAttribute("aria-label");
             pill.removeAttribute("title");
         }
-        button.textContent = blueprint ? completed ? "Completed" : submitted ? "Submitted to Teacher" : "Submit to Teacher"
+        button.textContent = blueprint ? submitted ? "Share with teacher again" : "Submit to Teacher"
             : teacherReview ? filed ? "Submitted - synced" : submitted || completed ? "Sync drawing" : "Submit" : activity?.documentCheck ? "Check my document" : activity?.unityTestProjectVersion ? "Completed" : autoBlocks ? "Check & Save Activity" : completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
         button.classList.toggle("is-submit", teacherReview);
         button.disabled = preview || !state.progressLoaded || Boolean(state.documentCheckInProgress) ||
-            (blueprint ? submitted || completed || !currentKey : teacherReview && filed);
+            (blueprint ? !currentKey : teacherReview && filed);
         button.hidden = !preview && selfMarking && !siteQuestions && !completed;
     }
 
@@ -300,7 +300,7 @@
         if (state.content?.activities?.[getCurrentActivityIndex()]?.documentCheck === "blueprint-slideshow-teacher-v1") {
             host.dataset.teacherComment = teacherComment;
             host.textContent = (verification?.feedback?.message || (submission
-                ? `Submitted ${when(submission.submittedAt)}. Your teacher will review and confirm the slideshow. The mission completes automatically when your team details are ready too.`
+                ? `Submitted ${when(submission.submittedAt)}. Sharing is not checked continuously. If your teacher cannot open it, select Share with teacher again and allow Google Drive access.`
                 : "Paste your slideshow sharing link and select Submit to Teacher.")) +
                 (teacherComment ? ` Teacher feedback: ${teacherComment}` : "");
             return;
@@ -340,7 +340,7 @@
         updateActivityCompleteBar();
         try {
             // Started before other awaits so the Google permission popup keeps the Submit click's user gesture.
-            const driveAccessToken = blueprint ? "" : await getResearchReportDriveToken();
+            const driveAccessToken = await getResearchReportDriveToken();
             await checkBlockAnswers(index);
             const revision = state.blockRevision;
             return await queueProgressWrite(async () => {
@@ -356,7 +356,7 @@
                 updateActivityCompleteBar();
                 showDocumentVerification(result.verification, result.submission, result.teacherComment);
                 if (blueprint) {
-                    showStatusMessage("Slideshow submitted. Your teacher will confirm it; the mission completes automatically when your team details are ready too.");
+                    showStatusMessage("Slideshow shared with the DTECH Lead Teacher and submitted. Your teacher will review it; the mission completes when your team details are ready too.");
                     return result;
                 }
                 const filing = result.filing || {};
@@ -441,11 +441,11 @@
         title.textContent = blueprint ? "Submit your Blueprint Mission slideshow" : drawing ? "Submit your Google Drawing"
             : `Finish your ${state.content.worksheets?.[index]?.activity || "typed"} document`;
         const help = document.createElement("p");
-        help.textContent = blueprint ? "Paste the slideshow sharing link and select Submit to Teacher. Your teacher confirms the slideshow independently. The mission completes automatically once the slideshow is confirmed and your own team membership, building area and contribution are ready." : drawing
+        help.textContent = blueprint ? "Paste your Google Slides link, select Submit to Teacher and allow Google Drive access. The slideshow is shared with the DTECH Lead Teacher as a viewer. Your teacher confirms it independently; the mission completes when your own team details are ready too." : drawing
             ? "Save your Google Drawing's sharing link, then press Submit below and allow Google permission. Saved means sync is still needed; Submitted means your drawing has been filed in your DTECH folder. Your teacher receives your link and ticks Completed separately."
             : "Save your document and its sharing link, then use Check my document below. Google Docs and Word (.docx) files in Google Drive can be checked automatically. For other file types or OneDrive, ask your teacher to open the link and approve the completed text in Teacher Review.";
         const note = document.createElement("p");
-        note.textContent = blueprint ? "Set sharing so your teacher can open the slideshow. If you replace the link, submit the new slideshow for review." : drawing
+        note.textContent = blueprint ? "If your teacher cannot open an existing submission, select Share with teacher again. If you cannot share the slideshow, ask its owner to share it with the DTECH Lead Teacher." : drawing
             ? "Set sharing so your teacher can open the drawing. If you change to a different drawing link, press Submit again."
             : "This checks that the expected passage is substantially present. It cannot prove you typed it yourself, check formatting, or confirm your teacher's sharing access. A saved result is a check at that time, not continuous monitoring. After editing the document, check again.";
         const status = document.createElement("p");
@@ -758,10 +758,13 @@
         const verification = document.getElementById("worksheet-google-verification");
         if (verification) {
             host.after(verification);
-            const drawing = isTeacherReview(state.content.activities?.[activityIndex]);
-            verification.hidden = preview || !(drawing || state.content.activities?.[activityIndex]?.identityLessonVersion);
+            const activity = state.content.activities?.[activityIndex];
+            const drawing = isTeacherReview(activity);
+            verification.hidden = preview || !(drawing || activity?.identityLessonVersion);
             const help = document.getElementById("worksheet-google-verification-help");
-            if (help) help.textContent = drawing
+            if (help) help.textContent = activity?.documentCheck === "blueprint-slideshow-teacher-v1"
+                ? "Choose the same school Google account as your slideshow. Then select Submit to Teacher or Share with teacher again and allow Google Drive permission."
+                : drawing
                 ? "If Submit asks you to verify your school Google sign-in, use Sign in with Google here and choose the same school account. Your drawing link will stay in place. Then press Submit or Sync drawing below and allow Google Drive permission."
                 : "Choose the same school Google account you used for your answers above. Once you have verified it, click Check your answers below. Your typed answers will stay in place.";
         }

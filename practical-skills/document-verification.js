@@ -11,7 +11,7 @@ const TEACHER_ONLY = new Set([DRAWING_POLICY, BLUEPRINT_POLICY]);
 function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
     syncCompletion, getRequestUserEmail, normalizeEmail, schoolDomain, verifyDriveTokenForStudent,
     driveApiRequest, requireAdminAccess, canReview, autoEmailKitCertificate, notifySubmission = async () => false,
-    fileSubmission = async () => ({ filed: false }), fetchFile = fetch, blueprintTeams }) {
+    fileSubmission = async () => ({ filed: false }), fetchFile = fetch, blueprintTeams, shareBlueprint }) {
     let schema, submissionSchema, commentSchema;
     async function ensureCommentSchema() {
         if (!commentSchema) commentSchema = pool.query(`CREATE TABLE IF NOT EXISTS practical_skills_drawing_comments (
@@ -266,7 +266,12 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                     throw Object.assign(new Error(ready.results.find((result) => !result.passed && result.message)?.message ||
                         `Save a valid HTTPS sharing link to your ${blueprint ? "slideshow" : "Google Drawing"} before submitting.`), { status: 422 });
                 }
-                if (blueprint) await syncCompletion(email, item.kit, item.content);
+                if (blueprint) {
+                    if (!shareBlueprint) throw Object.assign(new Error("Slideshow sharing is unavailable. Ask your teacher for help."), { status: 503 });
+                    await shareBlueprint({ studentEmail: email, documentKey: item.documentKey,
+                        driveAccessToken: String(req.body?.driveAccessToken || "").trim() });
+                    await syncCompletion(email, item.kit, item.content);
+                }
                 await ensureSubmissionSchema();
                 await ensureCommentSchema();
                 const existing = blueprint ? await getSubmission(email, item.kit, item.index, item.documentKey) : null;
@@ -300,6 +305,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                     }
                 }
                 res.json({ submission: await getSubmission(email, item.kit, item.index, item.documentKey), emailed,
+                    ...(blueprint ? { sharedWithTeacher: true } : {}),
                     filing: blueprint ? null : { ...filing, ...await getDrawingFiling(email, item.documentKey), reason: filing.reason || "" },
                     verification: await get(email, item.kit, item.index, item.activity, item.row.responses),
                     teacherComment: await getComment(email, item.kit, item.index, item.documentKey) });
