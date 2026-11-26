@@ -194,6 +194,37 @@ test("project-only evidence is discoverable for packaging without adding project
   assert.equal(sandbox.buildProjectEvidenceRows().length, 0);
 });
 
+test("staff context resolves legacy project categories using the same normalizer as the activity list", async () => {
+  const serverSource = await fs.readFile(path.join(__dirname, "..", "server.js"), "utf8");
+  const start = serverSource.indexOf('require("./staff-evidence-package").registerStaffEvidencePackages(');
+  const end = serverSource.indexOf("\napp.use(express.static", start);
+  let loadContext;
+  let normalized = false;
+  const noop = () => {};
+  const email = "project-student@school.nz";
+  const sandbox = vm.createContext({
+    app: {}, hasDatabase: true,
+    require: () => ({ registerStaffEvidencePackages: (_app, dependencies) => { loadContext = dependencies.loadContext; } }),
+    isSchoolEmail: noop, canManagePracticalSchedule: noop, verifyDriveTokenForStudent: noop,
+    driveApiRequest: noop, githubApiRequest: noop, trelloApiRequest: noop, getStoredTrelloConnection: noop,
+    getStudentDirectoryRows: async () => [{ linked_emails: [email], year_level: "13" }],
+    buildStudentClassManagementRow: (row) => row, dedupeToLatestStudentRows: (rows) => rows,
+    normalizeEmail: (value) => String(value).toLowerCase(), ensureProjectInterestsSchema: async () => {},
+    pool: { query: async (_sql, params) => {
+      assert.deepEqual(Array.from(params), ["30", email]);
+      return { rows: [{ activity: { id: 30, name: "Legacy project", activity_category: "Activity" },
+        evidence_steps: [], template_copies: [{ templateId: "project-management", fileUrl: sourceUrl("project") }] }] };
+    } },
+    normalizeActivityCategoryForResponse: (activity) => { normalized = true; return { ...activity, activity_category: "Project" }; },
+    isExcludedNonDtechActivity: () => false, normalizeEvidenceStepsPayload: (rows) => rows
+  });
+  vm.runInContext(serverSource.slice(start, end), sandbox);
+  const row = await loadContext("30", email);
+  assert.equal(normalized, true);
+  assert.equal(row.activityName, "Legacy project");
+  assert.equal(row.copies.length, 1);
+});
+
 test("staff routes deny forged roles, verify Drive ownership and bind downloads to staff/student/assessment", async (t) => {
   const deps = await dependencies(t);
   const app = express();

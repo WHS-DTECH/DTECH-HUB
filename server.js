@@ -6483,11 +6483,12 @@ require("./staff-evidence-package").registerStaffEvidencePackages(app, {
        WHERE p.project_id::text = $1 AND p.student_email = $2 LIMIT 1`, [activityId, email]
     );
     const row = result.rows[0];
-    if (!row || isExcludedNonDtechActivity(row.activity)
-      || !/assessment|project/i.test(String(row.activity.activity_category || row.activity.category || ""))) {
+    const activity = row ? normalizeActivityCategoryForResponse(row.activity) : null;
+    if (!activity || isExcludedNonDtechActivity(activity)
+      || !/assessment|project/i.test(String(activity.activity_category || activity.category || ""))) {
       throw Object.assign(new Error("Student assessment or project allocation not found."), { status: 404 });
     }
-    return { activityName: row.activity.name, evidence: normalizeEvidenceStepsPayload(row.evidence_steps),
+    return { activityName: activity.name, evidence: normalizeEvidenceStepsPayload(row.evidence_steps),
       copies: Array.isArray(row.template_copies) ? row.template_copies : [] };
   }
 });
