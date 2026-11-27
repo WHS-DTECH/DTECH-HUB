@@ -172,6 +172,7 @@ try {
 }
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
 const SERVER_STARTED_AT = new Date().toISOString();
 const RELIEF_PLAN_BASE_URL = "https://tech-learningsites.onrender.com";
@@ -4264,6 +4265,9 @@ function parseCourseOutlineFromPdfText(text, sourceName = "") {
   };
 }
 
+app.use(express.json({ limit: "8mb" }));
+require("./hub-access").registerHubAccess(app, { pool, authenticateRequest });
+
 app.post("/api/course-outlines/parse-pdf", requireActivityWriteAccess, courseOutlinePdfUpload.single("courseOutlineFile"), async (req, res) => {
   const file = req.file;
   if (!file?.buffer) {
@@ -4296,7 +4300,7 @@ app.post("/api/course-outlines/parse-pdf", requireActivityWriteAccess, courseOut
 });
 
 app.post("/api/unit-plans/import-docx", unitPlanUpload.single("unitPlanFile"), async (req, res) => {
-  const userEmail = normalizeEmail(req.body?.created_by_email || req.body?.user_email || getRequestUserEmail(req));
+  const userEmail = normalizeEmail(getRequestUserEmail(req));
   if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
     res.status(403).json({ error: "Teacher/Admin access is required." });
     return;
@@ -4326,7 +4330,7 @@ app.post("/api/unit-plans/import-docx", unitPlanUpload.single("unitPlanFile"), a
 });
 
 app.post("/api/unit-plans/preview-docx", unitPlanUpload.single("unitPlanFile"), async (req, res) => {
-  const userEmail = normalizeEmail(req.body?.created_by_email || req.body?.user_email || getRequestUserEmail(req));
+  const userEmail = normalizeEmail(getRequestUserEmail(req));
   if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
     res.status(403).json({ error: "Teacher/Admin access is required." });
     return;
@@ -4352,7 +4356,7 @@ app.post("/api/unit-plans/preview-docx", unitPlanUpload.single("unitPlanFile"), 
 });
 
 app.post("/api/unit-plans/import-docx-template", async (req, res) => {
-  const userEmail = normalizeEmail(req.body?.created_by_email || req.body?.user_email || getRequestUserEmail(req));
+  const userEmail = normalizeEmail(getRequestUserEmail(req));
   if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
     res.status(403).json({ error: "Teacher/Admin access is required." });
     return;
@@ -4381,7 +4385,7 @@ app.post("/api/unit-plans/import-docx-template", async (req, res) => {
 });
 
 app.post("/api/unit-plans/preview-docx-template", async (req, res) => {
-  const userEmail = normalizeEmail(req.body?.created_by_email || req.body?.user_email || getRequestUserEmail(req));
+  const userEmail = normalizeEmail(getRequestUserEmail(req));
   if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
     res.status(403).json({ error: "Teacher/Admin access is required." });
     return;
@@ -6212,8 +6216,7 @@ async function syncDtechExcludedActivitiesVisibility() {
   return excludedIds.length;
 }
 
-app.use(express.json({ limit: "8mb" }));
-app.use(async (req, _res, next) => {
+async function authenticateRequest(req, _res, next) {
   req.auth_identity = {
     mode: effectiveAuthMode,
     token_present: false,
@@ -6231,6 +6234,7 @@ app.use(async (req, _res, next) => {
 
   req.auth_identity.token_present = true;
   const licenceAccessToken = bearerToken.split(".").length !== 3 && (
+    req.path === "/api/auth/session" ||
     /^\/api\/staff\/evidence-packages(?:\/|$)/.test(req.path) ||
     /^\/api\/admin\/security-notices(?:\/|$)/.test(req.path) ||
     (/^\/api\/knowledge-web\/(?:access|clouds|proposals(?:\/duplicates)?|manage\/clouds|manage\/proposals)\/?$/i.test(req.path) && req.method === "GET") ||
@@ -6275,6 +6279,7 @@ app.use(async (req, _res, next) => {
   req.auth_identity.source = licenceAccessToken ? "google_access_token" : "google_id_token";
   req.auth_identity.email = verification.email;
   req.auth_identity.subject = verification.subject;
+  req.auth_identity.expiresAt = verification.expiresAt;
   req.auth_identity.givenName = verification.givenName;
   req.auth_identity.familyName = verification.familyName;
   req.auth_identity.audience = verification.audience;
@@ -6282,7 +6287,7 @@ app.use(async (req, _res, next) => {
   req.authenticated_email = verification.email;
 
   next();
-});
+}
 const { createMinecraftPrerequisite, PLAYER: MINECRAFT_PLAYER_KIT, BUILDER: MINECRAFT_BUILDER_KIT } =
   require("./practical-skills/minecraft-prerequisite");
 const minecraftPrerequisite = createMinecraftPrerequisite({
@@ -7283,6 +7288,7 @@ async function verifyGoogleIdTokenAndExtractIdentity(idToken) {
     return {
       ok: true,
       email,
+      expiresAt: Number(payload.exp) * 1000,
       hostedDomain,
       subject: String(payload?.sub || "").trim(),
       givenName: String(payload?.given_name || "").trim(),
@@ -7319,7 +7325,7 @@ async function verifyGoogleAccessTokenAndExtractIdentity(accessToken) {
   if (profile.email_verified !== true || !isSchoolEmail(email)) {
     return { ok: false, error: "A verified school Google account is required." };
   }
-  return { ok: true, email };
+  return { ok: true, email, expiresAt: info.expiry_date };
 }
 
 function getRequestUserEmail(req) {
@@ -11943,24 +11949,6 @@ async function requireAdminAccess(req, res, next) {
     return;
   }
 
-  const roleHint = String(
-    req?.headers?.["x-user-role"] ||
-    req?.query?.role ||
-    req?.body?.role ||
-    req?.body?.user_role ||
-    ""
-  ).trim().toLowerCase();
-
-  if (roleHint === "admin" || roleHint === "student admin" || roleHint === "student_admin") {
-    if (effectiveAuthMode === "strict" && !req?.auth_identity?.verified) {
-      res.status(401).json({ error: "Verified Google identity is required for admin access.", auth_mode: effectiveAuthMode });
-      return;
-    }
-    req.user_email = email;
-    next();
-    return;
-  }
-
   try {
     if (typeof getUserRoleByEmail === "function" && typeof getMergedRolePermissions === "function") {
       const userRole = await getUserRoleByEmail(email);
@@ -15163,7 +15151,7 @@ app.post("/api/course-outlines", requireActivityWriteAccess, async (req, res) =>
   }
 });
 
-app.post("/api/staff_upload", async (req, res) => {
+app.post("/api/staff_upload", requireAdminAccess, async (req, res) => {
   const headers = Array.isArray(req.body?.headers) ? req.body.headers : [];
   const staffRows = Array.isArray(req.body?.staff) ? req.body.staff : [];
   const uploadYear = Number.parseInt(req.body?.uploadYear ?? req.body?.upload_year, 10) || null;
@@ -15338,7 +15326,7 @@ app.post("/api/staff_upload", async (req, res) => {
   }
 });
 
-app.get("/api/admin/staff-list", async (_req, res) => {
+app.get("/api/admin/staff-list", requireActivityWriteAccess, async (_req, res) => {
   try {
     const rows = await getStaffDirectoryRows();
     res.json(rows);
@@ -15347,25 +15335,39 @@ app.get("/api/admin/staff-list", async (_req, res) => {
   }
 });
 
-app.get("/api/staff_upload/all", async (_req, res) => {
+app.get("/api/staff_upload/all", async (req, res) => {
   try {
     const rows = await getStaffDirectoryRows();
-    res.json({ staff: rows });
+    const email = getRequestUserEmail(req);
+    const staff = await canManagePracticalSchedule(email)
+      ? rows
+      : rows.filter((row) => collectDirectoryEmails(row, ["email_school", "email", "user_email", "staff_email", "google_email"]).includes(email));
+    res.json({ staff });
   } catch (_error) {
-    res.json({ staff: [] });
+    res.status(500).json({ error: "Could not load staff directory." });
   }
 });
 
-app.get("/api/student_timetable/all", async (_req, res) => {
+app.get("/api/student_timetable/all", async (req, res) => {
   try {
     const rows = await getStudentDirectoryRows();
-    res.json({ students: rows });
+    const email = getRequestUserEmail(req);
+    let students = rows;
+    if (!(await canManagePracticalSchedule(email))) {
+      const linkedIds = new Set(dedupeToLatestStudentRows(rows.map(buildStudentClassManagementRow))
+        .filter((row) => row.linked_emails.includes(email))
+        .map((row) => String(row.id_number || "").trim().toLowerCase())
+        .filter(Boolean));
+      students = rows.filter((row) => collectStudentLinkedEmails(row).includes(email) ||
+        linkedIds.has(String(buildStudentClassManagementRow(row).id_number || "").trim().toLowerCase()));
+    }
+    res.json({ students });
   } catch (_error) {
-    res.json({ students: [] });
+    res.status(500).json({ error: "Could not load student timetable." });
   }
 });
 
-app.get("/api/timetable/all", async (_req, res) => {
+app.get("/api/timetable/all", requireActivityWriteAccess, async (_req, res) => {
   try {
     const rows = await getTeacherTimetableRows();
     res.json({ timetable: rows });
@@ -17280,7 +17282,7 @@ app.post("/api/suggestions", suggestionUpload.single("attachment"), async (req, 
   }
 });
 
-app.get("/api/admin/suggestions", async (_req, res) => {
+app.get("/api/admin/suggestions", requireAdminAccess, async (_req, res) => {
   if (!hasDatabase) {
     res.json(memorySuggestions.map((row) => ({
       id: row.id,
@@ -17368,7 +17370,7 @@ app.post("/api/admin/suggestions/email-list", requireAdminAccess, async (req, re
   }
 });
 
-app.get("/api/admin/suggestions/:id/attachment", async (req, res) => {
+app.get("/api/admin/suggestions/:id/attachment", requireAdminAccess, async (req, res) => {
   const id = Number.parseInt(req.params.id, 10);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).send("invalid id");
@@ -17414,7 +17416,7 @@ app.get("/api/admin/suggestions/:id/attachment", async (req, res) => {
 });
 
 app.get("/api/auth/user-access", async (req, res) => {
-  const email = normalizeEmail(req.query.email);
+  const email = normalizeEmail(getRequestUserEmail(req));
   if (!email) {
     res.status(400).json({ error: "email is required" });
     return;
@@ -19652,7 +19654,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
   }
 });
 
-app.get("/api/admin/user-roles", async (_req, res) => {
+app.get("/api/admin/user-roles", requireAdminAccess, async (_req, res) => {
   if (!hasDatabase) {
     res.json(Array.from(memoryUserRoles.values()));
     return;
@@ -19702,7 +19704,7 @@ app.get("/api/admin/user-roles", async (_req, res) => {
   }
 });
 
-app.post("/api/admin/user-roles", async (req, res) => {
+app.post("/api/admin/user-roles", requireAdminAccess, async (req, res) => {
   const body = req.body || {};
   const userType = String(body.user_type || "").trim();
   const userEmail = normalizeEmail(body.user_email);
@@ -19867,7 +19869,7 @@ app.post("/api/admin/user-roles", async (req, res) => {
   }
 });
 
-app.delete("/api/admin/user-roles/:email", async (req, res) => {
+app.delete("/api/admin/user-roles/:email", requireAdminAccess, async (req, res) => {
   const email = normalizeEmail(req.params.email);
   if (!email) {
     res.status(400).send("email is required");
@@ -19899,7 +19901,7 @@ app.delete("/api/admin/user-roles/:email", async (req, res) => {
   }
 });
 
-app.get("/api/admin/role-permissions", async (_req, res) => {
+app.get("/api/admin/role-permissions", requireAdminAccess, async (_req, res) => {
   try {
     const permissions = await getMergedRolePermissions();
     res.json(permissions);
@@ -19908,7 +19910,7 @@ app.get("/api/admin/role-permissions", async (_req, res) => {
   }
 });
 
-app.put("/api/admin/role-permissions", async (req, res) => {
+app.put("/api/admin/role-permissions", requireAdminAccess, async (req, res) => {
   const rows = Array.isArray(req.body?.permissions) ? req.body.permissions : [];
   if (!rows.length) {
     res.status(400).send("permissions array is required");
@@ -19963,7 +19965,7 @@ app.put("/api/admin/role-permissions", async (req, res) => {
   }
 });
 
-app.post("/api/admin/role-permissions/reset", async (_req, res) => {
+app.post("/api/admin/role-permissions/reset", requireAdminAccess, async (_req, res) => {
   if (!hasDatabase) {
     memoryRolePermissions = DEFAULT_ROLE_PERMISSIONS.map((row) => ({ ...row }));
     res.json({ ok: true, permissions: memoryRolePermissions });

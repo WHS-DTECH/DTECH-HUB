@@ -43,6 +43,8 @@ function fixture() {
         isAllowedHubAccount: (profile) => profile.email.endsWith("@school.nz"),
         fetchGoogleUserProfile: async () => ({ email: "teacher@school.nz" }),
         buildHubProfileFromIdTokenPayload: (payload) => ({ email: payload.email }),
+        establishHubSession: async () => {},
+        continueToRequestedPage() {},
         resolveHubAccessState: async () => {},
         renderHubAuthUi() {},
         fetchHubDriveSetup: async () => {}
@@ -51,7 +53,7 @@ function fixture() {
         extract("function getActiveHubBearerToken()", "function getActiveHubGrantedScopes()"),
         extract("function saveHubAuthState()", "function clearHubAuthState()"),
         extract("function loadHubAuthState()", "function isAllowedHubAccount("),
-        extract("async function handleHubGoogleCredential(", "function signOutHubGoogle()")
+        extract("async function handleHubGoogleCredential(", "async function signOutHubGoogle()")
     ].join("\n"), context);
     return { context, set: (value) => { raw = JSON.stringify(value); }, get: () => raw && JSON.parse(raw) };
 }
@@ -106,6 +108,15 @@ test("failed refresh leaves the existing account/tokens intact and callback erro
     await assert.rejects(c.handleHubGoogleToken({ access_token: "new" }), /Network unavailable/);
     assert.equal(JSON.stringify(c.hubAuthState), before);
     assert.equal(f.get().profile.email, "teacher@school.nz");
-    const init = source.slice(source.indexOf("function initHubGoogleAuth()"));
-    assert.doesNotMatch(init, /clearHubAuthState\(\)/);
+    const callback = source.slice(source.indexOf("callback: async (credentialResponse)"), source.indexOf("hubAuthState.idClientReady = true"));
+    assert.doesNotMatch(callback, /clearHubAuthState\(\)/);
+});
+
+test("a failed server session exchange does not replace the existing account", async () => {
+    const f = fixture(), c = f.context;
+    c.hubAuthState = { profile: { email: "teacher@school.nz" }, accessToken: "drive", expiresAt: Date.now() + 3600000 };
+    const before = JSON.stringify(c.hubAuthState);
+    c.establishHubSession = async () => { throw new Error("Session unavailable"); };
+    await assert.rejects(c.handleHubGoogleToken({ access_token: "new", expires_in: 3600 }), /Session unavailable/);
+    assert.equal(JSON.stringify(c.hubAuthState), before);
 });

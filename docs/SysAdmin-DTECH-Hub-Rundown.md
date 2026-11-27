@@ -101,6 +101,24 @@ three-column workspace with an expanded written-answer column, a seven-item
 interactive self-check, and a model answer revealed on demand.
 
 ## 2) How Google Sign-In Is Set Up
+
+**Current access policy:** The server verifies Google sign-in and creates an
+HttpOnly, SameSite=Lax session, stored in the `hub_sessions`
+PostgreSQL table. Sign-out deletes the current session. Only the homepage and
+its assets are public; other pages, files and APIs require verified school
+sign-in. Health checks remain public and the external exam webhook uses its
+own secret. Teacher and admin checks still apply where required. Legacy email
+and role headers alone no longer grant access, regardless of `AUTH_MODE`.
+The session expires with the Google token, or after eight hours at most.
+
+The database user must be able to create the session table, and the configured
+Google client ID or audience must match the app. After deployment, test an
+incognito visit to a protected page, then student and admin sign-in, navigation,
+sign-out, health checks and the external exam webhook.
+
+The rollout notes below describe the earlier hybrid-auth migration and are
+historical; they do not override the access policy above.
+
 - Frontend uses Google Identity Services OAuth token flow.
 - User signs in with Google and the app fetches profile details from the Google userinfo API.
 - The app stores signed-in profile context in browser local storage (`hub_google_auth_v1`).

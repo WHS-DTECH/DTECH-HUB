@@ -3665,6 +3665,24 @@ function buildHubProfileFromIdTokenPayload(payload) {
     };
 }
 
+async function establishHubSession(token) {
+    const response = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Could not establish a sign-in session. Please retry.");
+    }
+}
+
+function continueToRequestedPage() {
+    const next = new URLSearchParams(window.location.search).get("next");
+    if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return;
+    const target = new URL(next, window.location.origin);
+    if (target.origin === window.location.origin) window.location.assign(target.href);
+}
+
 async function handleHubGoogleCredential(credentialResponse) {
     const idToken = String(credentialResponse?.credential || "").trim();
     if (!idToken) {
@@ -3677,6 +3695,7 @@ async function handleHubGoogleCredential(credentialResponse) {
         throw new Error("This Google account is not allowed for this hub.");
     }
 
+    await establishHubSession(idToken);
     const expSeconds = Number(payload?.exp || 0);
     const keepDriveToken = normalizeEmail(hubAuthState.profile?.email) === profile.email && Boolean(getActiveHubAccessToken());
     hubAuthState.idToken = idToken;
@@ -3690,6 +3709,7 @@ async function handleHubGoogleCredential(credentialResponse) {
     await resolveHubAccessState();
     renderHubAuthUi();
     void fetchHubDriveSetup();
+    continueToRequestedPage();
 }
 
 async function handleHubGoogleToken(tokenResponse) {
@@ -3702,6 +3722,7 @@ async function handleHubGoogleToken(tokenResponse) {
         throw new Error("This Google account is not allowed for this hub.");
     }
 
+    await establishHubSession(tokenResponse.access_token);
     if (normalizeEmail(hubAuthState.profile?.email) !== profile.email) hubAuthState.idToken = null;
     else if (hubAuthState.idToken && getUsableHubBearerToken({ idToken: hubAuthState.idToken }) !== hubAuthState.idToken) hubAuthState.idToken = null;
     hubAuthState.accessToken = tokenResponse.access_token;
@@ -3712,16 +3733,20 @@ async function handleHubGoogleToken(tokenResponse) {
     await resolveHubAccessState();
     renderHubAuthUi();
     void fetchHubDriveSetup({ requireDriveToken: true });
+    continueToRequestedPage();
 }
 
-function signOutHubGoogle() {
+async function signOutHubGoogle() {
+    try {
+        const response = await fetch("/api/auth/session", { method: "DELETE" });
+        if (!response.ok) throw new Error("Could not sign out. Please retry.");
+    } catch (error) {
+        alert(error.message || "Could not sign out. Please retry.");
+        return;
+    }
     clearDrawingFilingReminderFlags();
     if (window.google?.accounts?.oauth2 && hubAuthState.accessToken) {
-        window.google.accounts.oauth2.revoke(hubAuthState.accessToken, () => {
-            clearHubAuthState();
-            renderHubAuthUi();
-        });
-        return;
+        window.google.accounts.oauth2.revoke(hubAuthState.accessToken, () => {});
     }
 
     clearHubAuthState();
@@ -3729,6 +3754,7 @@ function signOutHubGoogle() {
         window.google.accounts.id.disableAutoSelect();
     }
     renderHubAuthUi();
+    if (!isHomepagePath()) window.location.assign("/");
 }
 
 function bindHubAuthControls() {
@@ -3912,10 +3938,25 @@ function initHubGoogleAuth() {
     bindHubAuthControls();
 
     if (hubAuthState.profile?.email) {
-        resolveHubAccessState()
-            .finally(() => {
+        const restoreSession = async () => {
+            const response = await fetch("/api/auth/session", { cache: "no-store" });
+            if (response.ok && normalizeEmail((await response.json()).email) === normalizeEmail(hubAuthState.profile.email)) return;
+            const token = getActiveHubBearerToken();
+            if (!token) throw new Error("Your sign-in has expired. Please sign in again.");
+            await establishHubSession(token);
+        };
+        restoreSession()
+            .then(() => resolveHubAccessState())
+            .then(() => {
                 renderHubAuthUi();
                 void fetchHubDriveSetup();
+                continueToRequestedPage();
+            })
+            .catch((error) => {
+                console.error("[google-auth] Could not restore the Hub session:", error.message);
+                clearHubAuthState();
+                renderHubAuthUi();
+                alert(error.message || "Could not restore sign-in. Please sign in again.");
             });
     }
 
